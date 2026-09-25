@@ -2,6 +2,7 @@ import {
   ACCOUNT_STATUS_CODES,
   COURSE_LEVEL_CODES,
   COURSE_STATUS_CODES,
+  LESSON_STATUS_CODES,
   LKP_TYPE_CODES,
   type LkpTypeCode,
   ROLE_CODES,
@@ -90,6 +91,19 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at(COURSE_LEVEL_CODES.BEGINNER, 'Beginner'),
       at(COURSE_LEVEL_CODES.INTERMEDIATE, 'Intermediate'),
       at(COURSE_LEVEL_CODES.ADVANCED, 'Advanced'),
+    ],
+  },
+  /**
+   * A lesson's own stage, one shorter than a course's: a lesson is retired by leaving the
+   * syllabus, not by a status that says so. `LessonKind` stays unseeded for now — a lesson
+   * is one block of text in this phase, and a kind column with no code that reads it would
+   * be vocabulary in the database that nothing enforces.
+   */
+  [LKP_TYPE_CODES.LESSON_STATUS]: {
+    description: 'Whether a lesson is still being written',
+    values: [
+      at(LESSON_STATUS_CODES.DRAFT, 'Draft'),
+      at(LESSON_STATUS_CODES.PUBLISHED, 'Published'),
     ],
   },
 };

@@ -7,8 +7,10 @@ library.
 **Status: Phase 3 in progress** — accounts sign in, hold a session and a teacher can save a
 profile and write, publish and archive courses in the teacher portal (`/courses`, backed by
 `/api/v1/courses`), and order a course's syllabus of modules in the portal
-(`/courses/[id]/modules`, backed by `/api/v1/courses/:id/modules`). Lessons, enrollment,
-bookings and payments are still ahead.
+(`/courses/[id]/modules`, backed by `/api/v1/courses/:id/modules`). A lesson — one page of
+reading under a module, with its own draft/published flag, its slot in that module's order and
+its own publish rules — is written through `/api/v1/modules/:moduleId/lessons`. The lesson
+portal, enrollment, bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---

@@ -16,6 +16,7 @@ export const LKP_TYPE_CODES = {
   BOOKING_STATUS: 'BookingStatus',
   MEETING_STATUS: 'MeetingStatus',
   COURSE_STATUS: 'CourseStatus',
+  LESSON_STATUS: 'LessonStatus',
   LESSON_KIND: 'LessonKind',
   ENROLLMENT_SOURCE: 'EnrollmentSource',
   SUBSCRIPTION_STATUS: 'SubscriptionStatus',
@@ -87,6 +88,19 @@ export const COURSE_LEVEL_CODES = {
   BEGINNER: 'beginner',
   INTERMEDIATE: 'intermediate',
   ADVANCED: 'advanced',
+} as const;
+
+/**
+ * Where a lesson is in its own life — one stage shorter than a course's, because a lesson
+ * has no retirement of its own: taking one out of a syllabus is what `isActive` is for.
+ *
+ * A lesson is readable when *both* flags say so: a published lesson inside a draft course is
+ * invisible, and a draft lesson inside a published course is invisible. The course is the
+ * outer gate and the lesson the inner one, so neither can expose the other's unfinished work.
+ */
+export const LESSON_STATUS_CODES = {
+  DRAFT: 'draft',
+  PUBLISHED: 'published',
 } as const;
 
 /**

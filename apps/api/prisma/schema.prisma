@@ -57,6 +57,9 @@ model LkpValue {
   coursesAsLevel  Course[] @relation("course_level")
   coursesAsStatus Course[] @relation("course_status")
 
+  /// Lessons in their own stage of being written.
+  lessonsAsStatus Lesson[] @relation("lesson_status")
+
   @@unique([typeId, code], map: "uk_lkp_value_type_code")
   @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
   @@map("lkp_value")
@@ -220,9 +223,53 @@ model Module {
 
   course Course @relation("course_modules", fields: [courseId], references: [id], onDelete: Restrict)
 
+  /// The lessons inside this block, in the order the teacher put them in.
+  lessons Lesson[] @relation("module_lessons")
+
   @@unique([courseId, position], map: "uk_module_course_position")
   @@index([courseId, isActive, position], map: "ix_module_course_order")
   @@map("module")
+}
+
+/// One page of a module: what a teacher wrote, in the order it is taught.
+///
+/// Unlike a module, a lesson does carry its own status — a teacher writes a page over
+/// several sittings, and a half-written one should not reach a student just because the
+/// course around it is live. Both flags have to agree before a lesson is readable: the
+/// course is the outer gate, the lesson the inner one, so neither exposes the other's
+/// unfinished work.
+model Lesson {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  moduleId String @map("module_id") @db.Uuid
+
+  title String  @map("title")
+  /// The page itself, as the teacher typed it. Nullable for the same reason a course's
+  /// description is: naming a lesson is a planning act, and the writing can come after.
+  body  String? @map("body")
+
+  /// What the teacher thinks the page costs a student, shown but never enforced — it is an
+  /// estimate, and an estimate a scheduling rule depended on would be a promise nobody made.
+  estimatedMinutes Int? @map("estimated_minutes")
+
+  /// The slot inside the module, assigned by the service and never by a client. Gaps are
+  /// normal and kept: a retired lesson still holds its number, so nothing can slide into a
+  /// slot a student's note or bookmark once named.
+  position Int @map("position")
+
+  /// A lookup row, so Ops can retire a stage without a migration; the transitions between
+  /// them are enforced in code, which is the only place the difference is meaningful.
+  statusValueId String @map("status_value_id") @db.Uuid
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  module Module   @relation("module_lessons", fields: [moduleId], references: [id], onDelete: Restrict)
+  status LkpValue @relation("lesson_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+
+  @@unique([moduleId, position], map: "uk_lesson_module_position")
+  @@index([moduleId, isActive, position], map: "ix_lesson_module_order")
+  @@map("lesson")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its

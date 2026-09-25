@@ -247,16 +247,66 @@ Nest module, repository of ownership and guards instead of standing up a domain 
 - **Ownership is inherited rather than repeated.** Every entry point resolves the course against
   the session's own courses first, so a module id alone is never a key: another teacher's
   syllabus is `NOT_FOUND`, whether it is reached through its own course or somebody else's.
-- **Deactivating is the only removal.** `isActive` is what every list filters on, so a module
-  with lessons under it does not need an answer about those lessons before it can leave the
-  syllabus.
+- **Deactivating is the only removal, and a lesson goes with its module.** Lessons are reached
+  through the module they hang off, so retiring the block takes everything written under it out
+  of the syllabus without each lesson row needing its own answer first. Deleting a module
+  outright is refused by `lesson_module_id_fkey`, which is the same promise in stronger terms:
+  the block a lesson was written for is still there.
 - **The teacher edits the syllabus at `/courses/[id]/modules`, and the portal paints only what
   the API confirmed.** A move sends the whole order and repaints from the reply rather than
   swapping two rows locally, so a reorder the server refused cannot leave a syllabus on screen
   that was never written. Adding, renaming and removing all take the same no-optimistic-paint
   rule as the course editor.
+- **What sits inside a module is §10.** The syllabus has no fields of its own left to decide.
 
-## 10. Frontend
+## 10. Lessons
+
+A lesson is one page of reading inside a module — the thing a student actually opens. Its routes
+hang off the module (`/api/v1/modules/:moduleId/lessons`) while it lives inside the Course Nest
+module, because ownership is a question the course already knows how to answer and a second
+domain module would only re-derive the same two hops.
+
+- **A lesson does have a status of its own, and readability needs both gates.** `LkpLessonStatus`
+  carries draft → published, and a page is readable only when its lesson is published *and* its
+  course is published: neither flag may expose the other's unfinished work. A module deliberately
+  has no flag (§9) — it is a heading, and a heading with an opinion of its own would need rules
+  for which of the three wins.
+- **The content is one markdown `body`, capped at 20 000 characters.** No embedded video, no file
+  attachments, no block editor: those are the shapes that need a provider, and a provider is a
+  decision for later. A plain-text body is a column today and one migration away from whatever the
+  editor turns out to be.
+- **`estimatedMinutes` is shown, never enforced** (1–600, cleared with an explicit `null` rather
+  than by leaving the field alone). A teacher's guess at how long a page takes is useful
+  information and a promise the platform should not hold anyone to; no timer sits behind it.
+- **`position` is not writable, and the slot is unique per module** (`uk_lesson_module_position`)
+  rather than per course. A course-wide number would make every move inside one module a
+  renumbering of the whole syllabus, and lessons are read inside their own block.
+- **A retired lesson keeps its number** — `lastPosition` counts inactive rows, so "lesson 3" in a
+  message sent last month still means the same page, and gaps in the numbering are the price.
+- **A moved lesson is the exception: the number it vacated is not reserved.** The row leaves the
+  source module, so that module's `lastPosition` no longer sees it and the next lesson written
+  there reuses the slot. The asymmetry is deliberate — the stale-link worry is about a page still
+  in the syllabus under a label nobody changed, and a lesson that has gone to another module is
+  not that page.
+- **Reorder is scoped to one module, permutes the active slots, and demands the whole list.**
+  Two phases inside one transaction, because Postgres checks the unique index as each row lands;
+  the arithmetic lives in `planSlotMoves`, shared with the syllabus so the swap that fails on its
+  second row cannot be re-implemented wrongly in one of the two places.
+- **Publishing requires a non-blank body, and answers with a field error on `body`.** An empty
+  page is a broken promise to whoever opens it, and "write the page before publishing it" points
+  at the box to fix. A body of nothing but whitespace fails the same test.
+- **Unpublishing is always allowed; deactivating is not while the course is live.** Going back to
+  a draft hides rather than removes, so it cannot take something away from a student working
+  through it. Retiring a row can, so under a published course the answer is `409` naming the two
+  ways round it: unpublish the lesson, or archive the course.
+- **Ownership is two hops, resolved before anything is read.** The module is matched against a
+  course the session's teacher owns, and the lesson against that module — so another teacher's
+  lesson is `NOT_FOUND`, whether it is addressed through its own module or somebody else's, and a
+  malformed id is answered by the service before Postgres is asked.
+- **Teacher-side so far.** The gated read — what a student may actually see, with both publish
+  flags applied — is the student portal's first endpoint, not a variation on these ones.
+
+## 11. Frontend
 
 - **The signed-in portal is a viewport-height frame with one scrolling column.** The sidebar
   runs to the left edge of the window and holds still while `main` scrolls, so navigation never
@@ -315,7 +365,7 @@ Nest module, repository of ownership and guards instead of standing up a domain 
   the field it keys, so the rules stay on the server; a failure no field owns — a wrong
   password pair — appears once, as a form-level line, and never says which half was wrong.
 
-## 11. Development environment
+## 12. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:…`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -327,7 +377,7 @@ Nest module, repository of ownership and guards instead of standing up a domain 
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 12. Verification
+## 13. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 
