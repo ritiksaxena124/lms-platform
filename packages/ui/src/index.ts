@@ -17,6 +17,7 @@ export {
   type Breadcrumb,
   type PageHeaderProps,
 } from './components/PageHeader';
+export { PasswordField, type PasswordFieldProps } from './components/PasswordField';
 export {
   Skeleton,
   SkeletonGroup,
@@ -25,6 +26,7 @@ export {
 } from './components/Skeleton';
 export { Spinner, type SpinnerProps, type SpinnerSize } from './components/Spinner';
 export { StatusPill, type StatusPillProps, type StatusTone } from './components/StatusPill';
+export { TextField, type TextFieldProps } from './components/TextField';
 
 export { Reveal, REVEAL_STEP_MS, type RevealProps } from './motion/Reveal';
 export {
