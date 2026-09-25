@@ -1,12 +1,11 @@
 export { cn } from './lib/cn';
 
+export { Button, type ButtonProps } from './components/Button';
 export {
-  Button,
   buttonClass,
-  type ButtonProps,
   type ButtonSize,
   type ButtonVariant,
-} from './components/Button';
+} from './lib/button';
 export { Card, CardHeader, type CardHeaderProps, type CardProps } from './components/Card';
 export { EmptyState, type EmptyStateProps } from './components/EmptyState';
 export { ErrorState, type ErrorStateProps } from './components/ErrorState';
@@ -18,6 +17,7 @@ export {
   type PageHeaderProps,
 } from './components/PageHeader';
 export { PasswordField, type PasswordFieldProps } from './components/PasswordField';
+export { Select, type SelectProps, type SelectOption } from './components/Select';
 export {
   Skeleton,
   SkeletonGroup,
@@ -26,6 +26,7 @@ export {
 } from './components/Skeleton';
 export { Spinner, type SpinnerProps, type SpinnerSize } from './components/Spinner';
 export { StatusPill, type StatusPillProps, type StatusTone } from './components/StatusPill';
+export { Textarea, type TextareaProps } from './components/Textarea';
 export { TextField, type TextFieldProps } from './components/TextField';
 
 export { Reveal, REVEAL_STEP_MS, type RevealProps } from './motion/Reveal';

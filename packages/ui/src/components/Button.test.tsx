@@ -1,8 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Button, buttonClass } from './Button';
+import { buttonClass } from '../lib/button';
+import { Button } from './Button';
 
 describe('Button', () => {
   it('renders as an enabled submit button by default', () => {
@@ -75,5 +80,16 @@ describe('buttonClass', () => {
     const className = buttonClass({ variant: 'secondary', size: 'sm', fullWidth: true });
     expect(className).toContain('w-full');
     expect(className).toContain('rounded');
+  });
+
+  /** Next turns `'use client'` into a runtime wall, not a compile error: a server page that
+   * reaches through it fails when the route is opened in a browser. The module file is the
+   * only place that boundary is written down, so it is the file this checks. */
+  it('lives outside the client boundary, where a server page can call it', () => {
+    const source = readFileSync(
+      join(dirname(fileURLToPath(import.meta.url)), '..', 'lib', 'button.ts'),
+      'utf8',
+    );
+    expect(source.trimStart().startsWith("'use client'")).toBe(false);
   });
 });
