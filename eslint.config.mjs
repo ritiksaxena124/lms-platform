@@ -53,8 +53,9 @@ export default tseslint.config(
     },
   },
   {
-    // The logger is the one place allowed to write to stdout.
-    files: ['apps/api/src/common/logging/**/*.ts'],
+    // The logger is the one app-level writer to stdout, and a `*-cli.ts` script exists
+    // only to report to a terminal — neither should have to inject a logger to say "done".
+    files: ['apps/api/src/common/logging/**/*.ts', 'apps/api/src/**/*-cli.ts'],
     rules: { 'no-console': 'off' },
   },
   {

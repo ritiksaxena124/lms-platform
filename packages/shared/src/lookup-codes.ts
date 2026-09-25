@@ -51,6 +51,11 @@ export const BLOCKING_BOOKING_STATUSES: readonly string[] = [
   BOOKING_STATUS_CODES.CONFIRMED,
 ];
 
+export const ACCOUNT_STATUS_CODES = {
+  ACTIVE: 'active',
+  DISABLED: 'disabled',
+} as const;
+
 export const VERIFICATION_STATUS_CODES = {
   UNVERIFIED: 'unverified',
   PENDING: 'pending',
@@ -58,8 +63,17 @@ export const VERIFICATION_STATUS_CODES = {
   REJECTED: 'rejected',
 } as const;
 
-export function validateLookupSeeds(seeded: Record<LkpTypeCode, readonly string[]>): void {
-  for (const typeCode of Object.values(LKP_TYPE_CODES)) {
+/**
+ * Checks the reference rows for the types a caller actually reads. The required list is
+ * a parameter rather than "all of `LKP_TYPE_CODES`", because the code names every type
+ * the product will eventually have while each phase seeds only its own — validating all
+ * sixteen would mean shipping booking and payment vocabulary before a booking exists.
+ */
+export function validateLookupSeeds(
+  seeded: Partial<Record<LkpTypeCode, readonly string[]>>,
+  requiredTypes: readonly LkpTypeCode[],
+): void {
+  for (const typeCode of requiredTypes) {
     if (!Array.isArray(seeded[typeCode])) {
       throw new Error(`Lookup seed missing for reference type ${typeCode}`);
     }

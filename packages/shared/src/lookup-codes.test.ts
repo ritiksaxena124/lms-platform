@@ -3,8 +3,6 @@ import { describe, expect, it } from 'vitest';
 import {
   BLOCKING_BOOKING_STATUSES,
   BOOKING_STATUS_CODES,
-  LKP_TYPE_CODES,
-  type LkpTypeCode,
   ROLE_CODES,
   validateLookupSeeds,
 } from './lookup-codes';
@@ -29,13 +27,15 @@ describe('lookup reference codes', () => {
     ]);
   });
 
-  it('fails loudly when a reference type has no seeded values', () => {
-    const complete = Object.fromEntries(
-      Object.values(LKP_TYPE_CODES).map((type) => [type, ['placeholder']]),
-    ) as Record<LkpTypeCode, string[]>;
+  it('fails loudly when a reference type the application reads has no seeded values', () => {
+    const seeded: Record<string, string[]> = {
+      UserRole: ['student'],
+      AccountStatus: ['active'],
+    };
 
-    expect(() => validateLookupSeeds(complete)).not.toThrow();
-    delete (complete as Record<string, string[]>).BookingStatus;
-    expect(() => validateLookupSeeds(complete as never)).toThrow(/BookingStatus/);
+    expect(() => validateLookupSeeds(seeded, ['UserRole', 'AccountStatus'])).not.toThrow();
+    expect(() => validateLookupSeeds(seeded, ['UserRole', 'BookingStatus'])).toThrow(
+      /BookingStatus/,
+    );
   });
 });
