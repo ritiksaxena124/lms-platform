@@ -6,6 +6,7 @@ dist/
 .next/
 out/
 build/
+storybook-static/
 *.tsbuildinfo
 
 # env + secrets

@@ -42,7 +42,7 @@ export function PageHeader({
           <SkeletonGroup rows={1} rowClassName="h-8 w-56" className="flex-1" />
         ) : (
           <div className="min-w-0 flex-1">
-            <h1 className="text-h1 font-display text-ink-strong">{title}</h1>
+            <h1 className="text-h1 text-ink-strong">{title}</h1>
             {description ? (
               <p className="mt-1.5 max-w-[68ch] text-[0.9375rem] text-ink-muted">{description}</p>
             ) : null}

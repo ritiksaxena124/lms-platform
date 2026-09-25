@@ -9,5 +9,5 @@
     "declaration": false,
     "sourceMap": false
   },
-  "include": ["src", "vitest.config.ts"]
+  "include": ["src", ".storybook", "scripts", "vitest.config.ts"]
 }

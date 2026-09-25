@@ -123,6 +123,22 @@ silently doing nothing.
 - `@lms/ui` ships TypeScript source with no build step; apps compile it via
   `transpilePackages`. This keeps HMR honest and removes a publish-before-it-works class of
   bug.
+- **Storybook is the design system's source of truth for people.** The package has no build
+  output to read, so `bun run dev:ui` is how a developer sees a primitive before using it.
+  A component without a story is undocumented by definition.
+- **One typeface, deliberately.** Inter Variable covers headings, UI and metrics. A second
+  family would be a taste decision, and taste does not survive three portals and two
+  maintainers. Hierarchy comes from size, weight and colour instead.
+- **Borders carry structure; shadow is reserved for float.** Flat layout uses a 1px line, and
+  only menus, dialogs and toasts get `--shadow-overlay`. A shadow on static layout is a
+  rendering bug waiting for a dark theme.
+- **Gradients are named for their job.** Three exist — the primary button face, the welcome
+  panel, and a paper sheen. They live as `:root` custom properties plus `@utility` rules,
+  because `--image-*` is not a registered Tailwind v4 namespace and a `bg-gradient-*` class
+  would silently emit nothing.
+- **Illustrations are CC0 and vendored.** Open Peeps SVGs live in `packages/ui/illustrations`
+  and are copied into each portal's `public/` by `sync:illustrations`. They are decorative by
+  default (`aria-hidden`) and only announced when a `label` is passed.
 
 ## 8. Development environment
 

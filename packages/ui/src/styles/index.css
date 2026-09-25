@@ -6,10 +6,54 @@
  *
  * `@source` below makes Tailwind scan this package for class names, which is
  * required because package sources are symlinked and skipped by auto-detection.
+ *
+ * A consumer that compiles CSS through `@tailwindcss/vite` (Storybook) must
+ * still write those two lines in its own file — the plugin only treats a
+ * directly-imported file as a compile entry. See `.storybook/tailwind.css`.
  * ------------------------------------------------------------------------- */
+
+/* Inter, self-hosted and subset by unicode-range — every portal gets the same
+ * file, offline-capable, with no third-party font request on first paint. */
+@import '@fontsource-variable/inter/wght.css';
 
 @import './tokens.css';
 @import './base.css';
 @import './motion.css';
+
+/* Gradient stops. Plain properties rather than `@theme` entries: Tailwind only
+ * guarantees a variable it has registered a namespace for, and these are read
+ * by the `@utility` rules below, not by a generated namespace. */
+:root {
+  --gradient-brand: linear-gradient(
+    180deg,
+    color-mix(in oklab, var(--color-brand) 88%, white) 0%,
+    var(--color-brand-deep) 100%
+  );
+  --gradient-brand-wash: linear-gradient(
+    160deg,
+    var(--color-brand-soft) 0%,
+    color-mix(in oklab, var(--color-brand-soft) 40%, var(--color-surface)) 60%,
+    var(--color-surface) 100%
+  );
+  --gradient-paper-sheen: linear-gradient(
+    180deg,
+    var(--color-surface) 0%,
+    var(--color-paper) 100%
+  );
+}
+
+/* Three gradients, three jobs: the primary button, a welcome or feature panel,
+ * and a surface settling into the page. Anything else should be a border. */
+@utility bg-brand-gradient {
+  background-image: var(--gradient-brand);
+}
+
+@utility bg-brand-wash {
+  background-image: var(--gradient-brand-wash);
+}
+
+@utility bg-paper-sheen {
+  background-image: var(--gradient-paper-sheen);
+}
 
 @source '../';

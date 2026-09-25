@@ -10,6 +10,7 @@ export {
 export { Card, CardHeader, type CardHeaderProps, type CardProps } from './components/Card';
 export { EmptyState, type EmptyStateProps } from './components/EmptyState';
 export { ErrorState, type ErrorStateProps } from './components/ErrorState';
+export { Illo, type IlloProps, type IlloSize } from './components/Illo';
 export {
   Breadcrumbs,
   PageHeader,

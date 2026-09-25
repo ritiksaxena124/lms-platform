@@ -1,0 +1,49 @@
+/* Frame styling that exists only inside Storybook. It is outside `@source`, so
+ * these are plain rules built from the same tokens the components use. */
+
+.sb-frame {
+  display: flex;
+  min-height: 100vh;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--space-6);
+  padding: var(--space-8);
+  font-family: var(--font-sans);
+  color: var(--color-ink);
+}
+
+.sb-frame--surface {
+  background-color: var(--color-surface);
+}
+
+.sb-frame--paper {
+  background-color: var(--color-paper);
+}
+
+.sb-frame--sunk {
+  background-color: var(--color-paper-sunk);
+}
+
+.sb-docs-section {
+  flex: 1 1 100%;
+}
+
+.sb-swatch {
+  display: flex;
+  width: 11rem;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-field);
+}
+
+.sb-swatch__chip {
+  height: 3.5rem;
+}
+
+.sb-swatch__label {
+  padding: 0.5rem 0.625rem;
+  background: var(--color-surface);
+  font-size: 0.75rem;
+  line-height: 1.3;
+}

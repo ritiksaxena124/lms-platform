@@ -10,22 +10,23 @@ const button = cva(
   [
     'inline-flex shrink-0 items-center justify-center gap-2 whitespace-nowrap rounded-field border',
     'font-medium leading-none select-none',
-    'transition-[background-color,border-color,color,box-shadow,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
+    'transition-[background-color,border-color,color,transform] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
     'active:translate-y-px',
     'disabled:pointer-events-none disabled:opacity-55',
   ],
   {
     variants: {
       variant: {
-        primary:
-          'border-ember-deep bg-ember-deep text-white shadow-card hover:bg-ember hover:shadow-raised',
-        secondary: 'border-line bg-surface text-ink hover:border-line-strong hover:bg-paper',
+        // The one gradient in the button set: it marks the single action a view
+        // most wants you to take, and nothing else reaches for it.
+        primary: 'border-brand-deep bg-brand-gradient text-white hover:border-brand',
+        secondary: 'border-line-strong bg-surface text-ink hover:border-ink-faint hover:bg-paper',
         ghost: 'border-transparent bg-transparent text-ink-muted hover:bg-ink/6 hover:text-ink',
-        danger: 'border-danger bg-danger text-white shadow-card hover:bg-[#b01743]',
+        danger: 'border-danger bg-danger text-white hover:bg-[#a82944]',
       },
       size: {
         sm: 'h-8 px-3 text-[0.8125rem]',
-        md: 'h-10 px-4 text-[0.9375rem]',
+        md: 'h-9.5 px-3.5 text-[0.875rem]',
         lg: 'h-11 px-5 text-[0.9375rem]',
       },
       fullWidth: {

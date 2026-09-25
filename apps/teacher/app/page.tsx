@@ -1,12 +1,4 @@
-import {
-  Card,
-  CardHeader,
-  EmptyState,
-  PageHeader,
-  RouteTransition,
-  Stagger,
-  StatusPill,
-} from '@lms/ui';
+import { Card, CardHeader, Illo, PageHeader, RouteTransition, Stagger, StatusPill } from '@lms/ui';
 
 export default function OverviewPage() {
   return (
@@ -38,11 +30,16 @@ export default function OverviewPage() {
         </Card>
       </Stagger>
 
-      <div className="mt-4">
-        <EmptyState
-          title="Nothing to act on yet"
-          description="This portal is the shell: navigation, tokens and every operation state are wired up. Booking, course and payout data replace these panels from Phase 2 onward."
-        />
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-6 rounded-card border border-brand-line bg-brand-wash px-6 py-6">
+        <div className="min-w-0 flex-1">
+          <p className="eyebrow text-brand-deep">First things first</p>
+          <h2 className="mt-1 text-h2 text-ink-strong">Publish a course to open your calendar</h2>
+          <p className="mt-1 max-w-[52ch] text-[0.9375rem] text-ink-muted">
+            Until a course exists, students have nothing to request and this page stays as calm as
+            it is now.
+          </p>
+        </div>
+        <Illo src="/illustrations/peep-standing-03.svg" size="md" className="hidden sm:block" />
       </div>
     </RouteTransition>
   );

@@ -13,7 +13,7 @@
     font-family: var(--font-sans);
     font-size: 0.9375rem;
     line-height: 1.55;
-    font-feature-settings: 'cv05' 1, 'ss01' 1;
+    font-optical-sizing: auto;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -23,14 +23,9 @@
   h2,
   h3,
   h4 {
-    font-family: var(--font-display);
     color: var(--color-ink-strong);
     text-wrap: balance;
-  }
-
-  /* Optical size axis, where the variable font supports it. */
-  h1 {
-    font-variation-settings: 'SOFT' 0, 'WONK' 1;
+    letter-spacing: -0.01em;
   }
 
   p {
@@ -44,10 +39,12 @@
   }
 
   ::selection {
-    background-color: var(--color-ember-soft);
-    color: var(--color-ember-deep);
+    background-color: var(--color-brand-soft);
+    color: var(--color-brand-deep);
   }
 
+  /* A ring, not an outline: it follows the element's own radius, and the
+   * brand-soft halo stays visible on both surface and paper. */
   :focus-visible {
     outline: none;
     box-shadow: var(--shadow-focus);
@@ -56,7 +53,6 @@
 
   /* Numbers stay put in tables, clocks and money columns. */
   .tabular {
-    font-family: var(--font-mono);
     font-variant-numeric: tabular-nums;
     letter-spacing: -0.01em;
   }

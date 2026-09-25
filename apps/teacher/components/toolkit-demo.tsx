@@ -7,6 +7,7 @@ import {
   CardHeader,
   EmptyState,
   ErrorState,
+  Illo,
   notify,
   Reveal,
   Skeleton,
@@ -21,9 +22,9 @@ const SWATCHES = [
   { token: '--color-line', label: 'line' },
   { token: '--color-ink', label: 'ink' },
   { token: '--color-ink-muted', label: 'ink-muted' },
-  { token: '--color-ember-deep', label: 'ember-deep' },
-  { token: '--color-ember', label: 'ember' },
-  { token: '--color-ember-soft', label: 'ember-soft' },
+  { token: '--color-brand-deep', label: 'brand-deep' },
+  { token: '--color-brand', label: 'brand' },
+  { token: '--color-brand-soft', label: 'brand-soft' },
   { token: '--color-success', label: 'success' },
   { token: '--color-warning', label: 'warning' },
   { token: '--color-danger', label: 'danger' },
@@ -64,23 +65,23 @@ export function ToolkitDemo() {
         <CardHeader
           eyebrow="Type"
           title="Scale and voice"
-          description="Fraunces for titles, Public Sans for UI, JetBrains Mono wherever digits line up."
+          description="Inter Variable everywhere — headings, UI, metrics. Borders carry structure; the only shadow belongs to what floats."
         />
         <div className="mt-5 grid gap-6 border-t border-line pt-5 md:grid-cols-[minmax(0,1fr)_auto]">
           <div className="space-y-3">
-            <h2 className="text-h1 font-display text-ink-strong">Tuesday, 6 March</h2>
+            <h2 className="text-h1 text-ink-strong">Tuesday, 6 March</h2>
             <p className="text-label uppercase tracking-[0.09em] text-ink-muted">
               eyebrow · section label
             </p>
-            <h3 className="font-display text-h2 text-ink-strong">Section heading</h3>
-            <h4 className="font-display text-h3 text-ink">Sub-section heading</h4>
+            <h3 className="text-h2 text-ink-strong">Section heading</h3>
+            <h4 className="text-h3 text-ink">Sub-section heading</h4>
             <p className="max-w-reading text-[0.9375rem] text-ink-muted">
               Body copy sits at 15px on a 1.55 line height — wide enough to scan a timetable without
               crowding it, narrow enough to stay readable at 46 characters.
             </p>
           </div>
           <div className="flex flex-col items-end gap-1">
-            <span className="text-metric font-display text-ink-strong tabular">₹4,820</span>
+            <span className="text-metric text-ink-strong tabular">₹4,820</span>
             <span className="text-label text-ink-faint tabular">this month · 12 sessions</span>
           </div>
         </div>
@@ -252,6 +253,7 @@ export function ToolkitDemo() {
           <EmptyState
             title="No requests from students"
             description="Requests appear here the moment your profile is visible."
+            illustration={<Illo src="/illustrations/peep-sitting-01.svg" size="md" />}
           />
 
           <div className="flex items-center gap-3 text-label text-ink-muted">
@@ -301,19 +303,19 @@ export function ToolkitDemo() {
           <Reveal index={0}>
             <div className="rounded-card bg-paper-sunk p-4">
               <p className="text-label text-ink-faint">Reveal step</p>
-              <p className="text-metric font-display tabular">36ms</p>
+              <p className="text-metric tabular">36ms</p>
             </div>
           </Reveal>
           <Reveal index={1}>
             <div className="rounded-card bg-paper-sunk p-4">
               <p className="text-label text-ink-faint">Exit</p>
-              <p className="text-metric font-display tabular">150ms</p>
+              <p className="text-metric tabular">150ms</p>
             </div>
           </Reveal>
           <Reveal index={2}>
             <div className="rounded-card bg-paper-sunk p-4">
               <p className="text-label text-ink-faint">Enter</p>
-              <p className="text-metric font-display tabular">380ms</p>
+              <p className="text-metric tabular">380ms</p>
             </div>
           </Reveal>
         </div>

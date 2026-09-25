@@ -10,6 +10,12 @@ export interface EmptyStateProps {
   description?: string;
   /** A line-art icon from `lucide-react` or similar; sized by this component. */
   icon?: ReactNode;
+  /**
+   * A character from `<Illo>` for the empties a user will see often — a course
+   * with no bookings yet. Icon and illustration are mutually exclusive; the
+   * illustration wins.
+   */
+  illustration?: ReactNode;
   actionLabel?: string;
   onAction?: () => void;
   /** Keeps the action button honest while its request is in flight. */
@@ -25,6 +31,7 @@ export function EmptyState({
   title,
   description,
   icon,
+  illustration,
   actionLabel,
   onAction,
   actionBusy = false,
@@ -40,12 +47,13 @@ export function EmptyState({
         className,
       )}
     >
-      {icon ? (
-        <span aria-hidden="true" className="mb-3 text-ink-faint [&>svg]:size-6">
-          {icon}
-        </span>
-      ) : null}
-      <h3 className="font-display text-h3 text-ink-strong">{title}</h3>
+      {illustration ??
+        (icon ? (
+          <span aria-hidden="true" className="mb-3 text-ink-faint [&>svg]:size-6">
+            {icon}
+          </span>
+        ) : null)}
+      <h3 className={cn(illustration ? 'mt-4' : undefined, 'text-h3 text-ink-strong')}>{title}</h3>
       {description ? (
         <p className="mt-1 max-w-[46ch] text-[0.9375rem] text-ink-muted">{description}</p>
       ) : null}

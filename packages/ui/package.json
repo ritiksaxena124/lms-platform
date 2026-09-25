@@ -11,6 +11,9 @@
     "./styles.css": "./src/styles/index.css"
   },
   "scripts": {
+    "dev": "storybook dev -p 6006 --no-open",
+    "build:storybook": "storybook build -o storybook-static",
+    "sync:illustrations": "bun scripts/sync-illustrations.ts",
     "typecheck": "tsc --noEmit",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "test": "vitest run"
@@ -20,12 +23,16 @@
     "react-dom": "^19.0.0"
   },
   "dependencies": {
+    "@fontsource-variable/inter": "^5.3.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "react-hot-toast": "^2.6.0",
     "tailwind-merge": "^3.3.1"
   },
   "devDependencies": {
+    "@storybook/addon-vitest": "^10",
+    "@storybook/react-vite": "^10",
+    "@tailwindcss/vite": "^4.3.3",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.4",
     "@testing-library/react": "^16.3.0",
@@ -36,6 +43,7 @@
     "jsdom": "^26.1.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
+    "storybook": "^10",
     "typescript": "^5.9.2",
     "vitest": "^3.2.4"
   }

@@ -46,7 +46,7 @@ export function ToastCard({ tone, message, details, action, icon, onDismiss }: T
       role={isError ? 'alert' : 'status'}
       aria-live={isError ? 'assertive' : 'polite'}
       className={cn(
-        'lms-pop pointer-events-auto flex w-full max-w-sm items-stretch gap-3 overflow-hidden rounded-card border border-line bg-surface pr-2 shadow-overlay',
+        'lms-pop pointer-events-auto flex w-full max-w-sm items-stretch gap-3 overflow-hidden rounded-card border border-line-strong bg-surface pr-2 shadow-overlay',
       )}
     >
       <span aria-hidden="true" className={cn('w-1 shrink-0 rounded-l-card', TONE_ACCENT[tone])} />
@@ -72,8 +72,8 @@ export function ToastCard({ tone, message, details, action, icon, onDismiss }: T
             onClick={action.onClick}
             className={cn(
               'mt-2 rounded-field border border-line px-2.5 py-1 text-[0.8125rem] font-medium',
-              'transition-colors duration-[var(--duration-fast)] hover:border-ember-line hover:bg-ember-soft',
-              'text-ember-deep',
+              'transition-colors duration-[var(--duration-fast)] hover:border-brand-line hover:bg-brand-soft',
+              'text-brand-deep',
             )}
           >
             {action.label}

@@ -35,7 +35,7 @@ export function ErrorState({
       )}
     >
       <div className="min-w-0">
-        <h3 className="font-display text-h3 text-danger">{title}</h3>
+        <h3 className="text-h3 text-danger">{title}</h3>
         {message ? (
           <p className="mt-1 max-w-[62ch] text-[0.9375rem] text-ink-muted">{message}</p>
         ) : null}

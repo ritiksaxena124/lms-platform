@@ -24,7 +24,7 @@ export function AppNav() {
       <Link
         href="/"
         transitionTypes={['nav-back']}
-        className="flex items-baseline gap-2 font-display text-h2 text-ink-strong"
+        className="flex items-baseline gap-2 text-h2 text-ink-strong"
       >
         <span aria-hidden="true" className="inline-block size-2 rounded-pill bg-ember" />
         Teacher
@@ -45,14 +45,14 @@ export function AppNav() {
                     'relative flex items-center gap-2 rounded-field px-3 py-2 text-label',
                     'transition-[background-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
                     active
-                      ? 'bg-surface text-ink shadow-card lg:bg-ember-soft lg:text-ember-deep lg:shadow-none'
-                      : 'text-ink-muted hover:bg-ink/6 hover:text-ink',
+                      ? 'bg-brand-soft font-semibold text-brand-deep'
+                      : 'text-ink-muted hover:bg-paper-sunk hover:text-ink',
                   )}
                 >
                   <span
                     aria-hidden="true"
                     className={cn(
-                      'absolute -left-2 hidden h-4 w-[3px] rounded-pill bg-ember lg:block',
+                      'absolute -left-2 hidden h-4 w-[3px] rounded-pill bg-brand lg:block',
                       !active && 'lg:hidden',
                     )}
                   />

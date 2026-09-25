@@ -1,0 +1,12 @@
+/**
+ * Storybook's Tailwind entry.
+ *
+ * `@tailwindcss/vite` compiles the file it is *imported as*, not a file that
+ * merely has Tailwind somewhere in its @import chain — so this is the two lines
+ * a portal writes, spelled out here rather than reached through the package.
+ *
+ * The font is loaded in `preview.tsx` as a JS import instead, so the woff2 URLs
+ * resolve from the package that owns them.
+ */
+@import 'tailwindcss';
+@import '../src/styles/index.css';

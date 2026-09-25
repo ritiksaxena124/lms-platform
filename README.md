@@ -47,8 +47,9 @@ three apps share a session cookie in development without `localhost` CORS hacks.
 | `bun run dev`         | API + teacher portal together.                                           |
 | `bun run dev:api`     | NestJS API with watch mode.                                              |
 | `bun run dev:teacher` | Next.js teacher portal.                                                  |
+| `bun run dev:ui`      | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
 | `bun run test`        | All test suites (Vitest, per workspace package).                         |
-| `bun run format`      | Prettier over TS/TSX/JSON/MD/Prisma.                                     |
+| `bun run format`      | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
 
 ## Layout
 
@@ -64,6 +65,28 @@ packages/
 `@lms/shared` is consumed as compiled CommonJS by the API and as source by the apps
 (`transpilePackages`). `@lms/ui` is always consumed as source — it ships no build step,
 which is why editing a component hot-reloads in the portal.
+
+## Design system — Graphite
+
+Storybook is the surface the design system is maintained in: `bun run dev:ui` after
+changing anything under `packages/ui/src`. The **Design System** story states the rules,
+not just the values, so an unlisted component can still be made to look like it belongs.
+
+Four rules outrank taste:
+
+- **One typeface.** Inter Variable, 100–900, self-hosted from `@fontsource-variable/inter`
+  and imported by `@lms/ui/styles.css`. Portals add no font request of their own.
+- **Borders separate, surfaces stack.** Flat layout gets a 1px line. The only shadow in the
+  system (`--shadow-overlay`) belongs to things that float: menus, dialogs, toasts.
+- **Colour is meaningful.** Graphite neutrals do the structural work; brand emerald marks
+  the primary action; semantic tones stay in their own hue families.
+- **Gradient is a highlighter.** Exactly three exist (`--gradient-brand`, `-brand-wash`,
+  `-paper-sheen`), each with a named job. A fourth needs a reason, not a taste.
+
+Illustrations are hand-drawn characters from [Open Peeps](https://www.openpeeps.com),
+CC0, vendored under `packages/ui/illustrations/`. `bun run --filter @lms/ui
+sync:illustrations` copies them into each portal's `public/`; render them with `<Illo>`,
+which reserves the slot so a reveal never reflows.
 
 ## Conventions that are enforced, not documented-away
 

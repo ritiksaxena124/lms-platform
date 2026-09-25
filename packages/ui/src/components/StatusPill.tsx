@@ -5,8 +5,8 @@ import { cn } from '../lib/cn';
 export type StatusTone = 'neutral' | 'ember' | 'info' | 'success' | 'warning' | 'danger';
 
 const TONE: Record<StatusTone, string> = {
-  neutral: 'border-line bg-paper-sunk text-ink-muted',
-  ember: 'border-ember-line bg-ember-soft text-ember-deep',
+  neutral: 'border-line-strong bg-paper-sunk text-ink-muted',
+  ember: 'border-brand-line bg-brand-soft text-brand-deep',
   info: 'border-info-soft bg-info-soft text-info',
   success: 'border-success-soft bg-success-soft text-success',
   warning: 'border-warning-soft bg-warning-soft text-warning',

@@ -10,12 +10,13 @@
     "lint": "bun run --filter '*' lint",
     "test": "bun run --filter '*' test",
     "verify": "bun run build:shared && bun run typecheck && bun run lint && bun run test",
-    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,prisma}\"",
-    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,prisma}\"",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md}\"",
     "build:shared": "bun run --filter @lms/shared build",
     "dev": "bun run --filter '*' dev",
     "dev:api": "bun run --filter @lms/api dev",
-    "dev:teacher": "bun run --filter @lms/teacher dev"
+    "dev:teacher": "bun run --filter @lms/teacher dev",
+    "dev:ui": "bun run --filter @lms/ui dev"
   },
   "devDependencies": {
     "@eslint/js": "^9.35.0",
