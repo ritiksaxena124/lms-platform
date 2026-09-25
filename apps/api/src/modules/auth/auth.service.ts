@@ -165,6 +165,22 @@ export class AuthService {
     if (session) await this.sessions.revoke(session.id);
   }
 
+  /**
+   * The account behind a verified token, read now rather than remembered from the token.
+   * The guard has already proved the caller holds a valid token for this id and that the
+   * account is active; this turns that back into what the portal renders.
+   */
+  async me(userId: string): Promise<PublicUser> {
+    const user = await this.users.findById(userId);
+    if (!user) {
+      throw new UnauthorizedException({
+        code: API_ERROR_CODES.TOKEN_INVALID,
+        message: 'Session is not recognised.',
+      });
+    }
+    return toPublicUser(user);
+  }
+
   private async startSession(user: UserWithCodes, userAgent?: string): Promise<Session> {
     const issued = this.tokens.issue({ sub: user.id, role: user.role.code });
     const { token } = await this.sessions.issue(

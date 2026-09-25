@@ -1,6 +1,7 @@
 import { Controller, Get, ServiceUnavailableException } from '@nestjs/common';
 import { readFileSync } from 'node:fs';
 
+import { Public } from '../../modules/auth/public.decorator';
 import { PrismaService } from '../prisma/prisma.service';
 
 /**
@@ -18,6 +19,7 @@ const APP_VERSION: string = (() => {
 })();
 
 /** Liveness for the reverse proxy plus a real dependency check for deployment gates. */
+@Public()
 @Controller('health')
 export class HealthController {
   constructor(private readonly prisma: PrismaService) {}

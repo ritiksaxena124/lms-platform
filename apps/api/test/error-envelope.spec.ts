@@ -12,6 +12,7 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../src/app.module';
+import { Public } from '../src/modules/auth/public.decorator';
 import { createTestApp } from './utils/create-test-app';
 
 class RegisterDto {
@@ -24,6 +25,7 @@ class RegisterDto {
 }
 
 /** Stands in for a real feature route so the pipeline can be tested in isolation. */
+@Public()
 @Controller('_error-probe')
 class ErrorProbeController {
   @Get('boom')

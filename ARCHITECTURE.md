@@ -113,8 +113,8 @@ these rules hold:
 
 - **Access token: a 15-minute HS256 JWT**, carrying `sub` and `role` and nothing else. A JWT
   is read by whoever holds it, so an email or a name in the payload would be a copy of
-  personal data outliving the login that made it. Short expiry is the price of no session
-  lookup on every request.
+  personal data outliving the login that made it. Its expiry is what bounds the damage of a
+  leaked one; the role inside it is treated as a hint, not as authority — see below.
 - **Refresh token: an opaque random string in an `HttpOnly` cookie**, stored only as a
   SHA-256 hash, scoped to `Path=/api/v1/auth`. It is rotated on every use, and the row is
   retired rather than deleted — a row that survives is the only way to notice a replay.
@@ -131,6 +131,15 @@ these rules hold:
   person is looking at their own account; there is nothing to hide and something to act on.
 - **`ops` is not self-registerable.** The list lives in `@lms/shared`, so the sign-up form
   and the server read the same one and a client payload cannot mint an administrator.
+- **Both guards are global, registered in `AuthModule` as `APP_GUARD`.** A feature module
+  added next month is authenticated before anyone remembers to ask; the way a route becomes
+  public is `@Public()`, and forgetting it fails as a 401 in development rather than as an
+  open endpoint in production.
+- **The token says who signed in; the row says who they are now.** The guard verifies the
+  signature and then re-reads the account for its role and status, so a promotion, a
+  demotion and a disable all take effect on the next request instead of on the next login.
+  That is one indexed lookup per authenticated request, bought deliberately: without it a
+  disabled account keeps whatever it was for up to fifteen minutes.
 
 ## 8. Frontend
 
