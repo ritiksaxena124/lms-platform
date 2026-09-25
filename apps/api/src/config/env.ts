@@ -26,8 +26,14 @@ const EnvSchema = z.object({
     message: 'DATABASE_URL must be a postgresql:// connection string',
   }),
 
-  JWT_SECRET: z.string().min(32).optional(),
+  JWT_SECRET: z.string().min(32),
   REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
+
+  /** Host the session cookie is shared across, e.g. `localtest.me` so one login covers
+   * every portal. Unset keeps the cookie to the API host alone. */
+  COOKIE_DOMAIN: z.string().min(1).optional(),
+  /** Overrides the NODE_ENV-based default; useful when a staging box terminates TLS upstream. */
+  COOKIE_SECURE: z.enum(['true', 'false']).optional(),
 
   STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_DIR: z.string().min(1).default('./storage/uploads'),
@@ -43,7 +49,10 @@ const EnvSchema = z.object({
   VIDEO_PROVIDER: z.enum(['none', 'mock']).default('none'),
 });
 
-export type AppEnv = z.infer<typeof EnvSchema>;
+export type AppEnv = z.infer<typeof EnvSchema> & {
+  /** Resolved below: secure unless a local run over plain http says otherwise. */
+  cookieSecure: boolean;
+};
 
 export function parseEnv(raw: NodeJS.ProcessEnv = process.env): AppEnv {
   // A variable present but blank in an env file means "not provided"; without this,
@@ -61,20 +70,17 @@ export function parseEnv(raw: NodeJS.ProcessEnv = process.env): AppEnv {
   }
 
   const env = parsed.data;
-  if (env.NODE_ENV === 'production') {
-    const required: Array<keyof AppEnv> = ['JWT_SECRET'];
-    const missing = required.filter((key) => !env[key]);
-    if (missing.length > 0) {
-      throw new Error(
-        `Missing required environment variables in production: ${missing.join(', ')}`,
-      );
-    }
-  }
   if (env.STORAGE_PROVIDER === 's3') {
     throw new Error('S3 storage is not implemented yet; set STORAGE_PROVIDER=local');
   }
 
-  return env;
+  return {
+    ...env,
+    cookieSecure:
+      env.COOKIE_SECURE === undefined
+        ? env.NODE_ENV === 'production'
+        : env.COOKIE_SECURE === 'true',
+  };
 }
 
 export const REDACTED_KEYS = [

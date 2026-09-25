@@ -7,6 +7,7 @@ const BASE = {
   CORS_ORIGINS: 'http://teacher.localtest.me:3002',
   API_PUBLIC_URL: 'http://api.localtest.me:4000',
   DATABASE_URL: 'postgresql://lms:lms@localhost:5432/lms_test',
+  JWT_SECRET: 'a'.repeat(64),
 };
 
 describe('parseEnv', () => {
@@ -54,9 +55,25 @@ describe('parseEnv', () => {
   });
 
   it('treats a blank value in an env file as unset', () => {
-    const env = parseEnv({ ...BASE, JWT_SECRET: '', SMTP_URL: '  ' });
-    expect(env.JWT_SECRET).toBeUndefined();
+    const env = parseEnv({ ...BASE, SMTP_URL: '  ', COOKIE_DOMAIN: '' });
     expect(env.SMTP_URL).toBeUndefined();
+    expect(env.COOKIE_DOMAIN).toBeUndefined();
+  });
+
+  it('refuses to start without a signing secret, in any environment', () => {
+    // A random per-process fallback would boot cleanly and then log everyone out on the
+    // next restart, so the missing value has to stop the boot instead.
+    expect(() => parseEnv({ ...BASE, JWT_SECRET: '' })).toThrow(/JWT_SECRET/);
+    expect(() => parseEnv({ ...BASE, JWT_SECRET: 'short' })).toThrow(/JWT_SECRET/);
+  });
+
+  it('sends the session cookie over https unless the environment says otherwise', () => {
+    expect(parseEnv(BASE).cookieSecure).toBe(false); // NODE_ENV=test is plain http
+    expect(parseEnv({ ...BASE, NODE_ENV: 'production' }).cookieSecure).toBe(true);
+    // A proxy that terminates TLS makes production plain-http at the app, so it overrides.
+    expect(parseEnv({ ...BASE, NODE_ENV: 'production', COOKIE_SECURE: 'false' }).cookieSecure).toBe(
+      false,
+    );
   });
 
   it('fails fast when a provider is configured before its adapter exists', () => {

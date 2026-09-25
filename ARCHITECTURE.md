@@ -66,12 +66,14 @@ Every failure leaves the API as one envelope:
   "message": "Check the highlighted fields.",
   "requestId": "…",
   "timestamp": "…",
-  "details": { "validation": { "email": "Already taken" } }
+  "details": { "validation": { "email": ["Already taken"] } }
 }
 ```
 
 `code` is machine-readable and stable, from `API_ERROR_CODES` in `@lms/shared`; the client
 branches on it and never on wording. `message` is written for a human and is safe to show.
+Field errors are keyed **by field name**, never as a flat list of sentences — a form has to
+know which input to highlight, and parsing English to find out is not that.
 Unexpected errors return a generic message while the real cause is logged with the same
 `requestId`, so a stack trace, a connection string or an internal hostname can never reach
 a browser. `@lms/ui`'s `notify.fromApiError()` renders this exact shape, including field
@@ -104,7 +106,33 @@ later is an adapter plus an env change, not a refactor — and so nothing preten
 payment or start a call in the meantime. `STORAGE_PROVIDER=s3` throws at boot rather than
 silently doing nothing.
 
-## 7. Frontend
+## 7. Sessions and passwords
+
+A session is two tokens with two different jobs, and the split is what makes the rest of
+these rules hold:
+
+- **Access token: a 15-minute HS256 JWT**, carrying `sub` and `role` and nothing else. A JWT
+  is read by whoever holds it, so an email or a name in the payload would be a copy of
+  personal data outliving the login that made it. Short expiry is the price of no session
+  lookup on every request.
+- **Refresh token: an opaque random string in an `HttpOnly` cookie**, stored only as a
+  SHA-256 hash, scoped to `Path=/api/v1/auth`. It is rotated on every use, and the row is
+  retired rather than deleted — a row that survives is the only way to notice a replay.
+- **A retired token presented twice ends every session that account has.** The first use
+  proves the token was copied somewhere; there is no way to know where else it went.
+- **Unknown address and wrong password answer identically**, including the work: an unknown
+  email still verifies against a throwaway digest, so the endpoint cannot be read as a
+  directory of who has an account.
+- **scrypt from `node:crypto`, behind a `PASSWORD_HASHER` port.** Argon2id is the stronger
+  recommendation on paper, but every Argon2 and bcrypt binding is a native module, and
+  "builds on the laptop, fails on the VPS" is the worse failure. The cost parameters are
+  written _into_ the digest, so raising them later still verifies a password hashed today.
+- **A disabled account is refused with `ACCOUNT_DISABLED`, not a fake password error.** That
+  person is looking at their own account; there is nothing to hide and something to act on.
+- **`ops` is not self-registerable.** The list lives in `@lms/shared`, so the sign-up form
+  and the server read the same one and a client payload cannot mint an administrator.
+
+## 8. Frontend
 
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
   radius, shadow, duration or type step is defined. A portal re-themes by overriding tokens;
@@ -140,7 +168,7 @@ silently doing nothing.
   and are copied into each portal's `public/` by `sync:illustrations`. They are decorative by
   default (`aria-hidden`) and only announced when a `label` is passed.
 
-## 8. Development environment
+## 9. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:…`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -152,7 +180,7 @@ silently doing nothing.
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 9. Verification
+## 10. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 

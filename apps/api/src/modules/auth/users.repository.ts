@@ -23,4 +23,12 @@ export class UsersRepository {
   async findByEmail(email: string): Promise<UserWithCodes | null> {
     return this.prisma.user.findUnique({ where: { email }, include: WITH_CODES });
   }
+
+  async findById(id: string): Promise<UserWithCodes | null> {
+    return this.prisma.user.findUnique({ where: { id }, include: WITH_CODES });
+  }
+
+  async recordLogin(id: string): Promise<void> {
+    await this.prisma.user.update({ where: { id }, data: { lastLoginAt: new Date() } });
+  }
 }

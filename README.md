@@ -25,10 +25,12 @@ bun install
 # 1. API environment — the .env files are generated locally and never committed.
 cp apps/api/.env.example apps/api/.env       # set DATABASE_URL for the lms database
 cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_test
+# JWT_SECRET has no default in either file; generate one:  openssl rand -hex 32
 
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
 bun run --filter @lms/api db:migrate
+bun run --filter @lms/api db:seed       # reference rows: roles, account statuses
 
 # 3. Everything else is derived from those two files
 bun run verify        # build + typecheck + lint + test across the workspace
@@ -106,7 +108,7 @@ decision was made, and what was deliberately left out.
 | ----- | ------------------------------------------------------------ | ----------- |
 | 0     | Plan, architecture, data model                               | Approved    |
 | 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell | **Done**    |
-| 2     | Auth, accounts, roles, teacher profile                       | Not started |
+| 2     | Auth, accounts, roles, teacher profile                       | In progress |
 | 3     | Courses, lessons, enrollment                                 | Not started |
 | 4     | Availability, bookings, scheduling across timezones          | Not started |
 | 5     | Video + storage + email behind provider ports                | On hold     |
@@ -115,8 +117,13 @@ decision was made, and what was deliberately left out.
 
 ## Environment variables
 
-`apps/api/.env.example` documents every variable. Two are worth knowing early:
+`apps/api/.env.example` documents every variable. Four are worth knowing early:
 
+- `JWT_SECRET` has **no default and no fallback** — sign-in is impossible without it, and a
+  per-process random one would boot cleanly then log everyone out on the next restart.
+  Generate with `openssl rand -hex 32`.
+- `COOKIE_DOMAIN=localtest.me` is what lets one login cover all three portals. Left unset
+  the session cookie belongs to the API host alone.
 - `PAYMENT_PROVIDER` and `VIDEO_PROVIDER` default to `none`. Those integrations are on
   hold until a free option is chosen; the ports exist so nothing else has to change when
   they land.
