@@ -209,6 +209,11 @@ A portal is a client of that design, and inherits its rules:
 - **No price on the course row, and no `DELETE`.** Nothing can charge one yet, so a stored
   number would be a field no provider validates and a figure a student can be shown. Retiring
   is archiving; the row is what a later enrollment would point at.
+- **The teacher writes courses at `/courses`, `/courses/new` and `/courses/[id]/edit`.** One
+  list fetched once and filtered locally by status tab, one editor for both create and edit,
+  and the lifecycle buttons on the row as well as in the editor — because publishing is what
+  a teacher came here to do, and making them open a form to find the button costs a click
+  every time.
 - **Modules and lessons are the next two steps, in that order.** This section documents the
   container only — the structure inside a course is deliberately not modelled yet, so a
   lesson cannot be written against a module that has no decided shape.
@@ -224,6 +229,14 @@ A portal is a client of that design, and inherits its rules:
 - **Toasts go through `notify()`**, which wraps `react-hot-toast` for timing and renders our
   own card. No page calls a toast library directly, so a notification looks the same in all
   three portals and the library can be swapped in one file.
+- **A portal paints what the API confirmed, never what it hoped.** A refused publish leaves
+  the row reading `Draft` and the message goes to a toast; a saved edit re-syncs every field
+  from the response. An optimistic repaint is a lie the moment the server disagrees, and the
+  teacher has no way to tell.
+- **`'use client'` is a runtime wall, not a type error.** A server page that calls a
+  function exported from a client module compiles clean and fails when the route is opened.
+  That is why `buttonClass` lives in `lib/button.ts` with no directive: a `<Link>` styled
+  like the action beside it is decided on the server.
 - **Motion is CSS.** Route changes use the View Transitions API via React's
   `<ViewTransition>` (`RouteTransition`), links declare `nav-forward` / `nav-back`, and the
   portal chrome is anchored so only content moves. `prefers-reduced-motion` downgrades

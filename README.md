@@ -5,8 +5,8 @@ Three portals (teacher, student, ops) share one API, one database and one compon
 library.
 
 **Status: Phase 3 in progress** — accounts sign in, hold a session and a teacher can save a
-profile and author courses through the API (`/api/v1/courses`). Modules, lessons,
-enrollment, bookings and payments are still ahead.
+profile and write, publish and archive courses in the teacher portal (`/courses`, backed by
+`/api/v1/courses`). Modules, lessons, enrollment, bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---

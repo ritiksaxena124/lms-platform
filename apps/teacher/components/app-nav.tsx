@@ -8,6 +8,7 @@ import { useSession } from './session-provider';
 
 const ITEMS = [
   { href: '/', label: 'Overview' },
+  { href: '/courses', label: 'Courses' },
   { href: '/toolkit', label: 'Interface kit' },
 ] as const;
 
