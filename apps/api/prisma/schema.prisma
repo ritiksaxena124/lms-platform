@@ -46,7 +46,66 @@ model LkpValue {
 
   type LkpType @relation(fields: [typeId], references: [id], onDelete: Restrict)
 
+  /// Reverse relations for the two ways a user points at a reference row.
+  usersAsRole   User[] @relation("user_role")
+  usersAsStatus User[] @relation("user_status")
+
   @@unique([typeId, code], map: "uk_lkp_value_type_code")
   @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
   @@map("lkp_value")
+}
+
+/// Anyone who can sign in to one of the three portals. The role is a lookup row, not a
+/// column of allowed strings, so Ops can retire a role without a migration.
+model User {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Stored lower-case by the service that writes it. Unique forever: deactivating an
+  /// account must not recycle its address, or a new owner would inherit the old one's
+  /// bookings, payouts and reviews.
+  email           String    @unique @map("email")
+  passwordHash    String    @map("password_hash")
+  fullName        String    @map("full_name")
+  /// IANA zone the user works in ("Asia/Kolkata"), never a fixed UTC offset — a DST change
+  /// has to move the instant, which is what "same class time" means to a teacher.
+  timezone        String    @default("UTC") @map("timezone")
+  roleValueId     String    @map("role_value_id") @db.Uuid
+  statusValueId   String    @map("status_value_id") @db.Uuid
+  emailVerifiedAt DateTime? @map("email_verified_at") @db.Timestamptz(6)
+  lastLoginAt     DateTime? @map("last_login_at") @db.Timestamptz(6)
+
+  isActive  Boolean   @default(true) @map("is_active")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  role          LkpValue       @relation("user_role", fields: [roleValueId], references: [id], onDelete: Restrict)
+  status        LkpValue       @relation("user_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+  refreshTokens RefreshToken[]
+
+  @@index([roleValueId, isActive], map: "ix_user_role_active")
+  @@map("users")
+}
+
+/// One issued refresh session. The plaintext token never reaches the database — only its
+/// digest — so a leaked table cannot be used to mint sessions.
+model RefreshToken {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  tokenHash String    @unique @map("token_hash")
+  userId    String    @map("user_id") @db.Uuid
+  expiresAt DateTime  @map("expires_at") @db.Timestamptz(6)
+  /// Revocation is a business transition with a date, distinct from `isActive`, which
+  /// means "this row is archived". Rotation writes a new row rather than editing this one.
+  revokedAt DateTime? @map("revoked_at") @db.Timestamptz(6)
+  userAgent String?   @map("user_agent")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@index([userId, isActive, expiresAt], map: "ix_refresh_token_user_active")
+  @@map("refresh_token")
 }
