@@ -169,6 +169,22 @@ these rules hold:
   That is one indexed lookup per authenticated request, bought deliberately: without it a
   disabled account keeps whatever it was for up to fifteen minutes.
 
+A portal is a client of that design, and inherits its rules:
+
+- **The browser never stores the access token.** It lives in a module variable in
+  `apps/teacher/lib/api.ts`, so a reload has no token to reuse and must trade the cookie for
+  one — which is what `POST /auth/refresh` is for, and why `packages/shared/src/auth.ts`
+  owns the response shape both sides speak.
+- **One refresh at a time.** `refreshSession()` hands every concurrent caller the same
+  in-flight promise. Rotation plus replay-detection means three widgets booting in parallel
+  would otherwise present the same token three times and end the account's own sessions.
+- **Credential endpoints never replay.** `reviveSession: false` on login, register and
+  logout: a 401 from them is the answer, and replaying a logout would restore a session
+  someone had just asked to end.
+- **A refused refresh is announced, not swallowed.** `onSessionLost` lets the chrome drop the
+  greeting when a token dies mid-session; the alternative is a header that welcomes someone
+  the API no longer recognises.
+
 ## 8. Frontend
 
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
@@ -204,6 +220,16 @@ these rules hold:
 - **Illustrations are CC0 and vendored.** Open Peeps SVGs live in `packages/ui/illustrations`
   and are copied into each portal's `public/` by `sync:illustrations`. They are decorative by
   default (`aria-hidden`) and only announced when a `label` is passed.
+- **Route protection is a client gate, not Next middleware.** The refresh cookie is scoped to
+  `Path=/api/v1/auth`, so middleware running on a page path cannot see it and any decision it
+  made would be a guess. `RequireSession` runs where the answer actually exists, and it sits
+  in `app/(portal)/layout.tsx` so a new screen cannot be added unprotected by accident.
+- **A `?next=` is only followed after it is proved to be in-app.** `safeRedirectTarget`
+  accepts a root-relative path and drops everything else, including `//host` and `/\host`,
+  which are how a sign-in form becomes a phishing relay.
+- **Forms show what the API named, and nothing else.** `fieldErrors()` puts each message under
+  the field it keys, so the rules stay on the server; a failure no field owns — a wrong
+  password pair — appears once, as a form-level line, and never says which half was wrong.
 
 ## 9. Development environment
 

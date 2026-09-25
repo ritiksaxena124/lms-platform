@@ -27,6 +27,7 @@ bun install
 cp apps/api/.env.example apps/api/.env       # set DATABASE_URL for the lms database
 cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_test
 # JWT_SECRET has no default in either file; generate one:  openssl rand -hex 32
+cp apps/teacher/.env.example apps/teacher/.env.development   # where the portal finds the API
 
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
@@ -53,10 +54,11 @@ is the entire reason they exist:
 | `student@example.test` | student portal                                           |
 | `ops@example.test`     | ops portal — the role the sign-up form will not hand out |
 
-All three sign in with `lms-demo-password`. They are created only in `lms` and `lms_test`:
-seeding refuses when `NODE_ENV=production`, and re-running `db:seed` after you have changed
-one leaves it changed. The addresses sit under the reserved `.test` domain, so a demo
-account can never be pointed at a real mailbox.
+All three sign in with `lms-demo-password`, at <http://teacher.localtest.me:3000/login> —
+the sign-in form has a button that fills the teacher one for you. They are created only in
+`lms` and `lms_test`: seeding refuses when `NODE_ENV=production`, and re-running `db:seed`
+after you have changed one leaves it changed. The addresses sit under the reserved `.test`
+domain, so a demo account can never be pointed at a real mailbox.
 
 ## Commands
 

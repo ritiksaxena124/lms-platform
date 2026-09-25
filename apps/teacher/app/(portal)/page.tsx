@@ -6,7 +6,7 @@ export default function OverviewPage() {
       <PageHeader
         title="Overview"
         description="Sessions, earnings and student requests — the three things worth opening this portal for."
-        meta="Phase 1 shell · live data arrives with accounts in Phase 2"
+        meta="Phase 2 · accounts are live; courses and bookings arrive next"
         actions={
           <StatusPill tone="ember" pulse>
             Setting up

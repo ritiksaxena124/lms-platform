@@ -6,7 +6,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { ACCOUNT_STATUS_CODES, API_ERROR_CODES, LKP_TYPE_CODES, type RoleCode } from '@lms/shared';
+import {
+  ACCOUNT_STATUS_CODES,
+  API_ERROR_CODES,
+  LKP_TYPE_CODES,
+  type AuthUser,
+  type RoleCode,
+} from '@lms/shared';
 
 import { ENV } from '../../config/env.module';
 import type { AppEnv } from '../../config/env';
@@ -20,17 +26,7 @@ import type { UserWithCodes } from './users.repository';
 import { UsersRepository } from './users.repository';
 
 /** What a portal is allowed to know about an account. `passwordHash` is not on it. */
-export interface PublicUser {
-  id: string;
-  email: string;
-  fullName: string;
-  role: RoleCode;
-  status: string;
-  timezone: string;
-  emailVerifiedAt: string | null;
-  lastLoginAt: string | null;
-  createdAt: string;
-}
+export type PublicUser = AuthUser;
 
 export function toPublicUser(user: UserWithCodes): PublicUser {
   return {

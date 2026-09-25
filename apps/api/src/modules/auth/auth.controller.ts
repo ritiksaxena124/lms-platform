@@ -2,10 +2,12 @@ import { Body, Controller, Get, Headers, HttpCode, Inject, Post, Res } from '@ne
 import type { Response } from 'express';
 import { Throttle } from '@nestjs/throttler';
 
+import type { AuthSessionResponse, AuthUserResponse } from '@lms/shared';
+
 import { ENV } from '../../config/env.module';
 import type { AppEnv } from '../../config/env';
 import type { AuthenticatedUser } from './auth.guard';
-import { AuthService, type PublicUser, type Session } from './auth.service';
+import { AuthService, type Session } from './auth.service';
 import { CurrentUser } from './current-user.decorator';
 import { LoginDto } from './dto/login.dto';
 import { RegisterDto } from './dto/register.dto';
@@ -14,14 +16,6 @@ import { Public } from './public.decorator';
 
 /** Credential endpoints get a tighter budget than the rest of the API. */
 const CREDENTIAL_THROTTLE = { default: { limit: 20, ttl: 60_000 } };
-
-/** What a portal keeps after a sign-in: who you are, and how to prove it briefly. */
-interface SessionResponse {
-  user: PublicUser;
-  accessToken: string;
-  tokenType: 'Bearer';
-  expiresIn: number;
-}
 
 @Controller('auth')
 export class AuthController {
@@ -33,7 +27,7 @@ export class AuthController {
   @Public()
   @Post('register')
   @Throttle(CREDENTIAL_THROTTLE)
-  async register(@Body() dto: RegisterDto): Promise<{ user: PublicUser }> {
+  async register(@Body() dto: RegisterDto): Promise<AuthUserResponse> {
     const user = await this.auth.register(dto);
     return { user };
   }
@@ -46,7 +40,7 @@ export class AuthController {
     @Body() dto: LoginDto,
     @Headers('user-agent') userAgent: string | undefined,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<SessionResponse> {
+  ): Promise<AuthSessionResponse> {
     const session = await this.auth.login(dto, userAgent);
     setRefreshCookie(res, session.refreshToken, this.env);
     return toSessionResponse(session);
@@ -66,14 +60,14 @@ export class AuthController {
     @Headers('cookie') cookie: string | undefined,
     @Headers('user-agent') userAgent: string | undefined,
     @Res({ passthrough: true }) res: Response,
-  ): Promise<SessionResponse> {
+  ): Promise<AuthSessionResponse> {
     const session = await this.auth.refresh(readRefreshCookie(cookie), userAgent);
     setRefreshCookie(res, session.refreshToken, this.env);
     return toSessionResponse(session);
   }
 
   @Get('me')
-  me(@CurrentUser() user: AuthenticatedUser): Promise<{ user: PublicUser }> {
+  me(@CurrentUser() user: AuthenticatedUser): Promise<AuthUserResponse> {
     return this.auth.me(user.id).then((account) => ({ user: account }));
   }
 
@@ -89,7 +83,7 @@ export class AuthController {
   }
 }
 
-function toSessionResponse(session: Session): SessionResponse {
+function toSessionResponse(session: Session): AuthSessionResponse {
   return {
     user: session.user,
     accessToken: session.accessToken,

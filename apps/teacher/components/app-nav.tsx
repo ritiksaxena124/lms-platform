@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { cn } from '@lms/ui';
+import { buttonClass, cn, notify, Skeleton } from '@lms/ui';
+
+import { useSession } from './session-provider';
 
 const ITEMS = [
   { href: '/', label: 'Overview' },
@@ -19,7 +21,7 @@ export function AppNav() {
   return (
     <aside
       style={{ viewTransitionName: 'app-chrome' }}
-      className="shrink-0 border-line py-5 lg:w-56 lg:border-r lg:py-10"
+      className="shrink-0 border-line py-5 lg:flex lg:w-56 lg:flex-col lg:border-r lg:py-10"
     >
       <Link
         href="/"
@@ -63,6 +65,51 @@ export function AppNav() {
           })}
         </ul>
       </nav>
+
+      <AccountSlot />
     </aside>
+  );
+}
+
+/**
+ * Who this tab is acting as, and the one way to stop.
+ *
+ * Signing out has no redirect of its own: the session flips to signed-out, and
+ * `RequireSession` sends the page away. Two places deciding where a signed-out person
+ * belongs is one too many, and they would not always agree.
+ */
+function AccountSlot() {
+  const { status, user, signOut } = useSession();
+
+  if (status === 'signed-in' && user) {
+    return (
+      <div className="mt-6 border-t border-line pt-4 lg:mt-auto">
+        <p className="truncate text-label text-ink">{user.fullName}</p>
+        <p className="mt-0.5 truncate text-[0.75rem] text-ink-faint">{user.email}</p>
+        <button
+          type="button"
+          onClick={() => {
+            void signOut()
+              .then(() => notify.success('Signed out'))
+              .catch(() =>
+                notify.error('The API could not hear the goodbye, but this device has let go.'),
+              );
+          }}
+          className={cn(buttonClass({ variant: 'ghost', size: 'sm' }), 'mt-2 -ml-3')}
+        >
+          Sign out
+        </button>
+      </div>
+    );
+  }
+
+  if (status === 'bootstrapping') return <Skeleton className="mt-6 h-12 w-full rounded-card" />;
+
+  return (
+    <div className="mt-6 border-t border-line pt-4 lg:mt-auto">
+      <Link href="/login" className={buttonClass({ variant: 'secondary', size: 'sm' })}>
+        Sign in
+      </Link>
+    </div>
   );
 }
