@@ -72,6 +72,24 @@ export const VERIFICATION_STATUS_CODES = {
 } as const;
 
 /**
+ * Where a course is in its own life. `archived` is retired rather than deleted, because a
+ * student's enrollment or a recording's transcript will point at the course that made them
+ * a customer, and a missing row makes that record meaningless.
+ */
+export const COURSE_STATUS_CODES = {
+  DRAFT: 'draft',
+  PUBLISHED: 'published',
+  ARCHIVED: 'archived',
+} as const;
+
+/** How a teacher pitches a course to the person choosing between three of them. */
+export const COURSE_LEVEL_CODES = {
+  BEGINNER: 'beginner',
+  INTERMEDIATE: 'intermediate',
+  ADVANCED: 'advanced',
+} as const;
+
+/**
  * Checks the reference rows for the types a caller actually reads. The required list is
  * a parameter rather than "all of `LKP_TYPE_CODES`", because the code names every type
  * the product will eventually have while each phase seeds only its own — validating all

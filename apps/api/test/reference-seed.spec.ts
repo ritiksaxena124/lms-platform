@@ -1,7 +1,12 @@
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { LKP_TYPE_CODES, ROLE_CODES } from '@lms/shared';
+import {
+  COURSE_LEVEL_CODES,
+  COURSE_STATUS_CODES,
+  LKP_TYPE_CODES,
+  ROLE_CODES,
+} from '@lms/shared';
 
 import { LOOKUP_SEEDS, REQUIRED_LKP_TYPES } from '../src/reference/reference-data';
 import { assertSeedTargetAllowed, seedLookups } from '../src/reference/seed-lookups';
@@ -53,6 +58,25 @@ describe('reference data seeding', () => {
         seed.values.map((value) => [value.code, value.label]),
       );
     }
+  });
+
+  it('seeds the lifecycle a course moves through and the levels it can be tagged', async () => {
+    // The teacher phase needs both before a course can exist: `status` decides whether a
+    // student could ever see it, and the code list is what the publish transition checks.
+    const codesFor = async (typeCode: string) =>
+      (
+        await prisma.lkpValue.findMany({
+          where: { type: { code: typeCode } },
+          orderBy: { position: 'asc' },
+        })
+      ).map((value) => value.code);
+
+    expect(await codesFor(LKP_TYPE_CODES.COURSE_STATUS)).toEqual([
+      COURSE_STATUS_CODES.DRAFT,
+      COURSE_STATUS_CODES.PUBLISHED,
+      COURSE_STATUS_CODES.ARCHIVED,
+    ]);
+    expect(await codesFor(LKP_TYPE_CODES.COURSE_LEVEL)).toEqual(Object.values(COURSE_LEVEL_CODES));
   });
 
   it('is idempotent, because every boot and every test run calls it again', async () => {

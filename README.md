@@ -4,8 +4,9 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 2 in progress** — accounts sign in, hold a session and a teacher can save a
-profile. No courses, bookings or payments exist yet; those are Phases 3+.
+**Status: Phase 3 in progress** — accounts sign in, hold a session and a teacher can save a
+profile and author courses through the API (`/api/v1/courses`). Modules, lessons,
+enrollment, bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -127,8 +128,8 @@ decision was made, and what was deliberately left out.
 | ----- | ------------------------------------------------------------ | ----------- |
 | 0     | Plan, architecture, data model                               | Approved    |
 | 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell | **Done**    |
-| 2     | Auth, accounts, roles, teacher profile                       | In progress |
-| 3     | Courses, lessons, enrollment                                 | Not started |
+| 2     | Auth, accounts, roles, teacher profile                       | **Done**    |
+| 3     | Courses, lessons, enrollment                                 | In progress |
 | 4     | Availability, bookings, scheduling across timezones          | Not started |
 | 5     | Video + storage + email behind provider ports                | On hold     |
 | 6     | Payments (free-tier provider only)                           | On hold     |

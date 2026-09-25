@@ -1,5 +1,7 @@
 import {
   ACCOUNT_STATUS_CODES,
+  COURSE_LEVEL_CODES,
+  COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
   type LkpTypeCode,
   ROLE_CODES,
@@ -67,6 +69,27 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at('english', 'English'),
       at('computer_science', 'Computer Science'),
       at('spoken_english', 'Spoken English'),
+    ],
+  },
+  /**
+   * The two vocabularies a course is written in. Level is a lookup rather than a union of
+   * strings because Ops decides how many tiers the catalogue has — a fourth level for
+   * exam-only batches is a database row, not a release.
+   */
+  [LKP_TYPE_CODES.COURSE_STATUS]: {
+    description: 'Where a course is in its own life',
+    values: [
+      at(COURSE_STATUS_CODES.DRAFT, 'Draft'),
+      at(COURSE_STATUS_CODES.PUBLISHED, 'Published'),
+      at(COURSE_STATUS_CODES.ARCHIVED, 'Archived'),
+    ],
+  },
+  [LKP_TYPE_CODES.COURSE_LEVEL]: {
+    description: 'Who a course is written for',
+    values: [
+      at(COURSE_LEVEL_CODES.BEGINNER, 'Beginner'),
+      at(COURSE_LEVEL_CODES.INTERMEDIATE, 'Intermediate'),
+      at(COURSE_LEVEL_CODES.ADVANCED, 'Advanced'),
     ],
   },
 };

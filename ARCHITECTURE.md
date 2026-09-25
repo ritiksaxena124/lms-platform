@@ -185,7 +185,35 @@ A portal is a client of that design, and inherits its rules:
   greeting when a token dies mid-session; the alternative is a header that welcomes someone
   the API no longer recognises.
 
-## 8. Frontend
+## 8. Courses
+
+- **A course belongs to exactly one teacher account.** Co-authoring would need a join table
+  and a second set of permissions, and a course that can change hands underneath a student
+  is a course nobody is accountable for.
+- **A slug is unique per teacher, and stays taken after the course is archived.** `intro-to-algebra`
+  is a phrase two teachers will both reach for, and a global key hands the second one a fight
+  over a word. Retiring a course must not free its address: a link, a screenshot and a
+  forwarded message that named it are still in the world.
+- **`status` is not a writable field.** The validation pipe rejects unknown properties, so a
+  body cannot contain `status`, and the column moves only through `POST /courses/:id/publish`
+  and `/archive`. Those two handlers can attach a precondition; a PATCH could not.
+- **Publishing checks what a student reads** — a summary and a description — and answers per
+  field, so the form can point at the two boxes still empty rather than at the page.
+- **A published course cannot be edited.** Archive it first. A student reading a description
+  is reading a promise about the classes they enrolled for, and silent changes to it are how
+  that promise stops meaning anything.
+- **Another teacher's course answers `NOT_FOUND`, not `FORBIDDEN`.** Every read and write
+  carries `teacherUserId` in its `where` clause rather than checking ownership afterwards, so
+  ownership is not a step a later endpoint can forget. `403` would tell a colleague the id
+  exists and is a course.
+- **No price on the course row, and no `DELETE`.** Nothing can charge one yet, so a stored
+  number would be a field no provider validates and a figure a student can be shown. Retiring
+  is archiving; the row is what a later enrollment would point at.
+- **Modules and lessons are the next two steps, in that order.** This section documents the
+  container only — the structure inside a course is deliberately not modelled yet, so a
+  lesson cannot be written against a module that has no decided shape.
+
+## 9. Frontend
 
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
   radius, shadow, duration or type step is defined. A portal re-themes by overriding tokens;
@@ -231,7 +259,7 @@ A portal is a client of that design, and inherits its rules:
   the field it keys, so the rules stay on the server; a failure no field owns — a wrong
   password pair — appears once, as a form-level line, and never says which half was wrong.
 
-## 9. Development environment
+## 10. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:…`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -243,7 +271,7 @@ A portal is a client of that design, and inherits its rules:
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 10. Verification
+## 11. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 

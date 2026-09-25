@@ -53,6 +53,10 @@ model LkpValue {
   /// Profiles that offer this subject, once `Subject` rows exist.
   teacherSubjects TeacherSubject[] @relation("subject_profile")
 
+  /// Courses at this level, and courses in this stage of their life.
+  coursesAsLevel  Course[] @relation("course_level")
+  coursesAsStatus Course[] @relation("course_status")
+
   @@unique([typeId, code], map: "uk_lkp_value_type_code")
   @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
   @@map("lkp_value")
@@ -86,6 +90,7 @@ model User {
   status        LkpValue        @relation("user_status", fields: [statusValueId], references: [id], onDelete: Restrict)
   refreshTokens RefreshToken[]
   profile       TeacherProfile?
+  courses       Course[]        @relation("course_teacher")
 
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
@@ -145,6 +150,48 @@ model TeacherSubject {
   @@unique([profileId, subjectValueId], map: "uk_teacher_subject")
   @@index([subjectValueId, isActive], map: "ix_teacher_subject_subject")
   @@map("teacher_subject")
+}
+
+/// A course a teacher is writing, has written, or has retired. Owned by exactly one
+/// account: a co-author model would need a second table and the permissions question that
+/// comes with it, and a marketplace where a course can change hands underneath a student
+/// is a course nobody can be accountable for.
+model Course {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacherUserId String @map("teacher_user_id") @db.Uuid
+
+  title String @map("title")
+  /// The address a student is sent to. Unique per teacher rather than globally, because
+  /// "intro-to-algebra" is a phrase two teachers will both reach for, and a global key
+  /// hands the second one a fight over a word.
+  ///
+  /// Reserved for the teacher who used it first, even after the course is archived: an
+  /// old link has to keep resolving to the thing it described.
+  slug  String @map("slug")
+
+  /// One line under a card title. Nullable, because a draft with no summary is still a
+  /// draft worth keeping — but publishing is refused until it has one.
+  summary     String? @map("summary")
+  description String? @map("description")
+
+  /// Level and status are lookup rows, so Ops can add a tier or retire a state without a
+  /// migration; the transitions between statuses are enforced in code, which is the only
+  /// place the difference between "archived" and "published" is meaningful.
+  levelValueId  String @map("level_value_id") @db.Uuid
+  statusValueId String @map("status_value_id") @db.Uuid
+
+  isActive  Boolean   @default(true) @map("is_active")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teacher User     @relation("course_teacher", fields: [teacherUserId], references: [id], onDelete: Restrict)
+  level   LkpValue @relation("course_level", fields: [levelValueId], references: [id], onDelete: Restrict)
+  status  LkpValue @relation("course_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+
+  @@unique([teacherUserId, slug], map: "uk_course_teacher_slug")
+  @@index([teacherUserId, isActive, createdAt], map: "ix_course_teacher_created")
+  @@map("course")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its
