@@ -31,7 +31,7 @@ cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_te
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
 bun run --filter @lms/api db:migrate
-bun run --filter @lms/api db:seed       # reference rows: roles, account statuses, subjects
+bun run --filter @lms/api db:seed       # reference rows + the three demo accounts below
 
 # 3. Everything else is derived from those two files
 bun run verify        # build + typecheck + lint + test across the workspace
@@ -41,6 +41,22 @@ bun run dev           # API on :4000, teacher portal on :3000
 Then open <http://teacher.localtest.me:3000>. `*.localtest.me` resolves to `127.0.0.1`
 and gives every portal a subdomain of one registrable domain, which is what lets the
 three apps share a session cookie in development without `localhost` CORS hacks.
+
+### Signing in
+
+`db:seed` also creates three accounts. Their password is not a secret — being easy to type
+is the entire reason they exist:
+
+| Account                | Portal                                                   |
+| ---------------------- | -------------------------------------------------------- |
+| `teacher@example.test` | teacher portal                                           |
+| `student@example.test` | student portal                                           |
+| `ops@example.test`     | ops portal — the role the sign-up form will not hand out |
+
+All three sign in with `lms-demo-password`. They are created only in `lms` and `lms_test`:
+seeding refuses when `NODE_ENV=production`, and re-running `db:seed` after you have changed
+one leaves it changed. The addresses sit under the reserved `.test` domain, so a demo
+account can never be pointed at a real mailbox.
 
 ## Commands
 
