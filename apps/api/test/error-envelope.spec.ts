@@ -64,7 +64,7 @@ describe('error envelope', () => {
     await app?.close();
   });
 
-  it('returns one shape for validation failures, with field messages attached', async () => {
+  it('returns one shape for validation failures, keyed by field', async () => {
     const res = await request(app.getHttpServer())
       .post('/api/v1/_error-probe/register')
       .send({ email: 'not-an-email', password: 'short' })
@@ -73,9 +73,12 @@ describe('error envelope', () => {
     expect(res.body.code).toBe('VALIDATION_FAILED');
     expect(res.body.statusCode).toBe(400);
     expect(res.body.requestId).toMatch(/[0-9a-f-]{36}/i);
-    expect(res.body.details.validation).toEqual(
-      expect.arrayContaining([expect.stringMatching(/email/)]),
-    );
+    // Keyed by field, not a flat list: a form highlights `email`, and a client cannot
+    // find the field in "email must be an email" without reparsing English.
+    expect(res.body.details.validation).toMatchObject({
+      email: [expect.stringMatching(/must be an email/)],
+      password: [expect.stringMatching(/password/)],
+    });
   });
 
   it('accepts a valid payload', async () => {

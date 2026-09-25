@@ -4,6 +4,7 @@ import {
   BLOCKING_BOOKING_STATUSES,
   BOOKING_STATUS_CODES,
   ROLE_CODES,
+  SELF_REGISTERABLE_ROLES,
   validateLookupSeeds,
 } from './lookup-codes';
 
@@ -13,6 +14,11 @@ describe('lookup reference codes', () => {
       expect(typeof code).toBe('string');
     }
     expect(Object.values(ROLE_CODES)).toEqual(['student', 'teacher', 'ops']);
+  });
+
+  it('never lets a sign-up form ask for an ops account', () => {
+    expect([...SELF_REGISTERABLE_ROLES]).toEqual(['student', 'teacher']);
+    expect(SELF_REGISTERABLE_ROLES).not.toContain(ROLE_CODES.OPS);
   });
 
   it('only lets pending or confirmed bookings hold a slot', () => {

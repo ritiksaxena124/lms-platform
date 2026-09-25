@@ -1,9 +1,9 @@
 import type { INestApplication } from '@nestjs/common';
-import { ValidationPipe } from '@nestjs/common';
 import helmet from 'helmet';
 
 import { API_PREFIX } from './common/http/api-prefix';
 import { createRequestContextMiddleware } from './common/http/request-context.middleware';
+import { createValidationPipe } from './common/http/validation';
 import { AppLogger } from './common/logging/app-logger.service';
 import type { AppEnv } from './config/env';
 
@@ -24,16 +24,9 @@ export function configureApp(app: INestApplication, env: AppEnv): INestApplicati
     exposedHeaders: ['x-request-id'],
   });
 
-  // Unknown properties are stripped and rejected, so a client cannot smuggle e.g.
-  // `isActive: true` into a create/update payload.
-  app.useGlobalPipes(
-    new ValidationPipe({
-      whitelist: true,
-      forbidNonWhitelisted: true,
-      transform: true,
-      transformOptions: { enableImplicitConversion: false },
-    }),
-  );
+  // Unknown properties are stripped and rejected, and field errors leave keyed by field
+  // so a form can highlight the right input. See `createValidationPipe`.
+  app.useGlobalPipes(createValidationPipe());
 
   app.enableShutdownHooks();
 

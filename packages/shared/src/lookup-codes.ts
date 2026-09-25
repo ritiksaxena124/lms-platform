@@ -36,6 +36,13 @@ export const ROLE_CODES = {
 
 export type RoleCode = (typeof ROLE_CODES)[keyof typeof ROLE_CODES];
 
+/**
+ * Roles a person may ask for at the sign-up form. `ops` is absent on purpose: an internal
+ * account is issued by the platform, and a self-service route that accepted it would turn
+ * one typo in a client payload into an administrator.
+ */
+export const SELF_REGISTERABLE_ROLES = [ROLE_CODES.STUDENT, ROLE_CODES.TEACHER] as const;
+
 export const BOOKING_STATUS_CODES = {
   PENDING: 'pending',
   CONFIRMED: 'confirmed',

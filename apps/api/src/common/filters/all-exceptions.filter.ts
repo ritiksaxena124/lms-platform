@@ -91,6 +91,13 @@ function describe(exception: unknown): {
     const validationErrors = Array.isArray(objectPayload.message)
       ? objectPayload.message
       : undefined;
+    // An exception may carry its own structured details — field-keyed validation errors,
+    // or the limits a request exceeded. They travel through untouched rather than being
+    // flattened back into a message string.
+    const explicitDetails =
+      objectPayload.details && typeof objectPayload.details === 'object'
+        ? objectPayload.details
+        : undefined;
 
     return {
       statusCode,
@@ -101,7 +108,11 @@ function describe(exception: unknown): {
           : (CODE_BY_STATUS[statusCode] ?? API_ERROR_CODES.INTERNAL_ERROR),
       message:
         typeof objectPayload.message === 'string' ? objectPayload.message : exception.message,
-      ...(validationErrors ? { details: { validation: validationErrors } } : {}),
+      ...(explicitDetails
+        ? { details: explicitDetails }
+        : validationErrors
+          ? { details: { validation: validationErrors } }
+          : {}),
     };
   }
 
