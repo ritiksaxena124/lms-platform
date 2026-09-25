@@ -214,11 +214,44 @@ A portal is a client of that design, and inherits its rules:
   and the lifecycle buttons on the row as well as in the editor — because publishing is what
   a teacher came here to do, and making them open a form to find the button costs a click
   every time.
-- **Modules and lessons are the next two steps, in that order.** This section documents the
-  container only — the structure inside a course is deliberately not modelled yet, so a
-  lesson cannot be written against a module that has no decided shape.
+- **What sits inside a course is §9.** The container has no fields of its own left to decide;
+  the syllabus underneath it is where the next rules live.
 
-## 9. Frontend
+## 9. Modules
+
+A module is one ordered block of a course's syllabus — the level a lesson will sit under. Its
+routes hang off the course (`/api/v1/courses/:courseId/modules`) and it shares the course's
+Nest module, repository of ownership and guards instead of standing up a domain of its own.
+
+- **A module has no status of its own.** Whether a student may read one is decided by the
+  course's lifecycle, and a second flag would need rules for which of them wins when they
+  disagree.
+- **`position` is not a writable field.** The API appends at the end of the order. A body that
+  could name its own slot could put two modules in it, and the unique index would answer a
+  drag-and-drop mistake with a 500.
+- **A retired module keeps its slot, and a new one takes the number after the highest the
+  course ever used.** `lastPosition` counts inactive rows, so "module 3" in a message sent last
+  month cannot come to mean a different block. Gaps in the numbering are the price, and a
+  syllabus is read in order rather than by arithmetic on its labels.
+- **A reorder permutes the slots the active modules already hold** rather than renumbering from
+  1 — the slots retired rows sit on stay theirs. The body must name every active module exactly
+  once, or nothing moves at all.
+- **The write is two phases inside one transaction.** `uk_module_course_position` is checked as
+  each row lands, not at commit, so a straight swap fails on its second row: the first has
+  already taken the slot the second still stands in. Every row is lifted above any slot a
+  course can reach, then set down.
+- **Adding and renaming are allowed while a course is published; removing is not.** A teacher
+  extending a live syllabus gives a student more to read. Taking a module away could remove what
+  they are working through, so the answer is `409` and a message naming archiving as the way
+  round it.
+- **Ownership is inherited rather than repeated.** Every entry point resolves the course against
+  the session's own courses first, so a module id alone is never a key: another teacher's
+  syllabus is `NOT_FOUND`, whether it is reached through its own course or somebody else's.
+- **Deactivating is the only removal.** `isActive` is what every list filters on, so a module
+  with lessons under it does not need an answer about those lessons before it can leave the
+  syllabus.
+
+## 10. Frontend
 
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
   radius, shadow, duration or type step is defined. A portal re-themes by overriding tokens;
@@ -272,7 +305,7 @@ A portal is a client of that design, and inherits its rules:
   the field it keys, so the rules stay on the server; a failure no field owns — a wrong
   password pair — appears once, as a form-level line, and never says which half was wrong.
 
-## 10. Development environment
+## 11. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:…`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -284,7 +317,7 @@ A portal is a client of that design, and inherits its rules:
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 11. Verification
+## 12. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 

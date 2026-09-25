@@ -189,9 +189,40 @@ model Course {
   level   LkpValue @relation("course_level", fields: [levelValueId], references: [id], onDelete: Restrict)
   status  LkpValue @relation("course_status", fields: [statusValueId], references: [id], onDelete: Restrict)
 
+  /// The syllabus, in the order the teacher put it in.
+  modules Module[] @relation("course_modules")
+
   @@unique([teacherUserId, slug], map: "uk_course_teacher_slug")
   @@index([teacherUserId, isActive, createdAt], map: "ix_course_teacher_created")
   @@map("course")
+}
+
+/// One ordered block of a course's syllabus — the level a lesson sits under.
+///
+/// A module has no status of its own: the course's lifecycle is what decides whether a
+/// student can read this row, and a second flag would need rules for which one wins.
+model Module {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+
+  title       String  @map("title")
+  summary     String? @map("summary")
+  description String? @map("description")
+
+  /// The slot inside the course, assigned by the service and never by a client. Gaps are
+  /// normal and kept: a retired module still holds its number, so nothing can slide into a
+  /// slot a student's note, screenshot or bookmark once named.
+  position Int @map("position")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course Course @relation("course_modules", fields: [courseId], references: [id], onDelete: Restrict)
+
+  @@unique([courseId, position], map: "uk_module_course_position")
+  @@index([courseId, isActive, position], map: "ix_module_course_order")
+  @@map("module")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its
