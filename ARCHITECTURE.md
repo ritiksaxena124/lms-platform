@@ -250,6 +250,11 @@ Nest module, repository of ownership and guards instead of standing up a domain 
 - **Deactivating is the only removal.** `isActive` is what every list filters on, so a module
   with lessons under it does not need an answer about those lessons before it can leave the
   syllabus.
+- **The teacher edits the syllabus at `/courses/[id]/modules`, and the portal paints only what
+  the API confirmed.** A move sends the whole order and repaints from the reply rather than
+  swapping two rows locally, so a reorder the server refused cannot leave a syllabus on screen
+  that was never written. Adding, renaming and removing all take the same no-optimistic-paint
+  rule as the course editor.
 
 ## 10. Frontend
 

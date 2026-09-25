@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Button,
@@ -320,6 +321,20 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
           </Button>
         ) : null}
       </div>
+
+      {course ? (
+        <p className="text-[0.8125rem] text-ink-muted">
+          The course is more than this page:{' '}
+          <Link
+            href={`/courses/${course.id}/modules`}
+            transitionTypes={['nav-forward']}
+            className="text-brand underline-offset-4 hover:underline"
+          >
+            write its syllabus
+          </Link>
+          .
+        </p>
+      ) : null}
 
       {course?.status.code === 'archived' ? (
         <p className="text-[0.75rem] leading-snug text-ink-faint">
