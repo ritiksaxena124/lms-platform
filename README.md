@@ -4,8 +4,9 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 1 complete** — foundation only. No auth, courses or bookings exist yet;
-those are Phases 2+. See [Phase plan](#phases).
+**Status: Phase 2 in progress** — accounts sign in, hold a session and a teacher can save a
+profile. No courses, bookings or payments exist yet; those are Phases 3+.
+See [Phase plan](#phases).
 
 ---
 
@@ -30,7 +31,7 @@ cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_te
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
 bun run --filter @lms/api db:migrate
-bun run --filter @lms/api db:seed       # reference rows: roles, account statuses
+bun run --filter @lms/api db:seed       # reference rows: roles, account statuses, subjects
 
 # 3. Everything else is derived from those two files
 bun run verify        # build + typecheck + lint + test across the workspace

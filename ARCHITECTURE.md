@@ -45,6 +45,11 @@ was ready to run.
   `WHERE is_active`, so an archived row cannot block a new one.
 - Append-only ledgers (payments, moderation decisions, status transitions) never update in
   place; a correction is a new row pointing at the old one.
+- A join row follows the same rule: removing a subject from a teacher's profile deactivates
+  the row, and adding it back revives that same row. That is what makes
+  `@@unique([profile_id, subject_value_id])` safe — an unconditional delete-then-insert
+  would fight the no-hard-delete rule, and a partial unique index would let one profile list
+  the same subject twice.
 
 ## 3. Reference data lives in the database
 
@@ -54,6 +59,14 @@ migration that rewrites a column type. The code strings are still typed —
 `packages/shared/src/lookup-codes.ts` exports them as `as const` objects, and
 `validateLookupSeeds()` fails the boot if a seed set is missing a code the application
 expects. Enums are the one thing you cannot add to without a schema change; codes you can.
+
+An API that speaks these codes translates them at the edge and never deeper: a request body
+carries `subjects: ["mathematics"]`, the row carries a `lkp_value` uuid, and
+`ReferenceService` is the only file through which the two meet. A response sends
+`{ code, label }` rather than a bare code, because a portal that keeps its own translation
+table is a second catalogue that starts drifting the day Ops renames one. The order a list of
+them reads in is `lkp_value.position`, which is a decision Ops can change; it is never the
+order the client happened to send.
 
 ## 4. Errors
 
@@ -74,6 +87,11 @@ Every failure leaves the API as one envelope:
 branches on it and never on wording. `message` is written for a human and is safe to show.
 Field errors are keyed **by field name**, never as a flat list of sentences — a form has to
 know which input to highlight, and parsing English to find out is not that.
+For any of that to run, the controller must import its DTO as a **value**. `import type`
+erases the class from the emitted parameter metadata, Nest reads the parameter as `Object`,
+and the route then answers 200 to a body it should have rejected. The same mistake in a
+constructor fails loudly ("Nest can't resolve dependencies"), which makes the parameter
+position the dangerous half: it looks like a working endpoint.
 Unexpected errors return a generic message while the real cause is logged with the same
 `requestId`, so a stack trace, a connection string or an internal hostname can never reach
 a browser. `@lms/ui`'s `notify.fromApiError()` renders this exact shape, including field
@@ -93,6 +111,16 @@ errors, which is why both sides import the type from one place.
 - `packages/shared/src/timezone.ts` and `money.ts` are the only places this math lives, and
   both are tested across DST boundaries. Money is an integer in minor units plus a currency
   code — never a float, never a rupee value with an implicit scale.
+- **An amount and its currency are one decision, so they are validated as one.** Either half
+  on its own is meaningless: a rate without a currency is a number someone will later read
+  as rupees, and a currency without a rate is a form field that went nowhere. Both are
+  optional together and required as a pair, which is why the DTO uses `@ValidateIf` on the
+  pair rather than `@IsOptional` on each — `@IsOptional` skips an absent property, and an
+  absent currency is precisely the case that has to fail.
+- **A teacher's working zone belongs to the account, not to the profile row.** It decides
+  when a class is, what "today" means in a dashboard and when a reminder is humane; a copy on
+  the profile would be a second truth to keep in step, so the profile form writes
+  `users.timezone` and reads it back from there.
 
 ## 6. Third-party providers
 

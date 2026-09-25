@@ -50,6 +50,9 @@ model LkpValue {
   usersAsRole   User[] @relation("user_role")
   usersAsStatus User[] @relation("user_status")
 
+  /// Profiles that offer this subject, once `Subject` rows exist.
+  teacherSubjects TeacherSubject[] @relation("subject_profile")
+
   @@unique([typeId, code], map: "uk_lkp_value_type_code")
   @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
   @@map("lkp_value")
@@ -79,12 +82,69 @@ model User {
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  role          LkpValue       @relation("user_role", fields: [roleValueId], references: [id], onDelete: Restrict)
-  status        LkpValue       @relation("user_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+  role          LkpValue        @relation("user_role", fields: [roleValueId], references: [id], onDelete: Restrict)
+  status        LkpValue        @relation("user_status", fields: [statusValueId], references: [id], onDelete: Restrict)
   refreshTokens RefreshToken[]
+  profile       TeacherProfile?
 
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
+}
+
+/// What a student sees before they book: the teacher's own description of their work.
+/// One row per teacher, written by the first save rather than at registration, so signing
+/// up never leaves an empty profile that looks like a filled one.
+///
+/// The working timezone is deliberately absent — it lives on `User`, because a teacher's
+/// zone decides when their classes are, not only what their profile says.
+model TeacherProfile {
+  id     String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId String @unique @map("user_id") @db.Uuid
+
+  /// One line in a search result. Kept short by validation so the card does not wrap.
+  headline String? @map("headline")
+  bio      String? @map("bio")
+
+  /// Minor units plus an ISO 4217 code, never a float, and never a formatted string —
+  /// "₹1,200" is unrenderable in a currency the reader does not share.
+  /// Nullable as a pair: a teacher who has not decided yet should not be forced to
+  /// publish a number they will not honour.
+  hourlyRateMinorUnits Int?    @map("hourly_rate_minor_units")
+  currencyCode         String? @map("currency_code") @db.VarChar(3)
+
+  isActive  Boolean   @default(true) @map("is_active")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  user     User             @relation(fields: [userId], references: [id], onDelete: Restrict)
+  subjects TeacherSubject[]
+
+  @@map("teacher_profile")
+}
+
+/// Which subjects a profile offers. A join row rather than an array column, because a
+/// subject is a lookup value students will search and filter by, and a text array cannot
+/// be indexed against a `lkp_value` that Ops may retire.
+///
+/// Removing a subject deactivates the row and re-adding it revives the same one — which is
+/// what makes the unique key below safe alongside the no-hard-delete rule.
+model TeacherSubject {
+  id             String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profileId      String @map("profile_id") @db.Uuid
+  subjectValueId String @map("subject_value_id") @db.Uuid
+
+  isActive  Boolean   @default(true) @map("is_active")
+  deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  profile TeacherProfile @relation(fields: [profileId], references: [id], onDelete: Restrict)
+  subject LkpValue       @relation("subject_profile", fields: [subjectValueId], references: [id], onDelete: Restrict)
+
+  @@unique([profileId, subjectValueId], map: "uk_teacher_subject")
+  @@index([subjectValueId, isActive], map: "ix_teacher_subject_subject")
+  @@map("teacher_subject")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its

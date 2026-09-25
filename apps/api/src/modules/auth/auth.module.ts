@@ -17,12 +17,15 @@ import { UsersRepository } from './users.repository';
     RefreshTokensRepository,
     { provide: PASSWORD_HASHER, useClass: ScryptPasswordHasher },
     { provide: ACCESS_TOKENS, useClass: JwtAccessTokens },
-    // Registering the guards here keeps `UsersRepository` private to this module while
-    // making them global: `APP_GUARD` applies to every route in the application, so a
-    // feature module added later is authenticated before anyone remembers to ask.
+    // The guards are registered here rather than in the root module so that everything an
+    // authenticated request needs — token check, account row, role — is defined next to
+    // the code that owns them. `APP_GUARD` still applies to every route in the
+    // application, so a feature module added later is protected before anyone asks.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
-  exports: [AuthService],
+  // `UsersRepository` is exported, not duplicated: a teacher profile writes the working
+  // timezone onto the account, and this stays the only module that reads the user row.
+  exports: [AuthService, UsersRepository],
 })
 export class AuthModule {}

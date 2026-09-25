@@ -11,6 +11,7 @@ export const LKP_TYPE_CODES = {
   USER_ROLE: 'UserRole',
   ACCOUNT_STATUS: 'AccountStatus',
   VERIFICATION_STATUS: 'VerificationStatus',
+  SUBJECT: 'Subject',
   BOOKING_TYPE: 'BookingType',
   BOOKING_STATUS: 'BookingStatus',
   MEETING_STATUS: 'MeetingStatus',

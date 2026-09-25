@@ -51,6 +51,24 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at(VERIFICATION_STATUS_CODES.REJECTED, 'Rejected'),
     ],
   },
+  /**
+   * What a teacher can say they teach, and what a student searches by later. A list of
+   * rows rather than a list of strings in code because the catalogue is a business
+   * decision: Ops adds "Electronics" between two releases without a deploy, and a
+   * retired subject stays reservable because old profiles still point at it.
+   */
+  [LKP_TYPE_CODES.SUBJECT]: {
+    description: 'Subjects a teacher may offer and a student may search for',
+    values: [
+      at('mathematics', 'Mathematics'),
+      at('physics', 'Physics'),
+      at('chemistry', 'Chemistry'),
+      at('biology', 'Biology'),
+      at('english', 'English'),
+      at('computer_science', 'Computer Science'),
+      at('spoken_english', 'Spoken English'),
+    ],
+  },
 };
 
 export const REQUIRED_LKP_TYPES = Object.keys(LOOKUP_SEEDS) as LkpTypeCode[];
