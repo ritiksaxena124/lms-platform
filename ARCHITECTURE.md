@@ -253,6 +253,11 @@ Nest module, repository of ownership and guards instead of standing up a domain 
 
 ## 10. Frontend
 
+- **The signed-in portal is a viewport-height frame with one scrolling column.** The sidebar
+  runs to the left edge of the window and holds still while `main` scrolls, so navigation never
+  slides away under a teacher mid-list. The height is `dvh`, not `screen`: a mobile browser's
+  URL bar is part of the viewport, and a frame measured against the screen loses its last row
+  of pixels to a bar that is not in the layout.
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
   radius, shadow, duration or type step is defined. A portal re-themes by overriding tokens;
   it does not get to invent `#3b82f6`.

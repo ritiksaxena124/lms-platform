@@ -15,6 +15,9 @@ const ITEMS = [
 /**
  * The one element that never animates: content slides, the chrome stays put, so
  * a navigation always reads as "the page changed" rather than "the app moved".
+ *
+ * It carries its own inset now that the sidebar sits against the viewport edge — the
+ * divider is the column's, not a margin around the app.
  */
 export function AppNav() {
   const pathname = usePathname();
@@ -22,7 +25,7 @@ export function AppNav() {
   return (
     <aside
       style={{ viewTransitionName: 'app-chrome' }}
-      className="shrink-0 border-line py-5 lg:flex lg:w-56 lg:flex-col lg:border-r lg:py-10"
+      className="shrink-0 border-line px-4 py-5 lg:flex lg:w-56 lg:flex-col lg:border-r lg:px-5 lg:py-10"
     >
       <Link
         href="/"
