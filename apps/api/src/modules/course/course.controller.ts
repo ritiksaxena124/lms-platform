@@ -1,10 +1,9 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
-import { ROLE_CODES } from '@lms/shared';
+import { ROLE_CODES, type Course, type CourseChoice } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { Roles } from '../auth/roles.decorator';
-import type { CourseDocument } from './courses.service';
 import { CoursesService } from './courses.service';
 // Value imports: the validation pipe finds a DTO through emitted parameter metadata, and
 // an erased class would leave every body unchecked.
@@ -25,7 +24,7 @@ export class CoursesController {
   async list(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: ListCoursesQueryDto,
-  ): Promise<{ items: CourseDocument[] }> {
+  ): Promise<{ items: Course[] }> {
     return { items: await this.courses.list(user.id, query.status) };
   }
 
@@ -33,15 +32,22 @@ export class CoursesController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateCourseDto,
-  ): Promise<{ course: CourseDocument }> {
+  ): Promise<{ course: Course }> {
     return { course: await this.courses.create(user.id, dto) };
+  }
+
+  /** Declared before `:id`, because a route that reads like an id is the one case where
+   * ordering is the whole difference between a list of levels and a 404. */
+  @Get('levels')
+  async levels(): Promise<{ items: CourseChoice[] }> {
+    return { items: await this.courses.levels() };
   }
 
   @Get(':id')
   async read(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-  ): Promise<{ course: CourseDocument }> {
+  ): Promise<{ course: Course }> {
     return { course: await this.courses.read(user.id, id) };
   }
 
@@ -50,7 +56,7 @@ export class CoursesController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateCourseDto,
-  ): Promise<{ course: CourseDocument }> {
+  ): Promise<{ course: Course }> {
     return { course: await this.courses.update(user.id, id, dto) };
   }
 
@@ -59,7 +65,7 @@ export class CoursesController {
   async publish(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-  ): Promise<{ course: CourseDocument }> {
+  ): Promise<{ course: Course }> {
     return { course: await this.courses.publish(user.id, id) };
   }
 
@@ -68,7 +74,7 @@ export class CoursesController {
   async archive(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
-  ): Promise<{ course: CourseDocument }> {
+  ): Promise<{ course: Course }> {
     return { course: await this.courses.archive(user.id, id) };
   }
 }

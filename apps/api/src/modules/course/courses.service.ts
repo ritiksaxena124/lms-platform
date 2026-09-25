@@ -8,6 +8,8 @@ import {
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
+  type Course,
+  type CourseChoice,
 } from '@lms/shared';
 
 import type { ReferenceValue } from '../../reference/reference.service';
@@ -15,18 +17,6 @@ import { ReferenceService } from '../../reference/reference.service';
 import type { CourseWithVocabulary } from './courses.repository';
 import { CoursesRepository } from './courses.repository';
 import type { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
-
-export interface CourseDocument {
-  id: string;
-  title: string;
-  slug: string;
-  summary: string | null;
-  description: string | null;
-  level: { code: string; label: string };
-  status: { code: string; label: string };
-  createdAt: string;
-  updatedAt: string;
-}
 
 /** A course row is addressed by its id and nothing else, so this is the whole of it. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -48,7 +38,7 @@ function slugify(title: string): string {
   return slug.length >= 3 ? slug : '';
 }
 
-function toDocument(course: CourseWithVocabulary): CourseDocument {
+function toDocument(course: CourseWithVocabulary): Course {
   return {
     id: course.id,
     title: course.title,
@@ -85,7 +75,7 @@ export class CoursesService {
     private readonly reference: ReferenceService,
   ) {}
 
-  async create(teacherUserId: string, dto: CreateCourseDto): Promise<CourseDocument> {
+  async create(teacherUserId: string, dto: CreateCourseDto): Promise<Course> {
     const level = await this.level(dto.level);
     const draft = await this.status(COURSE_STATUS_CODES.DRAFT);
 
@@ -110,17 +100,25 @@ export class CoursesService {
     return toDocument(course);
   }
 
-  async list(teacherUserId: string, statusCode?: string): Promise<CourseDocument[]> {
+  /** The levels a course can be tagged, in the order the catalogue sets. The portal renders
+   * this instead of keeping three strings of its own, which is the whole argument for
+   * reference rows. */
+  async levels(): Promise<CourseChoice[]> {
+    const values = await this.reference.activeValues(LKP_TYPE_CODES.COURSE_LEVEL);
+    return values.map(({ code, label }) => ({ code, label }));
+  }
+
+  async list(teacherUserId: string, statusCode?: string): Promise<Course[]> {
     const status = statusCode ? await this.status(statusCode) : null;
     const courses = await this.courses.listForTeacher(teacherUserId, status?.id ?? null);
     return courses.map(toDocument);
   }
 
-  async read(teacherUserId: string, id: string): Promise<CourseDocument> {
+  async read(teacherUserId: string, id: string): Promise<Course> {
     return toDocument(await this.owned(teacherUserId, id));
   }
 
-  async update(teacherUserId: string, id: string, dto: UpdateCourseDto): Promise<CourseDocument> {
+  async update(teacherUserId: string, id: string, dto: UpdateCourseDto): Promise<Course> {
     const course = await this.owned(teacherUserId, id);
 
     if (course.status.code === COURSE_STATUS_CODES.PUBLISHED) {
@@ -145,7 +143,7 @@ export class CoursesService {
     return toDocument(await this.courses.updateColumns(course.id, columns));
   }
 
-  async publish(teacherUserId: string, id: string): Promise<CourseDocument> {
+  async publish(teacherUserId: string, id: string): Promise<Course> {
     const course = await this.owned(teacherUserId, id);
 
     if (course.status.code !== COURSE_STATUS_CODES.DRAFT) {
@@ -175,7 +173,7 @@ export class CoursesService {
     return toDocument(await this.courses.updateStatus(course.id, published.id));
   }
 
-  async archive(teacherUserId: string, id: string): Promise<CourseDocument> {
+  async archive(teacherUserId: string, id: string): Promise<Course> {
     const course = await this.owned(teacherUserId, id);
 
     if (course.status.code !== COURSE_STATUS_CODES.PUBLISHED) {

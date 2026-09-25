@@ -45,4 +45,17 @@ export class ReferenceService {
     });
     return rows;
   }
+
+  /**
+   * Everything currently offerable under a type, in the order Ops set it. A picker asks
+   * for this instead of keeping its own list, so a value that appears in the database
+   * appears in the form without anyone shipping a change.
+   */
+  async activeValues(typeCode: LkpTypeCode): Promise<ReferenceValue[]> {
+    return this.prisma.lkpValue.findMany({
+      where: { type: { code: typeCode }, isActive: true },
+      select: { id: true, code: true, label: true },
+      orderBy: { position: 'asc' },
+    });
+  }
 }

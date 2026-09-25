@@ -140,6 +140,30 @@ describe('courses', () => {
     expect(res.body.code).toBe('FORBIDDEN');
   });
 
+  it('offers the levels a teacher can choose, in the catalogue order', async () => {
+    // The portal renders this list rather than keeping its own three strings, so a level
+    // Ops adds is a row that appears — not a release nobody remembered to plan.
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/courses/levels')
+      .set('Authorization', `Bearer ${teacher}`)
+      .expect(200);
+
+    expect(res.body.items).toEqual([
+      { code: 'beginner', label: 'Beginner' },
+      { code: 'intermediate', label: 'Intermediate' },
+      { code: 'advanced', label: 'Advanced' },
+    ]);
+  });
+
+  it('does not hand the level catalogue to a student', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/courses/levels')
+      .set('Authorization', `Bearer ${student}`)
+      .expect(403);
+
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+
   it('starts a course as a draft, not as something a student can find', async () => {
     const res = await postCourse(
       { title: 'Algebra for the CBSE boards', level: 'intermediate' },
