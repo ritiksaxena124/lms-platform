@@ -250,6 +250,12 @@ export function CourseSyllabus({ courseId }: { courseId: string }) {
 
                   <div className="min-w-0 flex-1">
                     <h3 className="text-h3 text-ink-strong">{module.title}</h3>
+                    <Link
+                      href={`/courses/${courseId}/modules/${module.id}/lessons`}
+                      className="mt-1 inline-block text-[0.8125rem] text-brand underline-offset-4 hover:underline"
+                    >
+                      Lessons
+                    </Link>
                     {module.summary ? (
                       <p className="mt-1 text-[0.8125rem] leading-snug text-ink-muted">
                         {module.summary}

@@ -256,7 +256,7 @@ Nest module, repository of ownership and guards instead of standing up a domain 
   the API confirmed.** A move sends the whole order and repaints from the reply rather than
   swapping two rows locally, so a reorder the server refused cannot leave a syllabus on screen
   that was never written. Adding, renaming and removing all take the same no-optimistic-paint
-  rule as the course editor.
+  rule as the course editor. Each module row links down into its lessons (§10).
 - **What sits inside a module is §10.** The syllabus has no fields of its own left to decide.
 
 ## 10. Lessons
@@ -303,8 +303,19 @@ domain module would only re-derive the same two hops.
   course the session's teacher owns, and the lesson against that module — so another teacher's
   lesson is `NOT_FOUND`, whether it is addressed through its own module or somebody else's, and a
   malformed id is answered by the service before Postgres is asked.
-- **Teacher-side so far.** The gated read — what a student may actually see, with both publish
-  flags applied — is the student portal's first endpoint, not a variation on these ones.
+- **The teacher writes pages at `/courses/[id]/modules/[moduleId]/lessons`, reached from a
+  module row on the syllabus.** Same no-optimistic-paint rule as the rest: a publish the API
+  refused leaves a draft pill on screen, and a reorder repaints from the order that came back.
+  Because a lesson has its own flag, the screen says which flag it is showing — the row's pill
+  is the lesson, and the course's state is spelled out in words beside the module title rather
+  than as a second chip a colour-blind reader has to tell apart.
+- **A move is a request of its own, never part of the edit form.** The API treats a body that
+  names a module as a move and ignores every other field in it, so a form that sent the edits
+  and the move together would lose the edits without saying so. The row's move control sends
+  only the module, and the lesson leaves the list because it is no longer this module's page.
+- **The student read is not built yet.** The gated list — what a student may actually see, with
+  both publish flags applied — is the student portal's first endpoint, not a variation on these
+  teacher ones.
 
 ## 11. Frontend
 

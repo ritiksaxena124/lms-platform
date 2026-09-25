@@ -109,6 +109,14 @@ describe('CourseSyllabus', () => {
     expect(link).toHaveAttribute('href', '/courses/c1/edit');
   });
 
+  it('links each module to the lessons inside it', async () => {
+    render(<CourseSyllabus courseId="c1" />);
+
+    const list = await rows();
+    const into = within(list[1] as HTMLElement).getByRole('link', { name: /lessons/i });
+    expect(into).toHaveAttribute('href', '/courses/c1/modules/m2/lessons');
+  });
+
   it('adds a module at the end, and shows the slot the API chose rather than a guessed one', async () => {
     api.createModule.mockResolvedValue(moduleOf({ id: 'm4', title: 'Decimals', position: 4 }));
 
