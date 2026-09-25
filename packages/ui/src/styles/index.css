@@ -1,0 +1,15 @@
+/* ---------------------------------------------------------------------------
+ * The single import a portal needs:
+ *
+ *   @import 'tailwindcss';
+ *   @import '@lms/ui/styles.css';
+ *
+ * `@source` below makes Tailwind scan this package for class names, which is
+ * required because package sources are symlinked and skipped by auto-detection.
+ * ------------------------------------------------------------------------- */
+
+@import './tokens.css';
+@import './base.css';
+@import './motion.css';
+
+@source '../';

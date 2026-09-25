@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest';
+
+import { isRedactedKey, parseEnv } from './env';
+
+const BASE = {
+  NODE_ENV: 'test',
+  CORS_ORIGINS: 'http://teacher.localtest.me:3002',
+  API_PUBLIC_URL: 'http://api.localtest.me:4000',
+  DATABASE_URL: 'postgresql://lms:lms@localhost:5432/lms_test',
+};
+
+describe('parseEnv', () => {
+  it('accepts a complete configuration and applies defaults', () => {
+    const env = parseEnv({ ...BASE });
+    expect(env.PORT).toBe(4000);
+    expect(env.CORS_ORIGINS).toEqual(['http://teacher.localtest.me:3002']);
+    expect(env.MAX_UPLOAD_MB).toBe(15);
+    expect(env.PAYMENT_PROVIDER).toBe('none');
+    expect(env.VIDEO_PROVIDER).toBe('none');
+  });
+
+  it('rejects an empty CORS list instead of silently allowing every origin', () => {
+    expect(() => parseEnv({ ...BASE, CORS_ORIGINS: '  ,  ' })).toThrow(/CORS_ORIGINS/);
+  });
+
+  it('rejects a non-postgres database url with a readable message', () => {
+    expect(() => parseEnv({ ...BASE, DATABASE_URL: 'mysql://x' })).toThrow(
+      /DATABASE_URL must be a postgresql/,
+    );
+  });
+
+  it('refuses to boot in production with a weak JWT secret', () => {
+    expect(() => parseEnv({ ...BASE, NODE_ENV: 'production', JWT_SECRET: 'short' })).toThrow(
+      /JWT_SECRET/,
+    );
+    expect(() =>
+      parseEnv({ ...BASE, NODE_ENV: 'production', JWT_SECRET: 'a'.repeat(32) }),
+    ).not.toThrow();
+  });
+
+  it('names every offending variable rather than the first one only', () => {
+    const error = (() => {
+      try {
+        parseEnv({ NODE_ENV: 'test' } as Record<string, string>);
+        return null;
+      } catch (caught) {
+        return (caught as Error).message;
+      }
+    })();
+
+    expect(error).toMatch(/CORS_ORIGINS/);
+    expect(error).toMatch(/API_PUBLIC_URL/);
+    expect(error).toMatch(/DATABASE_URL/);
+  });
+
+  it('treats a blank value in an env file as unset', () => {
+    const env = parseEnv({ ...BASE, JWT_SECRET: '', SMTP_URL: '  ' });
+    expect(env.JWT_SECRET).toBeUndefined();
+    expect(env.SMTP_URL).toBeUndefined();
+  });
+
+  it('fails fast when a provider is configured before its adapter exists', () => {
+    expect(() => parseEnv({ ...BASE, STORAGE_PROVIDER: 's3' })).toThrow(
+      /S3 storage is not implemented/,
+    );
+  });
+});
+
+describe('log redaction', () => {
+  it('matches secret-looking keys in any casing or separator style', () => {
+    for (const key of [
+      'password',
+      'new_password',
+      'accessToken',
+      'Authorization',
+      'api-key',
+      'DATABASE_URL',
+      'jwtSecret',
+    ]) {
+      expect(isRedactedKey(key)).toBe(true);
+    }
+    for (const key of ['email', 'courseId', 'status', 'isActive']) {
+      expect(isRedactedKey(key)).toBe(false);
+    }
+  });
+});

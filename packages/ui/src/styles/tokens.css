@@ -1,0 +1,120 @@
+/* ---------------------------------------------------------------------------
+ * @lms/ui design tokens — "Ink & Ember"
+ *
+ * A warm-paper editorial system for three dense admin portals. Colour carries
+ * meaning: clay is the only action colour, and the semantic tones (success,
+ * warning, danger) stay in their own hue families so a status pill can never be
+ * mistaken for a button.
+ *
+ * Every value is a CSS custom property, so a portal can re-theme itself by
+ * overriding tokens in one place — no build step, no duplicated class lists.
+ * Tailwind v4 reads these from `@theme`, which is why the names below are the
+ * public API (`bg-paper`, `text-ink-muted`, `rounded-card`, `font-display`).
+ * ------------------------------------------------------------------------- */
+
+@theme {
+  /* Surfaces --------------------------------------------------------------- */
+  --color-paper: #faf8f5; /* app background — warm, low glare for long shifts */
+  --color-paper-sunk: #f2eee7; /* wells behind code, disabled fields */
+  --color-surface: #ffffff; /* cards, sheets, dialogs */
+  --color-surface-raised: #ffffff;
+
+  /* Ink (text) ------------------------------------------------------------- */
+  --color-ink: #17181c; /* body text */
+  --color-ink-strong: #0c0d10; /* headings */
+  --color-ink-muted: #6d6f77; /* labels, metadata, disabled */
+  --color-ink-faint: #9a9ba2; /* placeholders, timestamps */
+  --color-ink-inverse: #faf8f5;
+
+  /* Lines ------------------------------------------------------------------ */
+  --color-line: #e6e1d8;
+  --color-line-strong: #cfc8ba;
+
+  /* Brand: ember clay ------------------------------------------------------ */
+  --color-ember: #b4530a;
+  --color-ember-deep: #8c3f06; /* primary action background, AA on white text */
+  --color-ember-soft: #f7ece2; /* selected rows, active nav, tints */
+  --color-ember-line: #e6c3a4;
+
+  /* Semantic status -------------------------------------------------------- */
+  --color-success: #1b6b4b;
+  --color-success-soft: #e3f0e9;
+  --color-warning: #8a6100;
+  --color-warning-soft: #faf0da;
+  --color-danger: #9f1239;
+  --color-danger-soft: #fbe6ea;
+  --color-info: #1d4e6b;
+  --color-info-soft: #e2eef4;
+
+  /* Type ------------------------------------------------------------------- */
+  /* The app loads the real files through next/font, which sets its own CSS
+   * variable name; point --lms-font-* at it to win over these fallbacks. */
+  --font-display: var(--lms-font-display, 'Fraunces', 'Iowan Old Style', Georgia, serif);
+  --font-sans: var(--lms-font-sans, 'Public Sans', 'Segoe UI', system-ui, sans-serif);
+  --font-mono: var(--lms-font-mono, 'JetBrains Mono', 'Cascadia Mono', ui-monospace, monospace);
+
+  /* Optical serif for page and section titles. */
+  --text-h1: 1.875rem;
+  --text-h1--line-height: 1.15;
+  --text-h1--letter-spacing: -0.018em;
+  --text-h1--font-weight: 600;
+  --text-h2: 1.25rem;
+  --text-h2--line-height: 1.3;
+  --text-h2--letter-spacing: -0.011em;
+  --text-h2--font-weight: 600;
+  --text-h3: 1rem;
+  --text-h3--line-height: 1.4;
+  --text-h3--font-weight: 600;
+  --text-eyebrow: 0.6875rem;
+  --text-eyebrow--line-height: 1;
+  --text-eyebrow--letter-spacing: 0.09em;
+  --text-eyebrow--font-weight: 600;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.2;
+  --text-label--font-weight: 550;
+  --text-metric: 2rem;
+  --text-metric--line-height: 1.05;
+  --text-metric--letter-spacing: -0.028em;
+  --text-metric--font-weight: 600;
+
+  /* Radii ------------------------------------------------------------------ */
+  --radius-field: 0.5rem; /* inputs, buttons */
+  --radius-card: 0.875rem;
+  --radius-sheet: 1.25rem;
+  --radius-pill: 999px;
+
+  /* Elevation: warm-tinted shadows so nothing looks like grey plastic. */
+  --shadow-hairline: 0 0 0 1px var(--color-line);
+  --shadow-card:
+    0 1px 2px -1px rgb(23 24 28 / 0.06), 0 2px 6px -2px rgb(23 24 28 / 0.06);
+  --shadow-raised:
+    0 1px 2px rgb(23 24 28 / 0.05), 0 8px 24px -8px rgb(23 24 28 / 0.14);
+  --shadow-overlay:
+    0 2px 4px rgb(23 24 28 / 0.06), 0 24px 56px -12px rgb(23 24 28 / 0.24);
+  --shadow-focus: 0 0 0 2px var(--color-paper), 0 0 0 4px var(--color-ember);
+
+  /* Motion ----------------------------------------------------------------- */
+  --duration-instant: 90ms;
+  --duration-fast: 160ms;
+  --duration-base: 240ms;
+  --duration-slow: 420ms;
+  --ease-out: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --ease-in-out: cubic-bezier(0.65, 0.05, 0.28, 1);
+  --ease-spring: cubic-bezier(0.34, 1.4, 0.64, 1);
+
+  /* Layout rhythm: one 4px scale, used as gaps and paddings everywhere. */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.25rem;
+  --space-6: 1.5rem;
+  --space-8: 2rem;
+  --space-10: 2.5rem;
+  --space-12: 3rem;
+  --space-16: 4rem;
+
+  /* Two measures: a page grid, and a column that stays readable at 400+ chars. */
+  --container-page: 78rem;
+  --container-reading: 46rem;
+}

@@ -1,0 +1,29 @@
+{
+  "name": "lms",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "typecheck": "bun run --filter '*' typecheck",
+    "lint": "bun run --filter '*' lint",
+    "test": "bun run --filter '*' test",
+    "verify": "bun run build:shared && bun run typecheck && bun run lint && bun run test",
+    "format": "prettier --write \"**/*.{ts,tsx,js,mjs,json,md,prisma}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,mjs,json,md,prisma}\"",
+    "build:shared": "bun run --filter @lms/shared build",
+    "dev": "bun run --filter '*' dev",
+    "dev:api": "bun run --filter @lms/api dev",
+    "dev:teacher": "bun run --filter @lms/teacher dev"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.35.0",
+    "eslint": "^9.35.0",
+    "eslint-plugin-react-hooks": "^6",
+    "globals": "^16.4.0",
+    "prettier": "^3.6.2",
+    "typescript": "^5.9.2",
+    "typescript-eslint": "^8.43.0"
+  }
+}

@@ -1,0 +1,52 @@
+// Prisma is the only source of truth for the schema. Every change goes through a
+// migration; `prisma migrate deploy` runs on the server, never `db push`.
+//
+// Conventions for every table added from here on:
+//   id uuid default gen_random_uuid(), created_at/updated_at timestamptz,
+//   is_active boolean default true, snake_case @map names, onDelete: Restrict
+//   (rows are soft-deactivated, never deleted or cascaded away).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// Configurable business constants. Statuses, roles and types live here rather than in
+/// TypeScript enums, so Ops can add or retire a value without a code change.
+model LkpType {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  code        String   @map("code")
+  description String?  @map("description")
+  isActive    Boolean  @default(true) @map("is_active")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  values LkpValue[]
+
+  @@unique([code], map: "uk_lkp_type_code")
+  @@map("lkp_type")
+}
+
+model LkpValue {
+  id       String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  typeId   String  @map("type_id") @db.Uuid
+  code     String  @map("code")
+  label    String  @map("label")
+  position Int     @default(0) @map("position")
+  isActive Boolean @default(true) @map("is_active")
+
+  /// Identity-style reference rows stay reserved once used: deactivating a status must
+  /// not free its code for a different meaning, because existing rows still point at it.
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  type LkpType @relation(fields: [typeId], references: [id], onDelete: Restrict)
+
+  @@unique([typeId, code], map: "uk_lkp_value_type_code")
+  @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
+  @@map("lkp_value")
+}

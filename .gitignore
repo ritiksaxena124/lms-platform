@@ -1,0 +1,30 @@
+# dependencies
+node_modules/
+
+# builds
+dist/
+.next/
+out/
+build/
+*.tsbuildinfo
+
+# env + secrets
+.env
+.env.*
+!.env.example
+
+# database / local storage
+storage/
+pgdata/
+
+# test + tooling
+coverage/
+.turbo/
+playwright-report/
+test-results/
+
+# editor / os
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json

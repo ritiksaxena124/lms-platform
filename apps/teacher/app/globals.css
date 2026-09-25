@@ -1,0 +1,10 @@
+@import 'tailwindcss';
+@import '@lms/ui/styles.css';
+
+/* next/font defines the real faces on <html>; the package falls back to system
+ * stacks when this file is not loaded, so it stays usable in isolation. */
+:root {
+  --lms-font-display: var(--font-fraunces), 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --lms-font-sans: var(--font-public-sans), 'Public Sans', 'Segoe UI', system-ui, sans-serif;
+  --lms-font-mono: var(--font-jetbrains-mono), 'JetBrains Mono', ui-monospace, monospace;
+}
