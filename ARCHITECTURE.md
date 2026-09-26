@@ -240,10 +240,12 @@ Nest module, repository of ownership and guards instead of standing up a domain 
   each row lands, not at commit, so a straight swap fails on its second row: the first has
   already taken the slot the second still stands in. Every row is lifted above any slot a
   course can reach, then set down.
-- **Adding and renaming are allowed while a course is published; removing is not.** A teacher
-  extending a live syllabus gives a student more to read. Taking a module away could remove what
-  they are working through, so the answer is `409` and a message naming archiving as the way
-  round it.
+- **Adding and renaming are allowed while a course is published; removing a block only when it
+  holds nothing a student is reading.** A teacher extending a live syllabus gives a student more
+  to read. Taking away a block with published pages inside it could remove what they are working
+  through, so the answer is `409` naming the lessons to take back first (§11). An empty block —
+  or one whose every page is still a draft — is not on a student's screen at all, so a teacher
+  tidying up a mistake is allowed to, rather than being told to archive the course.
 - **Ownership is inherited rather than repeated.** Every entry point resolves the course against
   the session's own courses first, so a module id alone is never a key: another teacher's
   syllabus is `NOT_FOUND`, whether it is reached through its own course or somebody else's.
@@ -295,10 +297,12 @@ domain module would only re-derive the same two hops.
 - **Publishing requires a non-blank body, and answers with a field error on `body`.** An empty
   page is a broken promise to whoever opens it, and "write the page before publishing it" points
   at the box to fix. A body of nothing but whitespace fails the same test.
-- **Unpublishing is always allowed; deactivating is not while the course is live.** Going back to
-  a draft hides rather than removes, so it cannot take something away from a student working
-  through it. Retiring a row can, so under a published course the answer is `409` naming the two
-  ways round it: unpublish the lesson, or archive the course.
+- **Unpublishing is always allowed; deactivating is refused only for a page a student can read.**
+  Going back to a draft hides rather than removes, so it cannot take something away from a student
+  working through it. Retiring a row can — but only if it was reachable, which needs both gates
+  open at once (§11). A draft page under a live course has never been on a student's screen, so a
+  teacher tidying one away is allowed to; refusing that would strand half-written pages in a live
+  syllabus with no answer short of archiving the course.
 - **Ownership is two hops, resolved before anything is read.** The module is matched against a
   course the session's teacher owns, and the lesson against that module — so another teacher's
   lesson is `NOT_FOUND`, whether it is addressed through its own module or somebody else's, and a
@@ -313,11 +317,44 @@ domain module would only re-derive the same two hops.
   names a module as a move and ignores every other field in it, so a form that sent the edits
   and the move together would lose the edits without saying so. The row's move control sends
   only the module, and the lesson leaves the list because it is no longer this module's page.
-- **The student read is not built yet.** The gated list — what a student may actually see, with
-  both publish flags applied — is the student portal's first endpoint, not a variation on these
-  teacher ones.
+- **What a student may read of all this is §11.** The two gates are enforced in one place there,
+  rather than being a rule each teacher route has to remember.
 
-## 11. Frontend
+## 11. The catalog: what a stranger may read
+
+The catalog is the same course seen by somebody who cannot edit it — `GET
+/api/v1/catalog/courses`, `/catalog/courses/levels` and `/catalog/courses/:id`, in their own Nest
+module (`modules/catalog`) because the question they answer is different in kind: no session, no
+ownership, no writes.
+
+- **It is the only public surface in the API, deliberately.** A shop window has to be readable
+  before anybody is asked to sign in, and what it can reach is decided entirely by the rows' own
+  statuses. `@Public()` on the controller is the exception that the global guard exists to make
+  expensive, so the suite checks the absence of a session as carefully as the tests everywhere
+  else check its presence — and the teacher's routes still answer `401` without one.
+- **Both gates are applied here and nowhere else.** A course appears only while it is published
+  (`archived` retires it from the catalog exactly as `draft` never admitted it), and a page inside
+  it appears only while its own lesson is published too. §10 promised those two flags; this is the
+  promise kept. A draft lesson under a live course is invisible here, which is what lets a teacher
+  pull one back without touching the course.
+- **A block is listed only while it holds something readable, so a card's counts are the detail's
+  counts.** `moduleCount` and `lessonCount` on a card count the same rows the course page will
+  list, not everything the teacher ever made. A card that promised nine pages and opened onto
+  four would teach a student to distrust every number on the screen.
+- **Nothing here hands over a page.** `body` is not selected by any catalog query — the syllabus
+  a student sees before enrolling is titles, order and each page's rough length, which is enough
+  to decide. Reading is what enrollment will be for, and it will be the only way to a body.
+- **`NOT_FOUND` is one answer for three cases.** An unpublished course, a retired one and an id
+  that never existed all read the same, and a malformed id is caught in the service before
+  Postgres is asked. A catalog that distinguished them would be a list of other people's drafts.
+- **Paged, filtered, and searchable by the two fields a card shows.** `level` is a `CourseLevel`
+  lookup code resolved at the edge (an unknown one is a field error, not an empty page), `q`
+  matches title or summary — never the description, because a hit the list cannot explain is a
+  worse result than no hit — and `page`/`pageSize` are validated as numbers so a query string
+  comparing `'2'` to `2` cannot be a bug later. Newest first, since a ranking this phase has no
+  signal for would be a guess with a sort button on it.
+
+## 12. Frontend
 
 - **The signed-in portal is a viewport-height frame with one scrolling column.** The sidebar
   runs to the left edge of the window and holds still while `main` scrolls, so navigation never
@@ -376,7 +413,7 @@ domain module would only re-derive the same two hops.
   the field it keys, so the rules stay on the server; a failure no field owns — a wrong
   password pair — appears once, as a form-level line, and never says which half was wrong.
 
-## 12. Development environment
+## 13. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:…`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -388,7 +425,7 @@ domain module would only re-derive the same two hops.
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 13. Verification
+## 14. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 

@@ -1,4 +1,5 @@
 export * from './auth';
+export * from './catalog';
 export * from './course-modules';
 export * from './courses';
 export * from './error-codes';

@@ -10,7 +10,9 @@ profile and write, publish and archive courses in the teacher portal (`/courses`
 `/api/v1/courses/:id/modules`), and write the lessons inside a module — the page, its rough
 length, its slot in that block's order and its own draft/published flag
 (`/courses/[id]/modules/[moduleId]/lessons`, backed by `/api/v1/modules/:moduleId/lessons`).
-Enrollment, bookings and payments are still ahead.
+A stranger can already browse what that makes readable: `/api/v1/catalog/courses` lists the
+published courses and `/api/v1/catalog/courses/:id` shows their syllabus — titles, order and
+rough length, never the page itself. Enrollment, bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---
