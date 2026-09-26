@@ -208,7 +208,8 @@ A portal is a client of that design, and inherits its rules:
   exists and is a course.
 - **No price on the course row, and no `DELETE`.** Nothing can charge one yet, so a stored
   number would be a field no provider validates and a figure a student can be shown. Retiring
-  is archiving; the row is what a later enrollment would point at.
+  is archiving; the row is what an enrollment points at (§12), and an archived course keeps a
+  roster of the people who were inside it.
 - **The teacher writes courses at `/courses`, `/courses/new` and `/courses/[id]/edit`.** One
   list fetched once and filtered locally by status tab, one editor for both create and edit,
   and the lifecycle buttons on the row as well as in the editor — because publishing is what
@@ -379,8 +380,36 @@ ownership, no writes.
   included, and a lesson title is a link only on a row the response marked free: the page itself
   is a second request (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape
   whether or not any room on it is open.
+- **What a student may read once they are inside a course is §12.** The catalog answers for
+  everybody who is not; the row that decides who counts as inside is the next subject.
 
-## 12. Frontend
+## 12. Enrollment
+
+An enrollment is one row saying one thing: this student holds a place in this course. It is
+the join the rest of Phase 3 has been pointing at — a free page is an invitation, and this is
+what an invitation is for.
+
+- **One place per student per course, and leaving does not put it up for grabs.**
+  `@@unique([courseId, studentUserId])` covers the pair rather than the student, because a
+  second course is a second decision. Quitting sets `isActive` false and the pair stays
+  claimed; coming back reopens the same row, which is why `createdAt` is the day a student
+  first enrolled and not the day they returned. Same reasoning a retired module keeps its
+  number: a record that changes meaning when read twice is worse than no record.
+- **An enrollment is never deleted, for the reason §2 gives and then some.** The row is why a
+  student could open the pages they already worked through, so erasing it would erase the
+  evidence of an access that happened.
+- **The table decides nothing about who may join.** The course has to be published and a
+  teacher cannot enroll in their own course, but both are rules an endpoint enforces — as
+  constraints they would freeze something a lookup row is meant to be able to change.
+- **Two indexes, one per question.** `ix_enrollment_student_list` answers "my courses", newest
+  first, and `ix_enrollment_course_roster` answers a teacher's headcount and the gate's own
+  lookup — "is this student inside this course" has to be an index probe, not a scan.
+- **Nothing reads it yet.** The routes that write and check this table are the next chunks of
+  this section, so as of now the catalog's two published statuses remain the only answer a
+  lesson gives a stranger. What shipped here is the promise, held by
+  `apps/api/test/enrollment-schema.spec.ts`.
+
+## 13. Frontend
 
 - **The signed-in portal is a viewport-height frame with one scrolling column.** The sidebar
   runs to the left edge of the window and holds still while `main` scrolls, so navigation never
@@ -496,7 +525,7 @@ ownership, no writes.
   the field it keys, so the rules stay on the server; a failure no field owns — a wrong
   password pair — appears once, as a form-level line, and never says which half was wrong.
 
-## 13. Development environment
+## 14. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:3001`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -510,7 +539,7 @@ ownership, no writes.
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 14. Verification
+## 15. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 

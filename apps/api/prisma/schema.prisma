@@ -94,6 +94,9 @@ model User {
   refreshTokens RefreshToken[]
   profile       TeacherProfile?
   courses       Course[]        @relation("course_teacher")
+  /// The courses this person holds a place in. Named `enrollments` rather than `courses`
+  /// because a teacher's own list is already `courses`, and the two must not rhyme.
+  enrollments   Enrollment[]    @relation("enrollment_student")
 
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
@@ -195,6 +198,10 @@ model Course {
   /// The syllabus, in the order the teacher put it in.
   modules Module[] @relation("course_modules")
 
+  /// Who holds a place in this course. A roster is read from here, never from a count
+  /// copied onto the course row, because the two would disagree the moment somebody left.
+  enrollments Enrollment[] @relation("course_enrollments")
+
   @@unique([teacherUserId, slug], map: "uk_course_teacher_slug")
   @@index([teacherUserId, isActive, createdAt], map: "ix_course_teacher_created")
   @@map("course")
@@ -276,6 +283,38 @@ model Lesson {
   @@unique([moduleId, position], map: "uk_lesson_module_position")
   @@index([moduleId, isActive, position], map: "ix_lesson_module_order")
   @@map("lesson")
+}
+
+/// A student's place in a course: the row that says they may read it.
+///
+/// One row per student per course, kept forever. Leaving sets `isActive` false rather than
+/// deleting, for two reasons — the pages they worked through were opened by this
+/// enrollment, so the record of their access has to outlive it; and a second insert for the
+/// same pair would leave a roster holding two answers to the question "is this person in
+/// this course". Coming back reopens the same row, which is also why `createdAt` is the
+/// date they first enrolled and not the date they returned.
+///
+/// Whether a person *may* take a place is decided by the endpoint that writes one: the
+/// course has to be published, the student has to not own it. Neither is a column here,
+/// because both are rules Ops or a teacher can change, and a constraint would freeze them.
+model Enrollment {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentUserId String @map("student_user_id") @db.Uuid
+  courseId      String @map("course_id") @db.Uuid
+
+  isActive  Boolean @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student User   @relation("enrollment_student", fields: [studentUserId], references: [id], onDelete: Restrict)
+  course  Course @relation("course_enrollments", fields: [courseId], references: [id], onDelete: Restrict)
+
+  /// The pair, not the student: one place per course, and a second course is a second
+  /// decision. Reserved after a leave, exactly as a slug is reserved after an archive.
+  @@unique([courseId, studentUserId], map: "uk_enrollment_student_course")
+  @@index([studentUserId, isActive, createdAt], map: "ix_enrollment_student_list")
+  @@index([courseId, isActive], map: "ix_enrollment_course_roster")
+  @@map("enrollment")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its
