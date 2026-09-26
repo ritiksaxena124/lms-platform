@@ -217,6 +217,79 @@
   animation: lms-shake var(--duration-slow) var(--ease-in-out) both;
 }
 
+/* 4. Icon gestures ----------------------------------------------------------
+ * An icon answers to the pointer on its card or its row, never to a pointer on
+ * the glyph itself: a mark that reacts alone promises a target that is not
+ * there. A host opts its icons in with `data-icon-zone`; a link or a button is
+ * a zone without being told.
+ *
+ * Each gesture restates what the glyph already means — the shackle lifts off a
+ * padlock, the hand swings on a clock, the arrow advances, a stack spreads —
+ * so the movement is information rather than decoration, and reads the same
+ * in every portal because it is defined once, here.
+ */
+
+.lms-icon {
+  /* A multi-value list invalidates as a whole, so the easing tokens carry their
+   * own fallbacks here: one unset property would drop every gesture at once. */
+  transition:
+    translate var(--duration-fast) var(--ease-spring, cubic-bezier(0.34, 1.4, 0.64, 1)),
+    color var(--duration-fast) var(--ease-out, cubic-bezier(0.22, 0.61, 0.36, 1));
+}
+
+/* SVG children transform against the viewBox, not the glyph's own box, or a
+ * rotation would pivot around the corner of its bounding path. */
+.lms-icon-shackle,
+.lms-icon-hand,
+.lms-icon-layer {
+  transform-box: view-box;
+  transform-origin: center;
+  transition:
+    translate var(--duration-base) var(--ease-spring, cubic-bezier(0.34, 1.4, 0.64, 1)),
+    rotate var(--duration-base) var(--ease-spring, cubic-bezier(0.34, 1.4, 0.64, 1));
+}
+
+[data-icon-zone]:hover .lms-icon-arrow-right,
+a:hover .lms-icon-arrow-right,
+button:hover .lms-icon-arrow-right {
+  translate: 2px 0;
+}
+
+[data-icon-zone]:hover .lms-icon-lock .lms-icon-shackle,
+[data-icon-zone]:hover .lms-icon-unlock .lms-icon-shackle,
+a:hover .lms-icon-lock .lms-icon-shackle,
+a:hover .lms-icon-unlock .lms-icon-shackle {
+  translate: 0 -1.4px;
+}
+
+[data-icon-zone]:hover .lms-icon-clock .lms-icon-hand,
+a:hover .lms-icon-clock .lms-icon-hand {
+  rotate: 32deg;
+}
+
+/* The block opens rather than the rows inside it moving: a module is a set of
+ * pages, and the gesture that says "a set" is the set spreading. */
+[data-icon-zone]:hover .lms-icon-layer:nth-child(2),
+a:hover .lms-icon-layer:nth-child(2) {
+  translate: 0 1.2px;
+}
+
+[data-icon-zone]:hover .lms-icon-layer:nth-child(3),
+a:hover .lms-icon-layer:nth-child(3) {
+  translate: 0 2.4px;
+}
+
+/* Colour, not movement: a field's glyph is already explained by its caret. */
+[data-icon-zone]:hover .lms-icon-search,
+[data-icon-zone]:focus-within .lms-icon-search {
+  color: var(--color-brand);
+}
+
+[data-icon-zone]:hover .lms-icon-user,
+a:hover .lms-icon-user {
+  translate: 0 -1px;
+}
+
 /* Reduced motion: content appears, nothing travels. */
 @media (prefers-reduced-motion: reduce) {
   *,
@@ -231,6 +304,16 @@
   [data-reveal] {
     opacity: 1 !important;
     transform: none !important;
+  }
+
+  /* Icons keep their colour and lose their travel: the gesture is a nicety,
+   * and a shackle that snaps upward is worse than one that stays put. */
+  .lms-icon,
+  .lms-icon-shackle,
+  .lms-icon-hand,
+  .lms-icon-layer {
+    translate: none !important;
+    rotate: none !important;
   }
 
   .lms-skeleton {

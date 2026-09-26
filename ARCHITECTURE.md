@@ -387,6 +387,16 @@ ownership, no writes.
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
   radius, shadow, duration or type step is defined. A portal re-themes by overriding tokens;
   it does not get to invent `#3b82f6`.
+- **Icons are one stroke family, and they answer to the pointer on their card rather than to
+  the pointer on themselves.** `Icon` in `@lms/ui` draws every glyph on a 20×20 box in
+  `currentColor`; a portal names the mark it wants and the kit owns the geometry and the
+  gesture (`styles/motion.css`) in the same place, so the same padlock lifts the same distance
+  in all three portals. A mark that reacts alone promises a target that is not there, so a
+  hover is opted in by its host — a link, a button, a card or row carrying `data-icon-zone` —
+  and reduced motion keeps the colour change while dropping the travel. A glyph gets words
+  only when it says something the text does not: a lock in a lesson row that names no state is
+  labelled "Behind enrollment", a clock beside "12 min" is not labelled at all, and a page with
+  no estimate gets no clock rather than a glyph that claims one.
 - Every operation has five states in the primitives, not in each page: idle, loading
   (`Button loading` keeps its label and blocks re-clicks), empty (`EmptyState`), error
   (`ErrorState` with a retry that can itself be busy), settled.

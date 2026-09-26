@@ -11,6 +11,13 @@ export { EmptyState, type EmptyStateProps } from './components/EmptyState';
 export { ErrorState, type ErrorStateProps } from './components/ErrorState';
 export { Illo, type IlloProps, type IlloSize } from './components/Illo';
 export {
+  Icon,
+  ICON_NAMES,
+  type IconName,
+  type IconProps,
+  type IconSize,
+} from './components/Icon';
+export {
   Breadcrumbs,
   PageHeader,
   type Breadcrumb,
