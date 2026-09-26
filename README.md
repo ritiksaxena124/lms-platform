@@ -24,7 +24,9 @@ One pair of routes, so there is only one list of gates to keep. The student port
 of its own now (`/login`, `/register` on :3001) and sends it on the reads whose answer depends on
 who is asking. That session is on screen too: an enroll button on a course outline, the outline
 rows it unlocks, a lesson that reads like a member's page, and a `/my-courses` shelf where a place
-can be left. Bookings and payments are still ahead.
+can be left. The teacher's side of the same table answers over HTTP now —
+`/api/v1/courses/:courseId/roster` names who holds a place in a course they own and the day they
+took it — with its portal screen next. Bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---

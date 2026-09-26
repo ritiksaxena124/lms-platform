@@ -10,6 +10,13 @@ const WITH_COURSE = {
 
 export type EnrollmentRow = Prisma.EnrollmentGetPayload<{ include: typeof WITH_COURSE }>;
 
+/** The student a place belongs to, as little of them as a class list has to say. */
+const WITH_STUDENT = {
+  student: { select: { id: true, fullName: true } },
+} as const satisfies Prisma.EnrollmentInclude;
+
+export type RosterRow = Prisma.EnrollmentGetPayload<{ include: typeof WITH_STUDENT }>;
+
 /**
  * The table behind the student's place in a course.
  *
@@ -92,5 +99,36 @@ export class EnrollmentsRepository {
       where: { id: courseId, isActive: true, statusValueId: courseStatusValueId },
       select: { id: true },
     });
+  }
+
+  /** The course whose roster is being read, and only if the caller wrote it. `isActive` is the
+   * whole of the filter, not its status: a teacher who archived a course still owns the class
+   * that sat in it, and §2 keeps the rows that say so. */
+  async findOwnedCourse(teacherUserId: string, courseId: string) {
+    return this.prisma.course.findFirst({
+      where: { id: courseId, teacherUserId, isActive: true },
+      select: { id: true },
+    });
+  }
+
+  /**
+   * Who holds an open place in one course, newest first, one page of them.
+   *
+   * `isActive` on the row, not on the student: a closed place is a person who left, and the
+   * count below answers the same question the list does so a page of a roster can say how big
+   * the class is.
+   */
+  async listRoster(courseId: string, skip: number, take: number) {
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.enrollment.findMany({
+        where: { courseId, isActive: true },
+        include: WITH_STUDENT,
+        orderBy: { createdAt: 'desc' },
+        skip,
+        take,
+      }),
+      this.prisma.enrollment.count({ where: { courseId, isActive: true } }),
+    ]);
+    return { rows, total };
   }
 }

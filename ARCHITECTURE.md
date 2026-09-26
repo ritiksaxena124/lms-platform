@@ -440,11 +440,30 @@ what an invitation is for.
   `POST /api/v1/enrollments` takes a place by `courseId`, and `POST
   /api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
   place is *worth* stays the catalog's decision — this module writes the row §11 reads.
-- **The role is the whole of "a teacher cannot enroll in their own course."** The controller is
-  `@Roles(STUDENT)`, so that request never reaches a query to be checked. When a later phase
-  wants teachers to take places too, the decorator is the one line that changes, and the
-  ownership question it would raise is a decision somebody makes on purpose rather than a hole a
-  service forgot to plug.
+- **The role is the whole of "a teacher cannot enroll in their own course."** The student
+  controller is `@Roles(STUDENT)`, so that request never reaches a query to be checked. When a
+  later phase wants teachers to take places too, the decorator is the one line that changes, and
+  the ownership question it would raise is a decision somebody makes on purpose rather than a hole
+  a service forgot to plug.
+- **A fourth route reads the same table for the teacher who owns the course.** `GET
+  /api/v1/courses/:courseId/roster` answers the question `ix_enrollment_course_roster` was built
+  for, and it is addressed through the course rather than through a student, so ownership is the
+  whole permission: another teacher's roster and a uuid nobody wrote are one `404`, exactly as on
+  every other `/courses/:id` route, because a `403` here would confirm that the course exists and
+  that somebody is inside it. It still lives in `modules/enrollments`, which owns the table — the
+  module reads `Course` for the ownership probe for the same reason it already reads it for the
+  publish gate on the other side.
+- **A roster row is a name and a day.** The entry is `student: { id, fullName }` plus
+  `enrolledAt`, and the shape is held by a test rather than left to taste. No email address: a
+  teacher does not need one to know who is coming to class, and a field added for convenience is
+  a field every later version has to defend. No enrollment id either, because there is no
+  teacher-side route that acts on a row — a roster is read, not managed, and the first endpoint
+  that needs an id is the decision to add one.
+- **It lists the class, not the history.** Only `isActive` places, newest first, paged
+  `{ items, page, pageSize, total }` like §11's shelf. A student who left is off the list and out
+  of the count, and one who came back is a single entry on the day they first arrived; a draft
+  course reads empty for its own teacher rather than refusing, and an archived one still names
+  who was inside it, since archiving closes pages rather than rewriting who turned up (§2).
 - **Both writes are idempotent and both answer `200`.** Enrolling twice returns the row that
   already exists, with its original `enrolledAt`; cancelling a closed place returns it closed. A
   button on a slow connection gets pressed twice, and a `201` with a second row — or a `409` the
@@ -464,7 +483,9 @@ what an invitation is for.
   reason this table keeps one row per pair.
 - **What holds it:** `apps/api/test/enrollment-schema.spec.ts` for the table's promises,
   `apps/api/test/enrollments.spec.ts` for the routes, the gate they open, the outline rows they
-  light up and the silence they keep. The student portal reads all three now — `lib/enrollments.ts`
+  light up and the silence they keep, and `apps/api/test/course-roster.spec.ts` for the teacher's
+  read of the same table — who is in the class, who is not, and what a roster is not allowed to
+  say. The student portal reads the first set now — `lib/enrollments.ts`
   for the transport, `EnrollControl` for taking a place, `my-courses` for the roster and leaving
   one — and the rules those screens keep are §13's.
 

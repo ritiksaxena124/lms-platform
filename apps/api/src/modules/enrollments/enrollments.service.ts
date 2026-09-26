@@ -3,18 +3,31 @@ import {
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
+  type CourseRosterEntry,
+  type CourseRosterResponse,
   type CreateEnrollmentInput,
   type Enrollment,
 } from '@lms/shared';
 
 import { ReferenceService } from '../../reference/reference.service';
-import type { EnrollmentRow } from './enrollments.repository';
+import type { EnrollmentRow, RosterRow } from './enrollments.repository';
 import { EnrollmentsRepository } from './enrollments.repository';
 
 /** A course is addressed by the id the catalog sent. A shape that cannot be one is refused
  * before Postgres is asked, because the database answers a malformed uuid with a syntax
  * error and that is a 500 about somebody's typo. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** A class list is read on a screen, not exported, so a page is what fits on one. */
+const DEFAULT_ROSTER_PAGE_SIZE = 25;
+
+function toRosterEntry(row: RosterRow): CourseRosterEntry {
+  return {
+    student: { id: row.student.id, fullName: row.student.fullName },
+    // The day the place was first taken, which a student who left and came back did not move.
+    enrolledAt: row.createdAt.toISOString(),
+  };
+}
 
 function toEnrollment(row: EnrollmentRow): Enrollment {
   return {
@@ -93,6 +106,41 @@ export class EnrollmentsService {
     );
     const rows = await this.enrollments.listOpen(studentUserId, published);
     return rows.map(toEnrollment);
+  }
+
+  /**
+   * Who holds a place in one of the caller's own courses.
+   *
+   * The other side of the pair, and the reason this read lives in a module the student writes
+   * to: the table is the enrollment's, so both questions about it are kept where the row's
+   * meaning is. Ownership is the whole permission — resolved against the courses the session
+   * wrote, and a course that is not the caller's answers exactly like one nobody ever created.
+   */
+  async roster(
+    teacherUserId: string,
+    courseId: string,
+    input: { page?: number; pageSize?: number },
+  ): Promise<CourseRosterResponse> {
+    const owned = UUID.test(courseId)
+      ? await this.enrollments.findOwnedCourse(teacherUserId, courseId)
+      : null;
+
+    if (!owned) {
+      throw new NotFoundException({
+        code: API_ERROR_CODES.NOT_FOUND,
+        message: 'We cannot find that course.',
+      });
+    }
+
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? DEFAULT_ROSTER_PAGE_SIZE;
+    const { rows, total } = await this.enrollments.listRoster(
+      owned.id,
+      (page - 1) * pageSize,
+      pageSize,
+    );
+
+    return { items: rows.map(toRosterEntry), page, pageSize, total };
   }
 
   /**

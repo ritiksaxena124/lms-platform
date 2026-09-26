@@ -44,3 +44,36 @@ export interface EnrollmentListResponse {
 export interface CreateEnrollmentInput {
   courseId: string;
 }
+
+/**
+ * A student as a teacher's roster shows them: the name and the id the pair is keyed by.
+ *
+ * No email address. A roster answers "who is coming to class", and an address is the field a
+ * list like this gains by convenience and never drops — the student id is here because two
+ * people can share a name and the screen needs one of them to be a key.
+ */
+export interface RosterStudent {
+  id: string;
+  fullName: string;
+}
+
+/**
+ * One open place in a course.
+ *
+ * There is no enrollment id: a teacher reads this list and does not act on rows in it. Leaving
+ * is the student's decision, so giving the roster a primary key would be an invitation to build
+ * the route that removes somebody's place for them.
+ */
+export interface CourseRosterEntry {
+  student: RosterStudent;
+  /** The day the place was first taken, which is not the day a student who left came back. */
+  enrolledAt: string;
+}
+
+export interface CourseRosterResponse {
+  items: CourseRosterEntry[];
+  page: number;
+  pageSize: number;
+  /** Every open place in the course, not the ones on this page. */
+  total: number;
+}
