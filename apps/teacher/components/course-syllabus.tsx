@@ -221,8 +221,9 @@ export function CourseSyllabus({ courseId }: { courseId: string }) {
 
       {live ? (
         <p className="text-[0.8125rem] leading-snug text-ink-muted">
-          A course a student can read is still a syllabus you can grow: adding and renaming work
-          now. Removing one needs the course archived first.
+          A course a student can read is still a syllabus you can grow: adding, renaming and
+          reordering blocks all work here, and so does removing one with nothing published in it.
+          A block that still holds a page a student can read is the one that waits.
         </p>
       ) : null}
 

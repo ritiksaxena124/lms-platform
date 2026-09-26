@@ -239,12 +239,12 @@ describe('CourseSyllabus', () => {
     ]);
   });
 
-  it('leaves a module standing when the live course refuses to lose one', async () => {
+  it('leaves a readable block standing when the API says it cannot go', async () => {
     api.readCourse.mockResolvedValue(
       course({ status: { code: 'published', label: 'Published' } }),
     );
     api.deactivateModule.mockRejectedValue(
-      conflict('Archive the course to take a module out of what a student is reading.'),
+      conflict('This block still holds a page a student can read. Take those lessons back to a draft first.'),
     );
 
     render(<CourseSyllabus courseId="c1" />);
@@ -252,10 +252,12 @@ describe('CourseSyllabus', () => {
     await userEvent.click(within(list[0] as HTMLElement).getByRole('button', { name: /remove/i }));
 
     expect(notify.error).toHaveBeenCalledWith(
-      'Archive the course to take a module out of what a student is reading.',
+      'This block still holds a page a student can read. Take those lessons back to a draft first.',
     );
     expect(await rows()).toHaveLength(3);
-    expect(screen.getByText(/removing one needs the course archived/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/a block that still holds a page a student can read/i),
+    ).toBeInTheDocument();
   });
 
   it('says a syllabus is empty in words a teacher can act on', async () => {

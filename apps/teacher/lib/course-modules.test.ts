@@ -110,7 +110,7 @@ describe('course modules client', () => {
         {
           statusCode: 409,
           code: 'CONFLICT',
-          message: 'Archive the course to take a module out of what a student is reading.',
+          message: 'This block still holds a page a student can read. Take those lessons back to a draft first.',
         },
         409,
       ),
@@ -118,7 +118,7 @@ describe('course modules client', () => {
 
     await expect(deactivateModule('c1', 'm1')).rejects.toMatchObject({
       code: 'CONFLICT',
-      message: 'Archive the course to take a module out of what a student is reading.',
+      message: 'This block still holds a page a student can read. Take those lessons back to a draft first.',
     });
   });
 });

@@ -139,6 +139,10 @@ describe('course modules', () => {
     const courseIds = (
       await prisma.course.findMany({ where: { teacherUserId: { in: userIds } }, select: { id: true } })
     ).map((row) => row.id);
+    const moduleIds = (
+      await prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { id: true } })
+    ).map((row) => row.id);
+    await prisma.lesson.deleteMany({ where: { moduleId: { in: moduleIds } } });
     await prisma.module.deleteMany({ where: { courseId: { in: courseIds } } });
     await prisma.course.deleteMany({ where: { id: { in: courseIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
@@ -379,16 +383,46 @@ describe('course modules', () => {
     expect(renamed.body.module.title).toBe('Equivalent fractions, on a number line');
   });
 
-  it('refuses to take away what a student may be reading', async () => {
+  it('refuses to take away a block a student may be reading', async () => {
     const courseId = await createPublishedCourse(teacher);
     const one = await postModule(courseId, { title: 'One' }, teacher).expect(201);
+    const moduleId = one.body.module.id as string;
 
-    const res = await deactivate(courseId, one.body.module.id, teacher).expect(409);
+    const written = await request(app.getHttpServer())
+      .post(`/api/v1/modules/${moduleId}/lessons`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .send({ title: 'Why the denominator stays put', body: 'Cut the pie twice.' })
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/modules/${moduleId}/lessons/${written.body.lesson.id}/publish`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .expect(200);
+
+    const res = await deactivate(courseId, moduleId, teacher).expect(409);
 
     expect(res.body.code).toBe('CONFLICT');
-    expect(res.body.message).toMatch(/archive/i);
+    expect(res.body.message).toMatch(/lesson/i);
 
     const list = await listModules(courseId, teacher).expect(200);
     expect(list.body.items).toHaveLength(1);
+  });
+
+  it('lets a live course let go of a block with nothing readable in it', async () => {
+    const courseId = await createPublishedCourse(teacher);
+    const added = await postModule(courseId, { title: 'A start' }, teacher).expect(201);
+    const draftOnly = await postModule(courseId, { title: 'Still being planned' }, teacher).expect(201);
+    await request(app.getHttpServer())
+      .post(`/api/v1/modules/${draftOnly.body.module.id}/lessons`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .send({ title: 'A page not published yet' })
+      .expect(201);
+
+    // A block is on the catalog only while it holds something to read, so taking away an
+    // empty one — or one whose every page is still a draft — hides nothing from anybody.
+    await deactivate(courseId, added.body.module.id, teacher).expect(200);
+    await deactivate(courseId, draftOnly.body.module.id, teacher).expect(200);
+
+    const list = await listModules(courseId, teacher).expect(200);
+    expect(list.body.items).toEqual([]);
   });
 });

@@ -550,6 +550,21 @@ describe('lessons', () => {
     expect(list.body.items[0]?.status.code).toBe('published');
   });
 
+  it('lets a live course let go of a page no student has ever seen', async () => {
+    const moduleId = await createModule(await createPublishedCourse(teacher), teacher);
+    const lesson = await createLesson(moduleId, teacher, 'A page that never went public');
+
+    await transition(moduleId, lesson.id, 'deactivate', teacher).expect(200);
+
+    // The refusal above protects a student's reading. A draft is not anyone's reading yet,
+    // so a teacher tidying one away from a live course is not taking anything from anybody.
+    const res = await listLessons(moduleId, teacher).expect(200);
+    expect(res.body.items).toEqual([]);
+
+    const row = await prisma.lesson.findUniqueOrThrow({ where: { id: lesson.id } });
+    expect(row.isActive).toBe(false);
+  });
+
   it('counts a retired lesson when choosing the next slot, whatever its status was', async () => {
     const moduleId = await createModule(await createCourse(teacher), teacher);
     const written = await createLesson(moduleId, teacher, 'Written', 'A page with a body.');

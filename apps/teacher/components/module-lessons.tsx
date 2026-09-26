@@ -287,8 +287,9 @@ export function ModuleLessons({ courseId, moduleId }: { courseId: string; module
       {live ? (
         <p className="text-[0.8125rem] leading-snug text-ink-muted">
           A course a student can read is still a syllabus you can grow: writing, ordering and
-          publishing pages all work now. Hiding one is what unpublishing is for — unpublish it
-          instead of removing it, and archive the course to take a page out of the syllabus.
+          publishing pages all work here, and so does taking out one that is still a draft. A
+          published page is the one that has to go back to a draft first — unpublishing is what
+          does that.
         </p>
       ) : null}
 

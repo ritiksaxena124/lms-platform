@@ -1,6 +1,13 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { API_ERROR_CODES, COURSE_STATUS_CODES, type CourseModule } from '@lms/shared';
+import {
+  API_ERROR_CODES,
+  COURSE_STATUS_CODES,
+  LESSON_STATUS_CODES,
+  LKP_TYPE_CODES,
+  type CourseModule,
+} from '@lms/shared';
 
+import { ReferenceService } from '../../reference/reference.service';
 import { CoursesRepository } from './courses.repository';
 import { CourseModulesRepository } from './course-modules.repository';
 import type { CreateCourseModuleDto, UpdateCourseModuleDto } from './dto/course-module.dto';
@@ -48,6 +55,7 @@ export class CourseModulesService {
   constructor(
     private readonly courses: CoursesRepository,
     private readonly modules: CourseModulesRepository,
+    private readonly reference: ReferenceService,
   ) {}
 
   async list(teacherUserId: string, courseId: string): Promise<CourseModule[]> {
@@ -125,19 +133,35 @@ export class CourseModulesService {
     return (await this.modules.listActive(course.id)).map(toDocument);
   }
 
-  /** Takes a module out of the syllabus. The row keeps its slot — see
-   * `lastPosition` — so nothing later inherits the number a student may have read. */
+  /**
+   * Takes a block out of the syllabus — unless it holds a page a student is reading, which is
+   * the same two gates the catalog opens on: the course published and a lesson published.
+   * The row keeps its slot either way — see `lastPosition` — so nothing later inherits the
+   * number a student may have read.
+   *
+   * An empty block, or one whose every page is still a draft, is not on a student's screen at
+   * all, so letting it go is a teacher tidying rather than a promise withdrawn. Refusing that
+   * too would strand a block added by mistake under a live course with no answer short of
+   * archiving the whole course.
+   */
   async deactivate(teacherUserId: string, courseId: string, id: string): Promise<CourseModule> {
     const course = await this.ownedCourse(teacherUserId, courseId);
+    const module = await this.inCourse(course.id, id);
 
     if (course.status.code === COURSE_STATUS_CODES.PUBLISHED) {
-      throw new ConflictException({
-        code: API_ERROR_CODES.CONFLICT,
-        message: 'Archive the course to take a module out of what a student is reading.',
-      });
+      const published = await this.reference.valueId(
+        LKP_TYPE_CODES.LESSON_STATUS,
+        LESSON_STATUS_CODES.PUBLISHED,
+      );
+      if (await this.modules.hasPagesToRead(module.id, published)) {
+        throw new ConflictException({
+          code: API_ERROR_CODES.CONFLICT,
+          message:
+            'This block still holds a page a student can read. Take those lessons back to a draft first.',
+        });
+      }
     }
 
-    const module = await this.inCourse(course.id, id);
     return toDocument(await this.modules.deactivate(module.id));
   }
 

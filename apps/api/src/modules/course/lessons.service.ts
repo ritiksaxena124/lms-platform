@@ -178,18 +178,29 @@ export class LessonsService {
     return toDocument(await this.lessons.updateStatus(lesson.id, draft));
   }
 
+  /**
+   * Removing a page is refused on exactly the condition that the catalog reads it: both
+   * gates open at once. A published page under a published course is something a student may
+   * have a link to, be partway through, or have written down — so it goes back to a draft
+   * first, which is the reversible move. Either gate closed means nobody is reading it, and a
+   * teacher tidying away a page no student has ever been shown is not taking anything from
+   * anybody; refusing that would leave half-written pages stuck in a live syllabus.
+   */
   async deactivate(teacherUserId: string, moduleId: string, id: string): Promise<Lesson> {
     const module = await this.ownedModule(teacherUserId, moduleId);
+    const lesson = await this.inModule(module.id, id);
 
-    if (module.course.status.code === COURSE_STATUS_CODES.PUBLISHED) {
+    const readable =
+      module.course.status.code === COURSE_STATUS_CODES.PUBLISHED &&
+      lesson.status.code === LESSON_STATUS_CODES.PUBLISHED;
+    if (readable) {
       throw new ConflictException({
         code: API_ERROR_CODES.CONFLICT,
         message:
-          'Take the lesson back to a draft to hide it, or archive the course to take it out of the syllabus.',
+          'A page a student can read goes back to a draft first — unpublish it, then take it out of the syllabus.',
       });
     }
 
-    const lesson = await this.inModule(module.id, id);
     return toDocument(await this.lessons.deactivate(lesson.id));
   }
 

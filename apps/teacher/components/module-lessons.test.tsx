@@ -370,11 +370,11 @@ describe('ModuleLessons', () => {
     ]);
   });
 
-  it('leaves a lesson standing when the live course refuses to lose one', async () => {
+  it('leaves a readable page standing when the API says it cannot go', async () => {
     api.readCourse.mockResolvedValue(course({ status: LIVE }));
     api.deactivateLesson.mockRejectedValue(
       conflict(
-        'Take the lesson back to a draft to hide it, or archive the course to take it out of the syllabus.',
+        'A page a student can read goes back to a draft first — unpublish it, then take it out of the syllabus.',
       ),
     );
 
@@ -383,10 +383,10 @@ describe('ModuleLessons', () => {
     await userEvent.click(within(list[0] as HTMLElement).getByRole('button', { name: /remove/i }));
 
     expect(notify.error).toHaveBeenCalledWith(
-      'Take the lesson back to a draft to hide it, or archive the course to take it out of the syllabus.',
+      'A page a student can read goes back to a draft first — unpublish it, then take it out of the syllabus.',
     );
     expect(await rows()).toHaveLength(3);
-    expect(screen.getByText(/unpublish it instead of removing it/i)).toBeInTheDocument();
+    expect(screen.getByText(/a published page is the one that has to go back to a draft/i)).toBeInTheDocument();
   });
 
   it('says a module has no lessons in words a teacher can act on', async () => {

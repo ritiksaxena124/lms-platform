@@ -80,6 +80,20 @@ export class CourseModulesRepository {
     return rows.map(({ id, position }) => ({ id, position }));
   }
 
+  /**
+   * Whether the block holds anything a student could open — an active page whose own gate is
+   * open. `deactivate` asks this before it refuses, so the rule is "you may not take away what
+   * is being read" rather than "you may not take away anything at all while the course is
+   * live", which would trap a block the catalog does not even show.
+   */
+  async hasPagesToRead(moduleId: string, publishedLessonStatusValueId: string) {
+    const page = await this.prisma.lesson.findFirst({
+      where: { moduleId, isActive: true, statusValueId: publishedLessonStatusValueId },
+      select: { id: true },
+    });
+    return page !== null;
+  }
+
   async create(courseId: string, position: number, columns: CourseModuleColumns) {
     return this.prisma.module.create({ data: { courseId, position, ...columns } });
   }
