@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   archiveCourse,
+  courseCurrencies,
   courseLevels,
   createCourse,
   listCourses,
@@ -20,6 +21,7 @@ const COURSE = {
   description: null,
   level: { code: 'intermediate', label: 'Intermediate' },
   status: { code: 'draft', label: 'Draft' },
+  price: null,
   createdAt: '2026-09-25T00:00:00.000Z',
   updatedAt: '2026-09-25T00:00:00.000Z',
 };
@@ -35,7 +37,11 @@ function requestAt(index: number): { url: string; method: string; body?: string 
   const call = fetchMock.mock.calls[index];
   if (!call) throw new Error(`only ${fetchMock.mock.calls.length} request(s) were made`);
   const init = (call[1] ?? {}) as RequestInit;
-  return { url: String(call[0]), method: String(init.method ?? 'GET'), body: init.body as string | undefined };
+  return {
+    url: String(call[0]),
+    method: String(init.method ?? 'GET'),
+    body: init.body as string | undefined,
+  };
 }
 
 beforeEach(() => {
@@ -69,6 +75,17 @@ describe('courses client', () => {
     expect(requestAt(0).url).toBe(`${BASE_URL}/api/v1/courses/levels`);
   });
 
+  it('asks the API for the currencies a price can be quoted in', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ items: [{ code: 'INR', label: 'Indian rupee' }] }),
+    );
+
+    await expect(courseCurrencies()).resolves.toEqual([{ code: 'INR', label: 'Indian rupee' }]);
+    // Its own route rather than a second use of the level list: a currency is a different
+    // lookup, and a picker that asked the wrong one would offer levels as money.
+    expect(requestAt(0).url).toBe(`${BASE_URL}/api/v1/courses/currencies`);
+  });
+
   it('reads one course by id, because an edit link is not always followed from the list', async () => {
     await expect(readCourse('c1')).resolves.toEqual(COURSE);
     expect(requestAt(0)).toMatchObject({
@@ -92,6 +109,30 @@ describe('courses client', () => {
     expect(url).toBe(`${BASE_URL}/api/v1/courses/c1`);
     expect(method).toBe('PATCH');
     expect(JSON.parse(body ?? '{}')).toEqual({ summary: 'A first pass at the topic.' });
+  });
+
+  it('sends a price as the pair the API asked for, in minor units', async () => {
+    await createCourse({
+      title: 'Fractions, slowly',
+      level: 'beginner',
+      price: { minorUnits: 199900, currency: 'INR' },
+    });
+
+    // The client does no arithmetic: the form turns rupees into paise and this file carries
+    // the figure on, so the amount has exactly one place where it is multiplied.
+    expect(JSON.parse(requestAt(0).body ?? '{}')).toEqual({
+      title: 'Fractions, slowly',
+      level: 'beginner',
+      price: { minorUnits: 199900, currency: 'INR' },
+    });
+  });
+
+  it('sends a cleared price as null, not as a key that is missing', async () => {
+    await updateCourse('c1', { price: null });
+
+    // An absent key means "say nothing about it" and leaves the old quote standing; the
+    // teacher emptied both boxes, and the body has to say so out loud.
+    expect(JSON.parse(requestAt(0).body ?? '{}')).toEqual({ price: null });
   });
 
   it('sends a transition as a request with no body at all', async () => {

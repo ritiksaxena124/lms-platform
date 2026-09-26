@@ -40,6 +40,7 @@ function course(overrides: Partial<Course> = {}): Course {
     description: 'Start with one pie, end with adding any two fractions.',
     level: { code: 'beginner', label: 'Beginner' },
     status: { code: 'draft', label: 'Draft' },
+    price: null,
     createdAt: '2026-09-25T00:00:00.000Z',
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,
@@ -145,7 +146,9 @@ describe('ModuleLessons', () => {
   it('names the module these are the lessons of, and links back to the syllabus', async () => {
     renderScreen();
 
-    expect(await screen.findByRole('heading', { name: 'Equivalent fractions' })).toBeInTheDocument();
+    expect(
+      await screen.findByRole('heading', { name: 'Equivalent fractions' }),
+    ).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /syllabus/i })).toHaveAttribute(
       'href',
       '/courses/c1/modules',
@@ -165,14 +168,17 @@ describe('ModuleLessons', () => {
 
   it('adds a lesson at the end, and shows the slot the API chose rather than a guessed one', async () => {
     api.createLesson.mockResolvedValue(
-      lesson({ id: 'l4', title: 'Practising equivalence', body: null, estimatedMinutes: null, position: 4 }),
+      lesson({
+        id: 'l4',
+        title: 'Practising equivalence',
+        body: null,
+        estimatedMinutes: null,
+        position: 4,
+      }),
     );
 
     renderScreen();
-    await userEvent.type(
-      await screen.findByLabelText('New lesson'),
-      'Practising equivalence',
-    );
+    await userEvent.type(await screen.findByLabelText('New lesson'), 'Practising equivalence');
     await userEvent.click(screen.getByRole('button', { name: /add lesson/i }));
 
     await waitFor(() =>
@@ -265,7 +271,9 @@ describe('ModuleLessons', () => {
     renderScreen();
     const list = await rows();
     await userEvent.click(
-      within(list[0] as HTMLElement).getByRole('button', { name: /publish halves on a number line/i }),
+      within(list[0] as HTMLElement).getByRole('button', {
+        name: /publish halves on a number line/i,
+      }),
     );
 
     await waitFor(() => expect(api.publishLesson).toHaveBeenCalledWith('m1', 'l1'));
@@ -278,7 +286,9 @@ describe('ModuleLessons', () => {
     renderScreen();
     const list = await rows();
     await userEvent.click(
-      within(list[1] as HTMLElement).getByRole('button', { name: /publish quarters on the same line/i }),
+      within(list[1] as HTMLElement).getByRole('button', {
+        name: /publish quarters on the same line/i,
+      }),
     );
 
     await waitFor(() => expect(api.publishLesson).toHaveBeenCalledWith('m1', 'l2'));
@@ -293,7 +303,9 @@ describe('ModuleLessons', () => {
     renderScreen();
     const list = await rows();
     await userEvent.click(
-      within(list[2] as HTMLElement).getByRole('button', { name: /unpublish comparing unit fractions/i }),
+      within(list[2] as HTMLElement).getByRole('button', {
+        name: /unpublish comparing unit fractions/i,
+      }),
     );
 
     await waitFor(() => expect(api.unpublishLesson).toHaveBeenCalledWith('m1', 'l3'));
@@ -306,7 +318,9 @@ describe('ModuleLessons', () => {
     renderScreen();
     const list = await rows();
     await userEvent.selectOptions(
-      within(list[0] as HTMLElement).getByLabelText(/move halves on a number line to another module/i),
+      within(list[0] as HTMLElement).getByLabelText(
+        /move halves on a number line to another module/i,
+      ),
       'm2',
     );
 
@@ -392,7 +406,9 @@ describe('ModuleLessons', () => {
       'A page a student can read goes back to a draft first — unpublish it, then take it out of the syllabus.',
     );
     expect(await rows()).toHaveLength(3);
-    expect(screen.getByText(/a published page is the one that has to go back to a draft/i)).toBeInTheDocument();
+    expect(
+      screen.getByText(/a published page is the one that has to go back to a draft/i),
+    ).toBeInTheDocument();
   });
 
   it('says a module has no lessons in words a teacher can act on', async () => {

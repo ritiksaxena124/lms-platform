@@ -25,6 +25,7 @@ const COURSE: Course = {
   description: 'Start with one pie, end with adding any two fractions.',
   level: { code: 'beginner', label: 'Beginner' },
   status: { code: 'published', label: 'Published' },
+  price: null,
   createdAt: '2026-09-20T00:00:00.000Z',
   updatedAt: '2026-09-25T00:00:00.000Z',
 };

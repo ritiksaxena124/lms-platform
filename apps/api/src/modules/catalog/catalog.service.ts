@@ -11,6 +11,7 @@ import {
   type CatalogListInput,
   type CatalogModule,
   type CourseChoice,
+  type CoursePrice,
 } from '@lms/shared';
 
 import { ReferenceService } from '../../reference/reference.service';
@@ -45,9 +46,15 @@ const DEFAULT_PAGE_SIZE = 12;
  * once created.
  */
 function readableModules(course: CourseCardRow): number[] {
-  return course.modules
-    .map((module) => module._count.lessons)
-    .filter((lessons) => lessons > 0);
+  return course.modules.map((module) => module._count.lessons).filter((lessons) => lessons > 0);
+}
+
+/** A quote, or the absence of one. `null` means the teacher has not said yet and `0` means
+ * they have said free, so the two are never collapsed on the way out — a shelf that printed
+ * ₹0 over an unpriced course would be making a promise nobody wrote. */
+function toPrice(course: CourseCardRow | CourseSyllabusRow): CoursePrice | null {
+  if (course.priceMinorUnits === null || course.priceCurrency === null) return null;
+  return { minorUnits: course.priceMinorUnits, currency: course.priceCurrency };
 }
 
 function toCard(course: CourseCardRow): CatalogCourse {
@@ -60,6 +67,7 @@ function toCard(course: CourseCardRow): CatalogCourse {
     summary: course.summary,
     level: { code: course.level.code, label: course.level.label },
     teacher: { displayName: course.teacher.fullName },
+    price: toPrice(course),
     moduleCount: modules.length,
     lessonCount: modules.reduce((total, lessons) => total + lessons, 0),
     updatedAt: course.updatedAt.toISOString(),
@@ -95,6 +103,7 @@ function toDetail(course: CourseSyllabusRow, holdsPlace: boolean): CatalogCourse
     description: course.description,
     level: { code: course.level.code, label: course.level.label },
     teacher: { displayName: course.teacher.fullName },
+    price: toPrice(course),
     modules,
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
@@ -176,11 +185,7 @@ export class CatalogService {
     const pageSize = input.pageSize ?? DEFAULT_PAGE_SIZE;
     const filters = await this.filters(input);
 
-    const { courses, total } = await this.catalog.page(
-      filters,
-      (page - 1) * pageSize,
-      pageSize,
-    );
+    const { courses, total } = await this.catalog.page(filters, (page - 1) * pageSize, pageSize);
 
     return { items: courses.map(toCard), page, pageSize, total };
   }
@@ -195,10 +200,7 @@ export class CatalogService {
   }
 
   async read(address: string, viewerId?: string): Promise<CatalogCourseDetail> {
-    const course = await this.catalog.findPublished(
-      courseRef(address),
-      await this.filters({}),
-    );
+    const course = await this.catalog.findPublished(courseRef(address), await this.filters({}));
 
     if (!course) {
       // One message for "not published", "retired" and "never there": a browser that could
@@ -225,11 +227,7 @@ export class CatalogService {
    * course's on purpose — "that page" is honest about which half of the address was wrong,
    * and says nothing about whether the page exists.
    */
-  async lesson(
-    address: string,
-    lessonId: string,
-    viewerId?: string,
-  ): Promise<CatalogLessonPage> {
+  async lesson(address: string, lessonId: string, viewerId?: string): Promise<CatalogLessonPage> {
     const lesson = UUID.test(lessonId)
       ? await this.catalog.findReadable(
           courseRef(address),

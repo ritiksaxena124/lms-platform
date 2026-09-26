@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import {
   COURSE_LEVEL_CODES,
   COURSE_STATUS_CODES,
+  CURRENCY_CODES,
   LKP_TYPE_CODES,
   ROLE_CODES,
 } from '@lms/shared';
@@ -77,6 +78,21 @@ describe('reference data seeding', () => {
       COURSE_STATUS_CODES.ARCHIVED,
     ]);
     expect(await codesFor(LKP_TYPE_CODES.COURSE_LEVEL)).toEqual(Object.values(COURSE_LEVEL_CODES));
+  });
+
+  it('seeds the currencies a price can be quoted in', async () => {
+    // A course is priced in one of these rows, so the money format `packages/shared` applies
+    // has something named behind it: which currencies the platform quotes in is Ops' call,
+    // and adding one must stay a row rather than a release.
+    const values = await prisma.lkpValue.findMany({
+      where: { type: { code: LKP_TYPE_CODES.CURRENCY } },
+      orderBy: { position: 'asc' },
+    });
+
+    expect(values.map((value) => [value.code, value.label])).toEqual([
+      [CURRENCY_CODES.INR, 'Indian rupee'],
+      [CURRENCY_CODES.USD, 'US dollar'],
+    ]);
   });
 
   it('is idempotent, because every boot and every test run calls it again', async () => {

@@ -19,7 +19,7 @@
  * published too — so the number on a card is the number of pages the detail will actually
  * list. A card that promised nine and opened onto four would teach a student to distrust it.
  */
-import type { CourseChoice } from './courses';
+import type { CourseChoice, CoursePrice } from './courses';
 
 /** Who wrote the course, as little of them as a browsing student needs. */
 export interface CatalogTeacher {
@@ -36,6 +36,9 @@ export interface CatalogCourse {
   teacher: CatalogTeacher;
   moduleCount: number;
   lessonCount: number;
+  /** What the teacher quotes, or `null` because they have not said. A price is a statement
+   * made to whoever walks past, so it rides on the public shelf with no session asked for. */
+  price: CoursePrice | null;
   updatedAt: string;
 }
 
@@ -74,6 +77,9 @@ export interface CatalogCourseDetail {
   description: string | null;
   level: CourseChoice;
   teacher: CatalogTeacher;
+  /** The card's figure and nothing new: the page a student decides on shows the number the
+   * shelf showed them. */
+  price: CoursePrice | null;
   modules: CatalogModule[];
   createdAt: string;
   updatedAt: string;

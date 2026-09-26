@@ -57,6 +57,9 @@ model LkpValue {
   coursesAsLevel  Course[] @relation("course_level")
   coursesAsStatus Course[] @relation("course_status")
 
+  /// What a course price is quoted in.
+  coursesAsPrice Course[] @relation("course_price_currency")
+
   /// Lessons in their own stage of being written.
   lessonsAsStatus Lesson[] @relation("lesson_status")
 
@@ -186,6 +189,15 @@ model Course {
   levelValueId  String @map("level_value_id") @db.Uuid
   statusValueId String @map("status_value_id") @db.Uuid
 
+  /// What a place costs, in the integer minor units `packages/shared` moves money in, beside
+  /// the currency row it is quoted against. Both halves are absent together, because "not
+  /// priced yet" and "priced at nothing" are two different things a student is told.
+  ///
+  /// This is a quote on a shelf, not a charge: nothing collects a payment in this phase, and
+  /// an enrollment stays a place rather than a purchase.
+  priceMinorUnits      Int?   @map("price_minor_units")
+  priceCurrencyValueId String? @map("price_currency_value_id") @db.Uuid
+
   isActive  Boolean   @default(true) @map("is_active")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -194,6 +206,10 @@ model Course {
   teacher User     @relation("course_teacher", fields: [teacherUserId], references: [id], onDelete: Restrict)
   level   LkpValue @relation("course_level", fields: [levelValueId], references: [id], onDelete: Restrict)
   status  LkpValue @relation("course_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+
+  /// The money a price names. `Restrict` for the reason a level is restricted: a retired
+  /// currency must not orphan the quote a teacher wrote against it.
+  priceCurrency LkpValue? @relation("course_price_currency", fields: [priceCurrencyValueId], references: [id], onDelete: Restrict)
 
   /// The syllabus, in the order the teacher put it in.
   modules Module[] @relation("course_modules")

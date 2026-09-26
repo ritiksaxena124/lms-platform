@@ -14,12 +14,19 @@ import {
 
 import type { ReferenceValue } from '../../reference/reference.service';
 import { ReferenceService } from '../../reference/reference.service';
-import type { CourseWithVocabulary } from './courses.repository';
+import type { CourseColumns, CourseWithVocabulary } from './courses.repository';
 import { CoursesRepository } from './courses.repository';
-import type { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
+import type { CoursePriceDto, CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
 
 /** A course row is addressed by its id and nothing else, so this is the whole of it. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The price columns as a writer sees them: a pair, because an amount standing over no
+ * currency is a number a student cannot read, and a currency standing over no amount is a
+ * unit nobody quoted. */
+type PriceColumns = Pick<CourseColumns, 'priceMinorUnits' | 'priceCurrencyValueId'>;
+
+const NO_PRICE: PriceColumns = { priceMinorUnits: null, priceCurrencyValueId: null };
 
 /**
  * A title is a sentence and a slug is a URL segment; this is the translation a teacher
@@ -47,6 +54,12 @@ function toDocument(course: CourseWithVocabulary): Course {
     description: course.description,
     level: { code: course.level.code, label: course.level.label },
     status: { code: course.status.code, label: course.status.label },
+    // One object or nothing: the two columns are written as a pair, so a course that had an
+    // amount and no currency would be a bug rather than a price worth showing.
+    price:
+      course.priceMinorUnits === null || course.priceCurrency === null
+        ? null
+        : { minorUnits: course.priceMinorUnits, currency: course.priceCurrency },
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };
@@ -78,6 +91,7 @@ export class CoursesService {
   async create(teacherUserId: string, dto: CreateCourseDto): Promise<Course> {
     const level = await this.level(dto.level);
     const draft = await this.status(COURSE_STATUS_CODES.DRAFT);
+    const price = await this.priceWrite(dto.price);
 
     const slug = dto.slug ?? slugify(dto.title);
     if (!slug) {
@@ -93,6 +107,9 @@ export class CoursesService {
         summary: dto.summary?.trim() || null,
         description: dto.description?.trim() || null,
         levelValueId: level.id,
+        // A create that said nothing about money is a course with no price on it, which is
+        // the same row a later patch clears.
+        ...(price ?? NO_PRICE),
       },
       draft.id,
     );
@@ -105,6 +122,13 @@ export class CoursesService {
    * reference rows. */
   async levels(): Promise<CourseChoice[]> {
     const values = await this.reference.activeValues(LKP_TYPE_CODES.COURSE_LEVEL);
+    return values.map(({ code, label }) => ({ code, label }));
+  }
+
+  /** The currencies a price can be quoted in. The picker is given the label to show and the
+   * code to send, so a currency Ops enables is an option in the form the day it is a row. */
+  async currencies(): Promise<CourseChoice[]> {
+    const values = await this.reference.activeValues(LKP_TYPE_CODES.CURRENCY);
     return values.map(({ code, label }) => ({ code, label }));
   }
 
@@ -134,6 +158,9 @@ export class CoursesService {
       ...(dto.description === undefined ? {} : { description: dto.description.trim() || null }),
       ...(dto.level === undefined ? {} : { levelValueId: (await this.level(dto.level)).id }),
       ...(dto.slug === undefined ? {} : { slug: dto.slug }),
+      // The one field with three answers: say nothing and the quote stands, say `null` and
+      // both columns go back, name a currency and an amount and both are written.
+      ...(await this.priceWrite(dto.price)),
     };
 
     if (dto.slug && dto.slug !== course.slug) {
@@ -163,7 +190,7 @@ export class CoursesService {
         message: 'A course needs a summary and a description before anyone can read it.',
         details: {
           validation: Object.fromEntries(
-            missing.map((field) => [field, ['Fill this in before publishing.']])
+            missing.map((field) => [field, ['Fill this in before publishing.']]),
           ),
         },
       });
@@ -201,6 +228,27 @@ export class CoursesService {
     return value;
   }
 
+  /**
+   * The price columns a body asks for, or `null` when the body did not mention a price.
+   *
+   * Both halves are resolved here and nowhere else, because the pair is the rule: an amount
+   * with no unit is not a price, and a unit with no amount is not one either. A currency the
+   * catalogue does not carry is the writer's mistake, so it is reported against the `price`
+   * field the way an unknown level is reported against `level` — and the lookup is scoped to
+   * the Currency type, which is what stops `beginner` from being a valid thing to quote in.
+   */
+  private async priceWrite(price?: CoursePriceDto | null): Promise<PriceColumns | null> {
+    if (price === undefined) return null;
+    if (price === null) return NO_PRICE;
+
+    const [currency] = await this.reference.valuesByCodes(LKP_TYPE_CODES.CURRENCY, [
+      price.currency,
+    ]);
+    if (!currency) throw fieldError('price', `Not a currency we know: ${price.currency}`);
+
+    return { priceMinorUnits: price.minorUnits, priceCurrencyValueId: currency.id };
+  }
+
   private async requireSlugFree(teacherUserId: string, slug: string, exceptCourseId?: string) {
     if ((await this.courses.slugTakenBy(teacherUserId, slug, exceptCourseId)) > 0) {
       throw new ConflictException({
@@ -216,9 +264,7 @@ export class CoursesService {
   private async owned(teacherUserId: string, id: string): Promise<CourseWithVocabulary> {
     // Postgres answers a malformed uuid with a syntax error, which would reach the client
     // as a 500 about someone's typo. A uuid that cannot exist is simply not found.
-    const course = UUID.test(id)
-      ? await this.courses.findOwned(teacherUserId, id)
-      : null;
+    const course = UUID.test(id) ? await this.courses.findOwned(teacherUserId, id) : null;
     if (!course) {
       // One message for "not yours" and "not there": the difference is only interesting
       // to someone deciding which ids to try next.

@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ROLE_CODES, type Course, type CourseChoice } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
@@ -41,6 +51,13 @@ export class CoursesController {
   @Get('levels')
   async levels(): Promise<{ items: CourseChoice[] }> {
     return { items: await this.courses.levels() };
+  }
+
+  /** The currencies a price can be quoted in, for the same reason the levels are here: the
+   * amount box needs a unit beside it, and the unit list is a lookup's business. */
+  @Get('currencies')
+  async currencies(): Promise<{ items: CourseChoice[] }> {
+    return { items: await this.courses.currencies() };
   }
 
   @Get(':id')

@@ -117,6 +117,14 @@ errors, which is why both sides import the type from one place.
   optional together and required as a pair, which is why the DTO uses `@ValidateIf` on the
   pair rather than `@IsOptional` on each — `@IsOptional` skips an absent property, and an
   absent currency is precisely the case that has to fail.
+- **The course price pair is resolved in the service, not by a database constraint.** A bare
+  `minorUnits`/`currency` in the write body is caught by the validation pipe (both required
+  once `price` is present, amount a non-negative integer), and an unknown or inactive currency
+  code is refused with a `price` field error after the service looks the code up under the
+  `Currency` lookup — a foreign key alone would accept any well-formed `LkpValue`, including a
+  `CourseLevel`. The read side keeps `null` and `0` apart on purpose: `null` is "nobody quoted
+  this" and `0` is "this is free", and collapsing them at the shelf would either start a money
+  conversation the teacher never joined or print a `₹0.00` that reads as a typo.
 - **A teacher's working zone belongs to the account, not to the profile row.** It decides
   when a class is, what "today" means in a dashboard and when a reminder is humane; a copy on
   the profile would be a second truth to keep in step, so the profile form writes
@@ -208,10 +216,17 @@ A portal is a client of that design, and inherits its rules:
   carries `teacherUserId` in its `where` clause rather than checking ownership afterwards, so
   ownership is not a step a later endpoint can forget. `403` would tell a colleague the id
   exists and is a course.
-- **No price on the course row, and no `DELETE`.** Nothing can charge one yet, so a stored
-  number would be a field no provider validates and a figure a student can be shown. Retiring
-  is archiving; the row is what an enrollment points at (§12), and an archived course keeps a
-  roster of the people who were inside it.
+- **A course can carry a price, and the price is a quote, not a checkout.** `priceMinorUnits`
+  and `priceCurrencyValueId` are two nullable columns that move as one decision (§5), the
+  currency a `LkpValue` under the `Currency` type rather than an enum so a new one is a seed
+  row, not a deploy. `null` in both means nobody has quoted it — which a shelf renders as
+  silence, distinct from a `0` that means free. Nothing charges it: `PAYMENT_PROVIDER` is still
+  `none` (§6), a place in a course is still taken for free through enrollment (§12), and the
+  figure is the teacher's stated intent rather than a settled transaction. It is writable while
+  a course is a draft and locked once published, exactly like every other field the student
+  reads.
+- **`DELETE` is still not a thing.** Retiring is archiving; the row is what an enrollment points
+  at (§12), and an archived course keeps a roster of the people who were inside it.
 - **The teacher writes courses at `/courses`, `/courses/new` and `/courses/[id]/edit`.** One
   list fetched once and filtered locally by status tab, one editor for both create and edit,
   and the lifecycle buttons on the row as well as in the editor — because publishing is what
@@ -272,7 +287,7 @@ module, because ownership is a question the course already knows how to answer a
 domain module would only re-derive the same two hops.
 
 - **A lesson does have a status of its own, and readability needs both gates.** `LkpLessonStatus`
-  carries draft → published, and a page is readable only when its lesson is published *and* its
+  carries draft → published, and a page is readable only when its lesson is published _and_ its
   course is published: neither flag may expose the other's unfinished work. A module deliberately
   has no flag (§9) — it is a heading, and a heading with an opinion of its own would need rules
   for which of the three wins.
@@ -351,6 +366,12 @@ no writes, and — but for the one route below — no session either.
   counts.** `moduleCount` and `lessonCount` on a card count the same rows the course page will
   list, not everything the teacher ever made. A card that promised nine pages and opened onto
   four would teach a student to distrust every number on the screen.
+- **A card's counts and a card's price come from the same row the detail lists.** A published
+  course exposes `price` — `{ minorUnits, currency: { code, label } }` or `null` — on both the
+  list item and the outline, with no session involved, because a quote is the same figure to a
+  stranger and to a member. The currency travels as a `{ code, label }` pair rather than a bare
+  code so the shelf can print a symbol without a lookup of its own, and the two catalog queries
+  `include` the price relation for exactly that reason.
 - **The outline never hands over a page; one named endpoint does.** `body` is not selected by
   the syllabus query — a student browsing sees titles, order and each page's rough length, which
   is enough to decide. The exception is `GET /catalog/courses/:id/lessons/:lessonId`, which
@@ -359,7 +380,7 @@ no writes, and — but for the one route below — no session either.
   slipped in, so the outline keeps one shape whether or not any room on it happens to be open.
 - **Each outline row carries two flags, because they answer two questions.** `isFreePreview` is
   the teacher's statement about the page — true whether or not anybody is signed in, and worth a
-  badge. `isReadable` is about the reader: it says the page route will hand *this* caller the
+  badge. `isReadable` is about the reader: it says the page route will hand _this_ caller the
   body. For a stranger they agree; for a student holding a place every published row reads true
   while the teacher's marks stay put. A screen links what `isReadable` says and badges what
   `isFreePreview` says, which is the only way the same component can be honest to both readers
@@ -438,15 +459,15 @@ what an invitation is for.
   lookup — "is this student inside this course" has to be an index probe, not a scan.
 - **Three routes, a student's and nobody else's.** `GET /api/v1/enrollments` is "my courses",
   `POST /api/v1/enrollments` takes a place by `courseId`, and `POST
-  /api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
-  place is *worth* stays the catalog's decision — this module writes the row §11 reads.
+/api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
+  place is _worth_ stays the catalog's decision — this module writes the row §11 reads.
 - **The role is the whole of "a teacher cannot enroll in their own course."** The student
   controller is `@Roles(STUDENT)`, so that request never reaches a query to be checked. When a
   later phase wants teachers to take places too, the decorator is the one line that changes, and
   the ownership question it would raise is a decision somebody makes on purpose rather than a hole
   a service forgot to plug.
 - **A fourth route reads the same table for the teacher who owns the course.** `GET
-  /api/v1/courses/:courseId/roster` answers the question `ix_enrollment_course_roster` was built
+/api/v1/courses/:courseId/roster` answers the question `ix_enrollment_course_roster` was built
   for, and it is addressed through the course rather than through a student, so ownership is the
   whole permission: another teacher's roster and a uuid nobody wrote are one `404`, exactly as on
   every other `/courses/:id` route, because a `403` here would confirm that the course exists and
@@ -568,6 +589,18 @@ what an invitation is for.
   reading nobody made. The flag travels with every save rather than only when it changes: a box
   the teacher cleared has to arrive as `false`, since leaving it out is how an open page stays
   open by accident.
+- **A price is entered in the major unit and sent in the minor one.** The editor's Price box
+  takes `499`, the currency picker offers only the `Currency` lookup's active rows (plus a real
+  "No price" option, because clearing is a choice a `disabled` placeholder cannot be), and the
+  form converts with `toMinorUnits` before the request — the same helper the display side reads
+  back through `fromMinorUnits`. The two boxes are one decision: a half-filled pair is refused
+  in the browser with the complaint on the empty box, so a round trip never happens on a price
+  the API would reject anyway. On the shelf and the outline, `apps/student/lib/price.ts` is the
+  single place that turns a `CoursePrice` into words — figure, `Free`, or nothing — and the card
+  and the header call it rather than each deciding whether `null` means "say zero" or "say
+  nothing". The figure is `formatMoney`, so grouping follows the currency (lakh groups for a
+  rupee) rather than the reader's locale, and a price on the page stays a quote: the enroll
+  button is unchanged, because taking a place is still free.
 - **One query, one request.** The shelf's search box waits 250ms after typing stops; the level
   chips are a toggle rather than a set, because a course has one level and pressing the chip
   you chose means "that was enough". Both filters clear the page they were applied to.

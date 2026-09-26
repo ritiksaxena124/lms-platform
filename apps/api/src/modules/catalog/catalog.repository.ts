@@ -16,12 +16,13 @@ import { PrismaService } from '../../common/prisma/prisma.service';
  * alone.
  */
 
-/** A course page: level and teacher travel as code plus label, so no portal keeps a
- * translation table that goes stale the day Ops renames a tier. */
+/** A course page: level, teacher and the currency of any price travel as code plus label, so
+ * no portal keeps a translation table that goes stale the day Ops renames a tier. */
 const CARD_INCLUDE = (lessonStatusValueId: string) =>
   ({
     level: { select: { code: true, label: true } },
     teacher: { select: { fullName: true } },
+    priceCurrency: { select: { code: true, label: true } },
     modules: {
       where: { isActive: true },
       orderBy: { position: 'asc' },
@@ -42,6 +43,7 @@ const SYLLABUS_INCLUDE = (lessonStatusValueId: string) =>
   ({
     level: { select: { code: true, label: true } },
     teacher: { select: { fullName: true } },
+    priceCurrency: { select: { code: true, label: true } },
     modules: {
       where: { isActive: true },
       orderBy: { position: 'asc' },
@@ -122,11 +124,7 @@ export class CatalogRepository {
    * course on the platform first, and any order keyed on quality is a ranking this phase
    * has no signal to compute.
    */
-  async page(
-    filters: CatalogFilters,
-    skip: number,
-    take: number,
-  ): Promise<CatalogPage> {
+  async page(filters: CatalogFilters, skip: number, take: number): Promise<CatalogPage> {
     const where: Prisma.CourseWhereInput = {
       isActive: true,
       statusValueId: filters.courseStatusValueId,

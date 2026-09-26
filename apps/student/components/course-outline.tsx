@@ -7,6 +7,7 @@ import type { CatalogCourseDetail } from '@lms/shared';
 
 import { describeFailure, isNotFound } from '@/lib/api';
 import { readCatalogCourse } from '@/lib/catalog';
+import { priceLabel } from '@/lib/price';
 
 import { EnrollControl } from './enroll-control';
 import { useSession } from './session-provider';
@@ -141,6 +142,7 @@ export function CourseOutline({ courseId }: { courseId: string }) {
   const lessons = course.modules.flatMap((module) => module.lessons);
   const lessonTotal = lessons.length;
   const minutes = readingMinutes(course);
+  const price = priceLabel(course.price);
   // Whether this reader holds a place shows up as every published row being open, which is the
   // only shape of that fact the outline is given. The explainer below is a claim about what
   // they may do, so it has to be read off the rows rather than assumed from a stranger's case.
@@ -153,7 +155,12 @@ export function CourseOutline({ courseId }: { courseId: string }) {
       </Link>
 
       <header className="mt-3">
-        <p className="eyebrow">{course.level.label}</p>
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <p className="eyebrow">{course.level.label}</p>
+          {price ? (
+            <p className="tabular text-[0.9375rem] font-semibold text-ink-strong">{price}</p>
+          ) : null}
+        </div>
         <h1 className="mt-2 text-h1 text-ink-strong">{course.title}</h1>
         <p
           data-icon-zone

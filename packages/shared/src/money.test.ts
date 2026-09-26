@@ -47,4 +47,13 @@ describe('money in integer minor units', () => {
     expect(formatMoney({ minorUnits: 3500, currency: 'JPY' }, 'ja-JP')).toBe('¥3,500');
     expect(formatMoney({ minorUnits: 250, currency: 'AUD' }, 'en-AU')).toBe('AUD 2.50');
   });
+
+  it('groups by the currency when nobody names a locale', () => {
+    // A rupee is written in lakh groups and a dollar in thousands, and a shelf that printed
+    // ₹1,23,456 over a US price — or $1,23,456 over an Indian one — would be a figure a
+    // reader has to re-read. The currency is the only clue the amount carries, so the
+    // default follows it rather than following wherever this repository happens to be.
+    expect(formatMoney({ minorUnits: 12345600, currency: 'INR' })).toBe('₹1,23,456.00');
+    expect(formatMoney({ minorUnits: 12345600, currency: 'USD' })).toBe('$123,456.00');
+  });
 });

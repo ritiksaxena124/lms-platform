@@ -36,6 +36,7 @@ function course(overrides: Partial<Course> = {}): Course {
     description: 'Start with one pie, end with adding any two fractions.',
     level: { code: 'beginner', label: 'Beginner' },
     status: { code: 'draft', label: 'Draft' },
+    price: null,
     createdAt: '2026-09-25T00:00:00.000Z',
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,
@@ -191,12 +192,12 @@ describe('CourseSyllabus', () => {
     render(<CourseSyllabus courseId="c1" />);
     const list = await rows();
     await userEvent.click(
-      within(list[0] as HTMLElement).getByRole('button', { name: /move equivalent fractions down/i }),
+      within(list[0] as HTMLElement).getByRole('button', {
+        name: /move equivalent fractions down/i,
+      }),
     );
 
-    await waitFor(() =>
-      expect(api.reorderModules).toHaveBeenCalledWith('c1', ['m2', 'm1', 'm3']),
-    );
+    await waitFor(() => expect(api.reorderModules).toHaveBeenCalledWith('c1', ['m2', 'm1', 'm3']));
     const after = await rows();
     expect(after.map((row) => row.querySelector('h3')?.textContent)).toEqual([
       'Adding fractions',
@@ -210,7 +211,9 @@ describe('CourseSyllabus', () => {
     const list = await rows();
 
     expect(
-      within(list[0] as HTMLElement).queryByRole('button', { name: /move equivalent fractions up/i }),
+      within(list[0] as HTMLElement).queryByRole('button', {
+        name: /move equivalent fractions up/i,
+      }),
     ).toBeNull();
     expect(
       within(list[2] as HTMLElement).queryByRole('button', { name: /move mixed numbers down/i }),
@@ -240,11 +243,11 @@ describe('CourseSyllabus', () => {
   });
 
   it('leaves a readable block standing when the API says it cannot go', async () => {
-    api.readCourse.mockResolvedValue(
-      course({ status: { code: 'published', label: 'Published' } }),
-    );
+    api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
     api.deactivateModule.mockRejectedValue(
-      conflict('This block still holds a page a student can read. Take those lessons back to a draft first.'),
+      conflict(
+        'This block still holds a page a student can read. Take those lessons back to a draft first.',
+      ),
     );
 
     render(<CourseSyllabus courseId="c1" />);

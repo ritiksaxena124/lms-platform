@@ -52,10 +52,17 @@ const CURRENCY_SYMBOLS: Record<string, string> = {
   JPY: '¥',
 };
 
-export function formatMoney({ minorUnits, currency }: Money, locale = 'en-IN'): string {
+/** Where each currency is written the way its readers count: a rupee in lakh groups, a
+ * dollar in thousands. Anything not listed is grouped the way an English-language US reader
+ * counts, which is the least surprising default for a code this file has not been told about. */
+const CURRENCY_LOCALES: Record<string, string> = { INR: 'en-IN' };
+
+const DEFAULT_LOCALE = 'en-US';
+
+export function formatMoney({ minorUnits, currency }: Money, locale?: string): string {
   const code = currency.toUpperCase();
   const symbol = CURRENCY_SYMBOLS[code] ?? `${code} `;
-  const formatted = new Intl.NumberFormat(locale, {
+  const formatted = new Intl.NumberFormat(locale ?? CURRENCY_LOCALES[code] ?? DEFAULT_LOCALE, {
     minimumFractionDigits: minorDigits(code),
     maximumFractionDigits: minorDigits(code),
   }).format(Number(fromMinorUnits(minorUnits, code)));

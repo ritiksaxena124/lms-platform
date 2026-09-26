@@ -2,6 +2,7 @@ import {
   ACCOUNT_STATUS_CODES,
   COURSE_LEVEL_CODES,
   COURSE_STATUS_CODES,
+  CURRENCY_CODES,
   LESSON_STATUS_CODES,
   LKP_TYPE_CODES,
   type LkpTypeCode,
@@ -92,6 +93,15 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at(COURSE_LEVEL_CODES.INTERMEDIATE, 'Intermediate'),
       at(COURSE_LEVEL_CODES.ADVANCED, 'Advanced'),
     ],
+  },
+  /**
+   * What a price is quoted in. Seeded as a lookup rather than checked into the money helper
+   * because the platform's list of currencies is a business decision, and a course priced in
+   * a retired currency still has to say what its number meant (§2 — the row stays reservable).
+   */
+  [LKP_TYPE_CODES.CURRENCY]: {
+    description: 'The money a course price is quoted in',
+    values: [at(CURRENCY_CODES.INR, 'Indian rupee'), at(CURRENCY_CODES.USD, 'US dollar')],
   },
   /**
    * A lesson's own stage, one shorter than a course's: a lesson is retired by leaving the

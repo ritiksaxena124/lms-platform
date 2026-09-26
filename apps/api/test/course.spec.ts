@@ -120,7 +120,10 @@ describe('courses', () => {
     // Children before parents: the schema restricts both relations, so the order is the
     // only way a suite gets to clear its own rows.
     const userIds = (
-      await prisma.user.findMany({ where: { email: { contains: `.${RUN}@` } }, select: { id: true } })
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
     ).map((row) => row.id);
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
@@ -180,10 +183,7 @@ describe('courses', () => {
   });
 
   it('keeps a slug the teacher typed instead of overwriting their work', async () => {
-    const res = await postCourse(
-      { ...COMPLETE, slug: 'board-algebra-2026' },
-      teacher,
-    ).expect(201);
+    const res = await postCourse({ ...COMPLETE, slug: 'board-algebra-2026' }, teacher).expect(201);
 
     expect(res.body.course.slug).toBe('board-algebra-2026');
   });
@@ -286,9 +286,11 @@ describe('courses', () => {
 
   it('edits a draft as much as the teacher likes', async () => {
     const id = await createDraft(teacher);
-    const res = await patchCourse(id, { title: 'Fractions, properly', summary: '' }, teacher).expect(
-      200,
-    );
+    const res = await patchCourse(
+      id,
+      { title: 'Fractions, properly', summary: '' },
+      teacher,
+    ).expect(200);
 
     expect(res.body.course).toMatchObject({
       title: 'Fractions, properly',
@@ -372,5 +374,183 @@ describe('courses', () => {
 
     // No hard delete: the row is what a later enrollment would have pointed at.
     expect(await prisma.course.count({ where: { id, isActive: true } })).toBe(1);
+  });
+
+  describe('what a course costs', () => {
+    /**
+     * A quote, not a charge. Nothing in this API takes money, so the two columns below hold
+     * what a teacher says the course will cost — which is why an amount and a currency are
+     * one decision (a number without a unit is not a price) and why leaving them both empty
+     * is a state the shelf has to print rather than a default.
+     */
+    const RUPEE = { minorUnits: 499900, currency: 'INR' };
+
+    it('prices a course in minor units and a currency the catalogue knows', async () => {
+      const res = await postCourse(
+        { ...COMPLETE, slug: 'priced-algebra', price: RUPEE },
+        teacher,
+      ).expect(201);
+
+      // The label rides along with the code for the same reason the level's does: the portal
+      // that prints it must not be the one keeping the translation table.
+      expect(res.body.course.price).toEqual({
+        minorUnits: 499900,
+        currency: { code: 'INR', label: 'Indian rupee' },
+      });
+    });
+
+    it('starts a course unpriced, which is not the same as free', async () => {
+      const id = await createDraft(teacher);
+      const res = await getCourse(id, teacher).expect(200);
+
+      expect(res.body.course.price).toBeNull();
+      const columns = await prisma.course.findUniqueOrThrow({
+        where: { id },
+        select: { priceMinorUnits: true, priceCurrencyValueId: true },
+      });
+      expect(columns).toEqual({ priceMinorUnits: null, priceCurrencyValueId: null });
+    });
+
+    it('publishes a course with no price, because a place is not yet a purchase', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, COMPLETE, teacher).expect(200);
+      const res = await transition(id, 'publish', teacher).expect(200);
+
+      // Enrollment gives a student a page, not a receipt, so a price cannot be a precondition
+      // of publication — and a teacher quoting one later is a draft edit away.
+      expect(res.body.course.price).toBeNull();
+    });
+
+    it('refuses half a price, because an amount with no unit is not a price', async () => {
+      const res = await postCourse({ ...COMPLETE, price: { minorUnits: 499900 } }, teacher).expect(
+        400,
+      );
+
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+      expect(res.body.details.validation.currency).toBeDefined();
+
+      const amountMissing = await postCourse(
+        { ...COMPLETE, price: { currency: 'INR' } },
+        teacher,
+      ).expect(400);
+      expect(amountMissing.body.details.validation.minorUnits).toBeDefined();
+    });
+
+    it('refuses an amount that is negative or not whole minor units', async () => {
+      const negative = await postCourse(
+        { ...COMPLETE, price: { minorUnits: -100, currency: 'INR' } },
+        teacher,
+      ).expect(400);
+      expect(negative.body.details.validation.minorUnits).toBeDefined();
+
+      // ₹4999.005 is a figure no column could hold and no student could be asked to pay.
+      const fractional = await postCourse(
+        { ...COMPLETE, price: { minorUnits: 499900.5, currency: 'INR' } },
+        teacher,
+      ).expect(400);
+      expect(fractional.body.details.validation.minorUnits).toBeDefined();
+    });
+
+    it('refuses a currency the catalogue does not offer, including one it offers for something else', async () => {
+      const invented = await postCourse(
+        { ...COMPLETE, price: { minorUnits: 100, currency: 'xyz' } },
+        teacher,
+      ).expect(400);
+      expect(invented.body.code).toBe('VALIDATION_FAILED');
+      expect(invented.body.details.validation.price).toBeDefined();
+
+      // `beginner` is a real row in a real lookup — the wrong one. The check is scoped to the
+      // Currency type, or a teacher could quote a course in a level.
+      const borrowed = await postCourse(
+        { ...COMPLETE, price: { minorUnits: 100, currency: 'beginner' } },
+        teacher,
+      ).expect(400);
+      expect(borrowed.body.details.validation.price).toBeDefined();
+    });
+
+    it('offers the currencies a teacher can quote in, in the catalogue order', async () => {
+      // The amount box needs a unit beside it, and the unit list comes from the database for
+      // the same reason the level picker does: a currency Ops enables is a box that offers it.
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/courses/currencies')
+        .set('Authorization', `Bearer ${teacher}`)
+        .expect(200);
+
+      expect(res.body.items).toEqual([
+        { code: 'INR', label: 'Indian rupee' },
+        { code: 'USD', label: 'US dollar' },
+      ]);
+    });
+
+    it('does not hand the currency catalogue to a student', async () => {
+      // A browsing reader is owed the currency of the course in front of them, which the
+      // course row already carries — the picker is a writer's tool.
+      const res = await request(app.getHttpServer())
+        .get('/api/v1/courses/currencies')
+        .set('Authorization', `Bearer ${student}`)
+        .expect(403);
+
+      expect(res.body.code).toBe('FORBIDDEN');
+    });
+
+    it('re-prices a draft and clears the price again, both columns together', async () => {
+      const id = await createDraft(teacher);
+      const priced = await patchCourse(
+        id,
+        { price: { minorUnits: 9900, currency: 'USD' } },
+        teacher,
+      ).expect(200);
+      expect(priced.body.course.price).toEqual({
+        minorUnits: 9900,
+        currency: { code: 'USD', label: 'US dollar' },
+      });
+
+      const cleared = await patchCourse(id, { price: null }, teacher).expect(200);
+      expect(cleared.body.course.price).toBeNull();
+
+      // One field clears both halves: a body that could leave a currency standing over an
+      // empty amount is how a shelf comes to say "US dollar" about nothing.
+      expect(
+        await prisma.course.count({
+          where: { id, priceMinorUnits: null, priceCurrencyValueId: null },
+        }),
+      ).toBe(1);
+    });
+
+    it('quotes free when the teacher says zero, and shows it as zero rather than as none', async () => {
+      const id = await createDraft(teacher);
+      const res = await patchCourse(
+        id,
+        { price: { minorUnits: 0, currency: 'INR' } },
+        teacher,
+      ).expect(200);
+
+      expect(res.body.course.price).toEqual({
+        minorUnits: 0,
+        currency: { code: 'INR', label: 'Indian rupee' },
+      });
+    });
+
+    it('leaves a price alone when the body does not mention it', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, { price: RUPEE }, teacher).expect(200);
+
+      const res = await patchCourse(id, { title: 'Fractions, third edition' }, teacher).expect(200);
+      expect(res.body.course.price?.minorUnits).toBe(499900);
+      expect(res.body.course.title).toBe('Fractions, third edition');
+    });
+
+    it('holds a price still on a published course, the same refusal as a title', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, { ...COMPLETE, price: RUPEE }, teacher).expect(200);
+      await transition(id, 'publish', teacher).expect(200);
+
+      // A student reading ₹4,999 on the shelf is reading a promise, and this is the same rule
+      // that stops a title moving under them: the change goes through archive.
+      await patchCourse(id, { price: { minorUnits: 1, currency: 'INR' } }, teacher).expect(409);
+
+      const unchanged = await getCourse(id, teacher).expect(200);
+      expect(unchanged.body.course.price?.minorUnits).toBe(499900);
+    });
   });
 });

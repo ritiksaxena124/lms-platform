@@ -2,20 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  Card,
-  EmptyState,
-  ErrorState,
-  Icon,
-  Illo,
-  SkeletonGroup,
-  Stagger,
-  cn,
-} from '@lms/ui';
+import { Card, EmptyState, ErrorState, Icon, Illo, SkeletonGroup, Stagger, cn } from '@lms/ui';
 import type { CatalogCourseListResponse, CourseChoice } from '@lms/shared';
 
 import { describeFailure } from '@/lib/api';
 import { browseCatalog, catalogLevels, type CatalogSearch } from '@/lib/catalog';
+import { priceLabel } from '@/lib/price';
 
 /**
  * The shelf: every course a stranger is allowed to see, and the two ways to narrow it.
@@ -234,39 +226,46 @@ export function CatalogShelf() {
       {result && courses.length > 0 ? (
         <>
           <Stagger as="ul" className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" startIndex={1}>
-            {courses.map((course) => (
-              <li key={course.id}>
-                <Card interactive data-icon-zone className="flex h-full flex-col">
-                  <p className="eyebrow">{course.level.label}</p>
-                  <h3 className="mt-2 text-h2 text-ink-strong">
-                    <Link
-                      href={`/courses/${course.id}`}
-                      transitionTypes={['nav-forward']}
-                      className="inline-flex items-start gap-1.5 text-ink-strong underline-offset-4 hover:underline"
-                    >
-                      {course.title}
-                      <Icon name="arrow-right" size="sm" className="mt-1 text-ink-faint" />
-                    </Link>
-                  </h3>
-                  <p className="mt-2 flex-1 text-[0.9375rem] text-ink-muted">
-                    {course.summary ?? 'No summary yet — the outline says what it covers.'}
-                  </p>
-                  <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line pt-3 text-[0.8125rem]">
-                    <span className="inline-flex items-center gap-1.5 text-ink">
-                      <Icon name="user" size="sm" className="text-ink-faint" />
-                      {course.teacher.displayName}
-                    </span>
-                    <span className="tabular inline-flex items-center gap-1.5 text-ink-faint">
-                      <Icon name="layers" size="sm" />
-                      {course.moduleCount}{' '}
-                      {course.moduleCount === 1 ? 'module' : 'modules'} · {course.lessonCount}{' '}
-                      {course.lessonCount === 1 ? 'lesson' : 'lessons'} · updated{' '}
-                      {UPDATED.format(new Date(course.updatedAt))}
-                    </span>
-                  </div>
-                </Card>
-              </li>
-            ))}
+            {courses.map((course) => {
+              const price = priceLabel(course.price);
+              return (
+                <li key={course.id}>
+                  <Card interactive data-icon-zone className="flex h-full flex-col">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <p className="eyebrow">{course.level.label}</p>
+                      {price ? (
+                        <p className="tabular text-[0.8125rem] font-semibold text-ink">{price}</p>
+                      ) : null}
+                    </div>
+                    <h3 className="mt-2 text-h2 text-ink-strong">
+                      <Link
+                        href={`/courses/${course.id}`}
+                        transitionTypes={['nav-forward']}
+                        className="inline-flex items-start gap-1.5 text-ink-strong underline-offset-4 hover:underline"
+                      >
+                        {course.title}
+                        <Icon name="arrow-right" size="sm" className="mt-1 text-ink-faint" />
+                      </Link>
+                    </h3>
+                    <p className="mt-2 flex-1 text-[0.9375rem] text-ink-muted">
+                      {course.summary ?? 'No summary yet — the outline says what it covers.'}
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line pt-3 text-[0.8125rem]">
+                      <span className="inline-flex items-center gap-1.5 text-ink">
+                        <Icon name="user" size="sm" className="text-ink-faint" />
+                        {course.teacher.displayName}
+                      </span>
+                      <span className="tabular inline-flex items-center gap-1.5 text-ink-faint">
+                        <Icon name="layers" size="sm" />
+                        {course.moduleCount} {course.moduleCount === 1 ? 'module' : 'modules'} ·{' '}
+                        {course.lessonCount} {course.lessonCount === 1 ? 'lesson' : 'lessons'} ·
+                        updated {UPDATED.format(new Date(course.updatedAt))}
+                      </span>
+                    </div>
+                  </Card>
+                </li>
+              );
+            })}
           </Stagger>
 
           {lastPage > 1 ? (

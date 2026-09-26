@@ -37,6 +37,7 @@ function course(overrides: Partial<Course> = {}): Course {
     description: 'Start with one pie, end with adding any two fractions.',
     level: { code: 'beginner', label: 'Beginner' },
     status: { code: 'draft', label: 'Draft' },
+    price: null,
     createdAt: '2026-09-20T00:00:00.000Z',
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,
@@ -162,16 +163,14 @@ describe('CourseList', () => {
     );
   });
 
-    it('archives a published course so it can be edited again', async () => {
+  it('archives a published course so it can be edited again', async () => {
     api.archiveCourse.mockResolvedValue({
       ...PUBLISHED,
       status: { code: 'archived', label: 'Archived' },
     });
 
     render(<CourseList />);
-    await userEvent.click(
-      await screen.findByRole('button', { name: /archive verbs in passing/i }),
-    );
+    await userEvent.click(await screen.findByRole('button', { name: /archive verbs in passing/i }));
 
     await waitFor(() => expect(api.archiveCourse).toHaveBeenCalledWith('c2'));
     expect(await within(rowOf('Verbs in passing')).findByText('Archived')).toBeInTheDocument();

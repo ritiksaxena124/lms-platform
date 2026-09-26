@@ -16,11 +16,13 @@ import {
   notify,
   type StatusTone,
 } from '@lms/ui';
-import type { Course, CourseChoice } from '@lms/shared';
+import type { Course, CourseChoice, CoursePriceInput } from '@lms/shared';
+import { fromMinorUnits, toMinorUnits } from '@lms/shared';
 
 import { describeFailure, fieldErrors } from '@/lib/api';
 import {
   archiveCourse,
+  courseCurrencies,
   courseLevels,
   createCourse,
   publishCourse,
@@ -41,9 +43,25 @@ interface FormValues {
   level: string;
   summary: string;
   description: string;
+  /** The amount as the teacher typed it, and the currency it is in. Two boxes, one decision —
+   * see `priceInput`. */
+  priceAmount: string;
+  priceCurrency: string;
 }
 
-const BLANK: FormValues = { title: '', slug: '', level: '', summary: '', description: '' };
+const BLANK: FormValues = {
+  title: '',
+  slug: '',
+  level: '',
+  summary: '',
+  description: '',
+  priceAmount: '',
+  priceCurrency: '',
+};
+
+/** The currency picker's own first row: a course with no price on it is a choice a teacher
+ * makes, not an empty box, so it is named rather than left blank. */
+const NO_PRICE = { value: '', label: 'No price' };
 
 function ofCourse(course: Course): FormValues {
   return {
@@ -52,6 +70,10 @@ function ofCourse(course: Course): FormValues {
     level: course.level.code,
     summary: course.summary ?? '',
     description: course.description ?? '',
+    priceAmount: course.price
+      ? fromMinorUnits(course.price.minorUnits, course.price.currency.code)
+      : '',
+    priceCurrency: course.price?.currency.code ?? '',
   };
 }
 
@@ -69,6 +91,7 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
   const [values, setValues] = useState<FormValues>(BLANK);
   const [course, setCourse] = useState<Course | null>(null);
   const [levels, setLevels] = useState<CourseChoice[]>([]);
+  const [currencies, setCurrencies] = useState<CourseChoice[]>([]);
   const [pending, setPending] = useState<'save' | 'publish' | 'archive' | null>(null);
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string | null>(null);
@@ -76,20 +99,21 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
   const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
 
-  // Levels and course travel together: the select is useless without the catalogue, so a
-  // page that half-loaded would show a form with an empty dropdown and no explanation.
+  // Catalogue and course travel together: a select with no options and a form with no values
+  // would be a page that half-loaded, and a teacher cannot tell the difference.
   useEffect(() => {
     let alive = true;
     setLoading(true);
     setLoadError(null);
 
-    const catalogue = courseLevels();
+    const catalogues = Promise.all([courseLevels(), courseCurrencies()]);
     const document = courseId ? readCourse(courseId) : Promise.resolve(null);
 
-    Promise.all([catalogue, document])
-      .then(([items, loaded]) => {
+    Promise.all([catalogues, document])
+      .then(([[levelRows, currencyRows], loaded]) => {
         if (!alive) return;
-        setLevels(items);
+        setLevels(levelRows);
+        setCurrencies(currencyRows);
         setCourse(loaded);
         if (loaded) setValues(ofCourse(loaded));
       })
@@ -136,9 +160,50 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
     };
   }
 
+  /**
+   * The two boxes as the pair the API wants.
+   *
+   * Both empty is `null` — the same sentence an emptied summary says — and one box empty while
+   * the other is full is a mistake the form does not send up to be refused: the answer would
+   * name a box the teacher can already see is empty, one round trip later. Anything the API
+   * still disagrees with (a currency the catalogue dropped since this page loaded) comes back
+   * as a field error like any other.
+   *
+   * The amount is turned into minor units here and nowhere else in the portal, so a figure has
+   * exactly one place where it is multiplied before it reaches a column.
+   */
+  function priceInput(local: Record<string, string[]>): { price: CoursePriceInput | null } {
+    const amount = values.priceAmount.trim();
+    const currency = values.priceCurrency;
+
+    if (!amount && !currency) return { price: null };
+    if (!currency) {
+      local.currency = ['Choose which currency this is, or clear the amount too.'];
+      return { price: null };
+    }
+    if (!amount) {
+      local.minorUnits = ['Give an amount, or clear the currency too.'];
+      return { price: null };
+    }
+
+    try {
+      return { price: { minorUnits: toMinorUnits(amount, currency), currency } };
+    } catch {
+      local.minorUnits = ['Digits, and one decimal point at most — 4999, or 4999.50.'];
+      return { price: null };
+    }
+  }
+
   async function save(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (busy || locked) return;
+
+    const local: Record<string, string[]> = {};
+    const price = priceInput(local);
+    if (Object.keys(local).length > 0) {
+      setFields(local);
+      return;
+    }
 
     setPending('save');
     setFields({});
@@ -146,11 +211,19 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
 
     let saved: Course;
     try {
-      saved = courseId
-        ? await updateCourse(courseId, editInput())
-        : await createCourse(draftInput());
+      const body = { ...(courseId ? editInput() : draftInput()), ...price };
+      saved = courseId ? await updateCourse(courseId, body) : await createCourse(body);
     } catch (error) {
-      const perField = fieldErrors(error);
+      let perField = fieldErrors(error);
+      // The API names a price as one field, and the only thing left to complain about once it
+      // has an amount and a unit is the unit — so the message goes where it was chosen.
+      if (perField.price) {
+        perField = {
+          ...perField,
+          currency: [...(perField.currency ?? []), ...perField.price],
+        };
+        delete perField.price;
+      }
       setFields(perField);
       if (Object.keys(perField).length === 0) setFormError(describeFailure(error));
       setPending(null);
@@ -172,7 +245,8 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
     setFormError(null);
 
     try {
-      const next = to === 'publish' ? await publishCourse(course.id) : await archiveCourse(course.id);
+      const next =
+        to === 'publish' ? await publishCourse(course.id) : await archiveCourse(course.id);
       setCourse(next);
       setValues(ofCourse(next));
       notify.success(next.status.label === 'Published' ? 'Published' : 'Archived');
@@ -289,6 +363,34 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
           error={fields.description}
           disabled={busy || locked}
         />
+
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField
+            id="priceAmount"
+            label="Price"
+            inputMode="decimal"
+            autoComplete="off"
+            placeholder="4999.00"
+            hint="Optional, and a quote rather than a checkout — a place in a course is still taken for free. ₹4,999 goes in as 4999."
+            value={values.priceAmount}
+            onChange={(event) => set('priceAmount', event.target.value)}
+            error={fields.minorUnits}
+            disabled={busy || locked}
+          />
+
+          <Select
+            id="priceCurrency"
+            label="Currency"
+            options={[
+              NO_PRICE,
+              ...currencies.map((choice) => ({ value: choice.code, label: choice.label })),
+            ]}
+            value={values.priceCurrency}
+            onChange={(event) => set('priceCurrency', event.target.value)}
+            error={fields.currency}
+            disabled={busy || locked}
+          />
+        </div>
       </Card>
 
       <div className="flex flex-wrap items-center gap-2">
@@ -338,8 +440,8 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
 
       {course?.status.code === 'archived' ? (
         <p className="text-[0.75rem] leading-snug text-ink-faint">
-          Archived courses are hidden from students. Their address stays reserved, so nothing
-          else can take it.
+          Archived courses are hidden from students. Their address stays reserved, so nothing else
+          can take it.
         </p>
       ) : null}
     </form>

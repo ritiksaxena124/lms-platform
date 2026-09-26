@@ -65,6 +65,7 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
       'We take linear equations in one variable and do them properly.\nNo shortcuts, no skipped steps.',
     level: { code: 'intermediate', label: 'Intermediate' },
     teacher: { displayName: 'Aditi Raman' },
+    price: null,
     modules: [
       {
         id: 'm1',
@@ -129,6 +130,10 @@ function withPlace(course: CatalogCourseDetail): CatalogCourseDetail {
 
 const unreadable = () =>
   new ApiError({ statusCode: 404, code: 'NOT_FOUND', message: 'We cannot find that course.' });
+
+/** A currency as the API pairs it with an amount, so a price can be printed without the page
+ * deciding what symbol belongs to a number. */
+const RUPEE = { code: 'INR', label: 'Indian rupee' };
 
 beforeEach(() => {
   session.value = { status: 'signed-out', user: null };
@@ -284,6 +289,36 @@ describe('CourseOutline', () => {
     expect(screen.getByText(/2 modules/i)).toBeInTheDocument();
     expect(screen.getByText(/3 lessons/i)).toBeInTheDocument();
     expect(screen.getByText(/about 20 min/i)).toBeInTheDocument();
+  });
+
+  it('says what a quoted course costs, in the currency the teacher priced it in', async () => {
+    api.readCatalogCourse.mockResolvedValue(
+      detail({ price: { minorUnits: 499900, currency: RUPEE } }),
+    );
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByRole('heading', { name: /Algebra for the CBSE boards/ });
+
+    // The figure the API sent in paise, printed with the symbol of the currency beside it —
+    // the page does the arithmetic in neither direction.
+    expect(screen.getByText('₹4,999.00')).toBeInTheDocument();
+  });
+
+  it('says Free in words when the teacher quoted zero, not a figure that reads as a typo', async () => {
+    api.readCatalogCourse.mockResolvedValue(detail({ price: { minorUnits: 0, currency: RUPEE } }));
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByRole('heading', { name: /Algebra for the CBSE boards/ });
+
+    expect(screen.getByText('Free')).toBeInTheDocument();
+    expect(screen.queryByText('₹0.00')).not.toBeInTheDocument();
+  });
+
+  it('says nothing about money for a course with no price, which is not the same as a free one', async () => {
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByRole('heading', { name: /Algebra for the CBSE boards/ });
+
+    // A price line that reads "no price listed" would be the page starting a conversation about
+    // money the teacher never joined — and enrollment is a place taken for free regardless.
+    expect(screen.queryByText(/₹|\$|free|price|cost/i)).not.toBeInTheDocument();
   });
 
   it('keeps the description as it was written, line breaks included', async () => {

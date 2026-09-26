@@ -25,6 +25,7 @@ export const LKP_TYPE_CODES = {
   NOTIFICATION_TYPE: 'NotificationType',
   TEACHING_MODE: 'TeachingMode',
   COURSE_LEVEL: 'CourseLevel',
+  CURRENCY: 'Currency',
   MODERATION_STATUS: 'ModerationStatus',
 } as const;
 
@@ -89,6 +90,21 @@ export const COURSE_LEVEL_CODES = {
   INTERMEDIATE: 'intermediate',
   ADVANCED: 'advanced',
 } as const;
+
+/**
+ * The money a price is quoted in. These codes are ISO 4217 and uppercase, unlike the other
+ * business codes here, because `formatMoney` reads them to decide how many decimal places and
+ * which symbol an amount deserves — a lowercased `inr` would format as `INR ` with no symbol.
+ *
+ * A lookup type rather than a union of strings for the reason level is one: which currencies
+ * the platform quotes in is Ops' decision, and adding one is a row.
+ */
+export const CURRENCY_CODES = {
+  INR: 'INR',
+  USD: 'USD',
+} as const;
+
+export type CurrencyCode = (typeof CURRENCY_CODES)[keyof typeof CURRENCY_CODES];
 
 /**
  * Where a lesson is in its own life — one stage shorter than a course's, because a lesson

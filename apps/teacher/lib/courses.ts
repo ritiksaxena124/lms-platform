@@ -16,9 +16,7 @@ import { apiJson } from './api';
  * in place while the teacher watched the box go empty.
  */
 function withoutAbsent<T extends object>(input: T): T {
-  return Object.fromEntries(
-    Object.entries(input).filter(([, value]) => value !== undefined),
-  ) as T;
+  return Object.fromEntries(Object.entries(input).filter(([, value]) => value !== undefined)) as T;
 }
 
 export async function listCourses(): Promise<Course[]> {
@@ -28,6 +26,14 @@ export async function listCourses(): Promise<Course[]> {
 
 export async function courseLevels(): Promise<CourseChoice[]> {
   const { items } = await apiJson<{ items: CourseChoice[] }>('/courses/levels');
+  return items;
+}
+
+/** The currencies a price can be quoted in. Its own route rather than a reuse of the level
+ * list, because the two pickers ask about two lookups — and a form that offered
+ * `beginner` as a unit of money would be a bug the API has already refused. */
+export async function courseCurrencies(): Promise<CourseChoice[]> {
+  const { items } = await apiJson<{ items: CourseChoice[] }>('/courses/currencies');
   return items;
 }
 

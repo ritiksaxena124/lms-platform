@@ -27,7 +27,11 @@ rows it unlocks, a lesson that reads like a member's page, and a `/my-courses` s
 can be left. The teacher's side of the same table is on both ends now:
 `/api/v1/courses/:courseId/roster` names who holds a place in a course they own and the day they
 took it, and the portal shows it at `/courses/[id]/roster` — a headcount, a name and a day per
-row, and no button that removes somebody. Bookings and payments are still ahead.
+row, and no button that removes somebody. A course can now carry a price the teacher sets in the
+editor and the shelf prints — a quote rather than a checkout (`PAYMENT_PROVIDER` is still `none`),
+stored as minor units plus a `Currency` lookup value, `null` when nobody has quoted it and `0` when
+the teacher says free, and enrollment still grants a place for nothing. Bookings and payments are
+still ahead.
 See [Phase plan](#phases).
 
 ---

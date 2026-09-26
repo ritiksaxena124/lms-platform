@@ -9,10 +9,13 @@ export type CourseWithVocabulary = Prisma.CourseGetPayload<{
 
 /** Level and status travel with every course the API returns, code and label together:
  * a portal that only received the code would have to keep its own translation table, and
- * that table is the one thing a lookup is supposed to make unnecessary. */
+ * that table is the one thing a lookup is supposed to make unnecessary. The currency rides
+ * along on the same terms, and needs one more than the codes do: an amount without its unit
+ * is a number, not a price. */
 const WITH_VOCABULARY = {
   level: { select: { code: true, label: true } },
   status: { select: { code: true, label: true } },
+  priceCurrency: { select: { code: true, label: true } },
 } as const satisfies Prisma.CourseInclude;
 
 /** Columns a writer may set. Lookup ids are resolved before this point, so the repository
@@ -23,6 +26,10 @@ export interface CourseColumns {
   summary: string | null;
   description: string | null;
   levelValueId: string;
+  /** One decision, so one pair: a caller cannot hand this repository an amount and leave the
+   * currency standing from the quote before it. */
+  priceMinorUnits: number | null;
+  priceCurrencyValueId: string | null;
 }
 
 /**

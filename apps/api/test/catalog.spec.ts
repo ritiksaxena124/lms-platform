@@ -141,12 +141,7 @@ async function writePublishedLesson(moduleId: string, token: string, title: stri
 }
 
 /** The teacher's own mark on a page: "a stranger may read this one". */
-async function markFree(
-  moduleId: string,
-  lessonId: string,
-  token: string,
-  isFreePreview = true,
-) {
+async function markFree(moduleId: string, lessonId: string, token: string, isFreePreview = true) {
   await request(app.getHttpServer())
     .patch(`/api/v1/modules/${moduleId}/lessons/${lessonId}`)
     .set('Authorization', `Bearer ${token}`)
@@ -201,10 +196,16 @@ describe('catalog', () => {
     // Children before parents: the schema restricts both relations, so the order is the
     // only thing that lets the rows leave.
     const userIds = (
-      await prisma.user.findMany({ where: { email: { contains: `.${RUN}@` } }, select: { id: true } })
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
     ).map((row) => row.id);
     const courseIds = (
-      await prisma.course.findMany({ where: { teacherUserId: { in: userIds } }, select: { id: true } })
+      await prisma.course.findMany({
+        where: { teacherUserId: { in: userIds } },
+        select: { id: true },
+      })
     ).map((row) => row.id);
     const moduleIds = (
       await prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { id: true } })
@@ -322,7 +323,11 @@ describe('catalog', () => {
     const kept = await createModule(courseId, teacher, 'Fractions on a number line');
     const retiredModule = await createModule(courseId, teacher, 'A block the teacher took back');
     await writePublishedLesson(kept, teacher, 'Where a half sits');
-    const retiredLesson = await writePublishedLesson(kept, teacher, 'A page taken back to the shelf');
+    const retiredLesson = await writePublishedLesson(
+      kept,
+      teacher,
+      'A page taken back to the shelf',
+    );
     await createLesson(retiredModule, teacher, 'Everything in a block that is gone');
     await transition(kept, retiredLesson, 'deactivate', teacher);
     await request(app.getHttpServer())
@@ -389,9 +394,7 @@ describe('catalog', () => {
     const res = await catalogList(`?q=${MARK}&level=advanced`).expect(200);
     expect(res.body.items.map((item: { id: string }) => item.id)).toContain(advanced);
     expect(
-      res.body.items.every(
-        (item: { level: { code: string } }) => item.level.code === 'advanced',
-      ),
+      res.body.items.every((item: { level: { code: string } }) => item.level.code === 'advanced'),
     ).toBe(true);
 
     const unknown = await catalogList('?level=whatever').expect(400);
@@ -606,6 +609,103 @@ describe('catalog', () => {
       const absent = await catalogRead('no-such-slug-anywhere').expect(404);
 
       expect(failureShape(draft.body)).toEqual(failureShape(absent.body));
+    });
+  });
+
+  describe('what a course costs', () => {
+    /** The teacher's own write, reached through the route that owns the price columns. A
+     * catalog route that could set one would be a student naming their own price. */
+    async function price(
+      courseId: string,
+      value: { minorUnits: number; currency: string } | null,
+      token = teacher,
+    ) {
+      await request(app.getHttpServer())
+        .patch(`/api/v1/courses/${courseId}`)
+        .set('Authorization', `Bearer ${token}`)
+        .send({ price: value })
+        .expect(200);
+    }
+
+    async function cardFor(courseId: string) {
+      const [card] = (await itemsMatching(MARK)).filter((item) => item.id === courseId);
+      return card;
+    }
+
+    it('shows the shelf the price the teacher quoted, currency and all', async () => {
+      const courseId = await createCourse(teacher);
+      await price(courseId, { minorUnits: 499900, currency: 'INR' });
+      await publishCourse(courseId, teacher);
+
+      // The label travels with the code for the same reason the level's does: a shelf that
+      // printed `INR` from its own table would be one Ops rename away from a wrong currency.
+      expect(await cardFor(courseId)).toMatchObject({
+        price: { minorUnits: 499900, currency: { code: 'INR', label: 'Indian rupee' } },
+      });
+
+      const res = await catalogRead(courseId).expect(200);
+      expect(res.body.course.price).toEqual({
+        minorUnits: 499900,
+        currency: { code: 'INR', label: 'Indian rupee' },
+      });
+    });
+
+    it('shows a course with no price as having no price, not as costing nothing', async () => {
+      const courseId = await createPublishedCourse(teacher);
+
+      // The distinction a student reads off the shelf: `null` is "this teacher has not said
+      // yet", `0` is "this teacher says free". A shelf that turned one into the other would
+      // be inventing a promise.
+      expect(await cardFor(courseId)).toMatchObject({ price: null });
+
+      const priced = await createCourse(teacher);
+      await price(priced, { minorUnits: 0, currency: 'INR' });
+      await publishCourse(priced, teacher);
+      expect(await cardFor(priced)).toMatchObject({ price: { minorUnits: 0 } });
+    });
+
+    it('lets a stranger read the price without a session', async () => {
+      const courseId = await createCourse(teacher);
+      await price(courseId, { minorUnits: 199900, currency: 'USD' });
+      await publishCourse(courseId, teacher);
+
+      const anonymous = await catalogRead(courseId).expect(200);
+      const enrolled = await catalogRead(courseId, student).expect(200);
+
+      // A price is a quote, not a charge — nothing about it depends on who is asking, and a
+      // figure that only appeared for a signed-in reader would be a discount nobody announced.
+      expect(anonymous.body.course.price).toEqual({
+        minorUnits: 199900,
+        currency: { code: 'USD', label: 'US dollar' },
+      });
+      expect(enrolled.body.course.price).toEqual(anonymous.body.course.price);
+    });
+
+    it('says the same price through a slug as through an id', async () => {
+      const courseId = await createCourse(teacher);
+      await price(courseId, { minorUnits: 75000, currency: 'INR' });
+      await publishCourse(courseId, teacher);
+      const { slug } = await prisma.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: { slug: true },
+      });
+
+      const byId = await catalogRead(courseId).expect(200);
+      const bySlug = await catalogRead(slug).expect(200);
+
+      expect(bySlug.body.course.price).toEqual(byId.body.course.price);
+    });
+
+    it('keeps a draft course’s price off the shelf with the rest of the draft', async () => {
+      const courseId = await createCourse(teacher);
+      await price(courseId, { minorUnits: 99900, currency: 'INR' });
+
+      expect((await itemsMatching(MARK)).map((item) => item.id)).not.toContain(courseId);
+      const hidden = await catalogRead(courseId).expect(404);
+
+      // The whole row is the thing that is invisible, so a price cannot leak through the
+      // 404 — and the message is the same one an unpriced draft gets.
+      expect(JSON.stringify(hidden.body)).not.toMatch(/price|999/i);
     });
   });
 });

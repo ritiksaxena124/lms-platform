@@ -26,10 +26,15 @@ function course(overrides: Partial<CatalogCourse> = {}): CatalogCourse {
     teacher: { displayName: 'Aditi Raman' },
     moduleCount: 2,
     lessonCount: 5,
+    price: null,
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,
   };
 }
+
+/** A currency as the API pairs it with an amount: the code it is keyed on, and the label a
+ * shelf may print beside it. */
+const RUPEE = { code: 'INR', label: 'Indian rupee' };
 
 const ALGEBRA = course();
 const VERBS = course({
@@ -67,7 +72,9 @@ describe('CatalogShelf', () => {
     expect(screen.getByRole('heading', { name: 'Verbs in passing' }));
     expect(screen.getByText('Aditi Raman'));
     // The counts a card shows are the counts the detail will list, so they are worth naming.
-    expect(within(screen.getByRole('link', { name: /Algebra/ }).closest('li')!).getByText(/5 lessons/));
+    expect(
+      within(screen.getByRole('link', { name: /Algebra/ }).closest('li')!).getByText(/5 lessons/),
+    );
   });
 
   it('shows where a course came from, not that it was written', async () => {
@@ -78,6 +85,42 @@ describe('CatalogShelf', () => {
     // A course with no summary is a course whose teacher never wrote one; the card says
     // nothing rather than "null" or an empty gap.
     expect(within(card).queryByText(/undefined|null/i)).not.toBeInTheDocument();
+  });
+
+  it('prints what a course costs beside the teacher who wrote it', async () => {
+    api.browseCatalog.mockResolvedValue(
+      page([course({ price: { minorUnits: 499900, currency: RUPEE } })]),
+    );
+
+    render(<CatalogShelf />);
+    const card = (await screen.findByRole('link', { name: /Algebra/ })).closest('li')!;
+
+    // The figure the API sent in paise, printed with the symbol of the currency that came
+    // beside it — the card does the arithmetic in neither direction.
+    expect(within(card).getByText('₹4,999.00')).toBeInTheDocument();
+  });
+
+  it('says Free in words when the teacher quoted zero, not a figure that reads as a typo', async () => {
+    api.browseCatalog.mockResolvedValue(
+      page([course({ price: { minorUnits: 0, currency: RUPEE } })]),
+    );
+
+    render(<CatalogShelf />);
+    const card = (await screen.findByRole('link', { name: /Algebra/ })).closest('li')!;
+
+    expect(within(card).getByText('Free')).toBeInTheDocument();
+    expect(within(card).queryByText('₹0.00')).not.toBeInTheDocument();
+  });
+
+  it('says nothing about money for a course with no price, which is not the same as a free one', async () => {
+    api.browseCatalog.mockResolvedValue(page([course({ price: null })]));
+
+    render(<CatalogShelf />);
+    const card = (await screen.findByRole('link', { name: /Algebra/ })).closest('li')!;
+
+    // A shelf full of "no price listed" would be the portal inventing a conversation about
+    // money that the teacher never started.
+    expect(within(card).queryByText(/₹|\$|free|price/i)).not.toBeInTheDocument();
   });
 
   it('offers only the levels the API is holding courses at', async () => {

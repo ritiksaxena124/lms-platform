@@ -3,7 +3,13 @@ import { randomUUID } from 'node:crypto';
 import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { COURSE_LEVEL_CODES, COURSE_STATUS_CODES, LKP_TYPE_CODES, ROLE_CODES } from '@lms/shared';
+import {
+  COURSE_LEVEL_CODES,
+  COURSE_STATUS_CODES,
+  CURRENCY_CODES,
+  LKP_TYPE_CODES,
+  ROLE_CODES,
+} from '@lms/shared';
 
 import { seedLookups } from '../src/reference/seed-lookups';
 
@@ -18,15 +24,14 @@ const emailFor = (name: string) => `${name}.${RUN}@localtest.me`;
 const prisma = new PrismaClient();
 
 async function lookupValue(typeCode: string, code: string): Promise<string> {
-  return (
-    await prisma.lkpValue.findFirstOrThrow({ where: { type: { code: typeCode }, code } })
-  ).id;
+  return (await prisma.lkpValue.findFirstOrThrow({ where: { type: { code: typeCode }, code } })).id;
 }
 
 let teacherRoleId: string;
 let activeStatusId: string;
 let beginnerId: string;
 let draftId: string;
+let rupeeId: string;
 
 const createTeacher = (email: string) =>
   prisma.user.create({
@@ -63,6 +68,7 @@ beforeAll(async () => {
   activeStatusId = await lookupValue(LKP_TYPE_CODES.ACCOUNT_STATUS, 'active');
   beginnerId = await lookupValue(LKP_TYPE_CODES.COURSE_LEVEL, COURSE_LEVEL_CODES.BEGINNER);
   draftId = await lookupValue(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.DRAFT);
+  rupeeId = await lookupValue(LKP_TYPE_CODES.CURRENCY, CURRENCY_CODES.INR);
 });
 
 afterAll(async () => {
@@ -116,9 +122,7 @@ describe('course', () => {
     const owner = await createTeacher(emailFor('vocabulary'));
     const nowhere = '00000000-0000-0000-0000-000000000000';
 
-    await expect(
-      createCourse(owner.id, 'bad-level', { levelValueId: nowhere }),
-    ).rejects.toThrow();
+    await expect(createCourse(owner.id, 'bad-level', { levelValueId: nowhere })).rejects.toThrow();
     await expect(
       createCourse(owner.id, 'bad-status', { statusValueId: nowhere }),
     ).rejects.toThrow();
@@ -133,15 +137,69 @@ describe('course', () => {
     expect(course.summary).toBeNull();
   });
 
-  it('has no price, because nothing can charge one yet', async () => {
-    const columns = await prisma.$queryRawUnsafe<{ column_name: string }[]>(
-      `SELECT column_name FROM information_schema.columns WHERE table_name = 'course'`,
-    );
+  /**
+   * A price is stored the way `packages/shared` moves money everywhere else: integer minor
+   * units plus a currency. This is a quote, not a charge — nothing takes payment (§6 keeps
+   * that for the payments phase), and an enrollment stays a place rather than a purchase.
+   * What a course costs is worth putting on the shelf before anybody can be billed for it,
+   * because the number a student reads and the number a teacher writes must be one field.
+   */
+  it('prices a course in integer minor units and a currency row', async () => {
+    const owner = await createTeacher(emailFor('priced'));
+    const priced = await createCourse(owner.id, 'priced-by-the-term', {
+      priceMinorUnits: 499900,
+      priceCurrencyValueId: rupeeId,
+    });
 
-    // Paid courses are a later decision with a provider attached to it. Storing a number
-    // now would be a field nothing validates and a student can be shown.
-    expect(columns.map((column) => column.column_name)).not.toContain(
-      expect.stringMatching(/price|amount|currency/i),
-    );
+    // Minor units, never a float: ₹4,999.00 is 499900 paise, and a decimal column would
+    // make the sum of two prices a matter of rounding. The currency is a reference row for
+    // the reason level is one — which money Ops accepts is a business decision.
+    expect(priced.priceMinorUnits).toBe(499900);
+    expect(priced.priceCurrencyValueId).toBe(rupeeId);
+  });
+
+  it('leaves a course unpriced when neither half of a price is written', async () => {
+    const owner = await createTeacher(emailFor('unpriced'));
+    const course = await createCourse(owner.id, 'written-in-quiet');
+
+    // Both null is one state, not two: a course with no price is a thing a teacher has not
+    // decided about yet, and the shelf has to be able to tell that from ₹0.
+    expect(course.priceMinorUnits).toBeNull();
+    expect(course.priceCurrencyValueId).toBeNull();
+  });
+
+  it('reads a price of zero as a decision rather than as an absent one', async () => {
+    const owner = await createTeacher(emailFor('free-course'));
+    const free = await createCourse(owner.id, 'open-to-all', {
+      priceMinorUnits: 0,
+      priceCurrencyValueId: rupeeId,
+    });
+
+    // `0` means the teacher priced the course and named nothing. A portal that tested the
+    // number for truthiness would show it as an unpriced draft.
+    expect(free.priceMinorUnits).toBe(0);
+    expect(free.priceCurrencyValueId).toBe(rupeeId);
+  });
+
+  it('will not let a currency row disappear while a course is priced in it', async () => {
+    const owner = await createTeacher(emailFor('currency-outlived'));
+    await createCourse(owner.id, 'priced-in-rupees', {
+      priceMinorUnits: 100,
+      priceCurrencyValueId: rupeeId,
+    });
+
+    // §2 again: the row can be retired, and a quote written against it stays readable.
+    await expect(prisma.lkpValue.delete({ where: { id: rupeeId } })).rejects.toThrow();
+  });
+
+  it('refuses a price written against a row that is not there', async () => {
+    const owner = await createTeacher(emailFor('bad-currency'));
+
+    await expect(
+      createCourse(owner.id, 'priced-nowhere', {
+        priceMinorUnits: 500,
+        priceCurrencyValueId: '00000000-0000-0000-0000-000000000000',
+      }),
+    ).rejects.toThrow();
   });
 });
