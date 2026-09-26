@@ -353,6 +353,12 @@ ownership, no writes.
   worse result than no hit — and `page`/`pageSize` are validated as numbers so a query string
   comparing `'2'` to `2` cannot be a bug later. Newest first, since a ranking this phase has no
   signal for would be a guess with a sort button on it.
+- **The student portal is its first consumer**, at `apps/student`: the shelf at `/` and a
+  course's outline at `/courses/[id]`. The address is the id rather than the prettier slug
+  because the read route is keyed by id — a slug that survives a retitling is an API decision
+  first, and a portal does not get to invent one. The outline prints each module's position as
+  the catalog sent it, gaps included, and no lesson title is a link: there is no page a visitor
+  may open yet, and a title that looked clickable would teach them not to trust the day it is.
 
 ## 12. Frontend
 
@@ -361,6 +367,23 @@ ownership, no writes.
   slides away under a teacher mid-list. The height is `dvh`, not `screen`: a mobile browser's
   URL bar is part of the viewport, and a frame measured against the screen loses its last row
   of pixels to a bar that is not in the layout.
+- **A public portal scrolls as a document.** The student portal is a header, a centered column
+  and a page that moves — no held-still sidebar, because the frame above is for somebody who
+  sits in a tool for hours and this is a shelf somebody walks past. The tokens are the same
+  ones; the difference is only chrome.
+- **A stranger's transport carries nothing.** `apps/student/lib/api.ts` is not the teacher's
+  file with the session code deleted: there is no access token in a module variable, no
+  `credentials: 'include'`, and no refresh to retry a `401`, because every route it can reach
+  is answered by the row's own status. Sending a cookie would be the one way for a cached
+  catalog response to carry one visitor's session to the next.
+- **Loading is derived from the answer's key, not announced by a flag.** A screen keeps the
+  request it is waiting on (`level|search|page`) beside the reply that earned it and shows a
+  skeleton while they disagree. Setting a `loading` boolean in an effect would flash a false
+  "nothing here yet" every time a filter changed mid-flight, and a late reply from a search
+  the visitor has already rewritten would land on top of the current one.
+- **One query, one request.** The shelf's search box waits 250ms after typing stops; the level
+  chips are a toggle rather than a set, because a course has one level and pressing the chip
+  you chose means "that was enough". Both filters clear the page they were applied to.
 - **Tokens before components.** `@lms/ui/src/styles/tokens.css` is the only place a colour,
   radius, shadow, duration or type step is defined. A portal re-themes by overriding tokens;
   it does not get to invent `#3b82f6`.
@@ -416,9 +439,11 @@ ownership, no writes.
 ## 13. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
-  `student:…`, `ops:…` and `api:4000` share one registrable domain and therefore one
+  `student:3001`, `ops:…` and `api:4000` share one registrable domain and therefore one
   `Domain=localtest.me` session cookie. This is the reason auth will work across portals in
-  development exactly the way it will in production, with no CORS or localhost hacks.
+  development exactly the way it will in production, with no CORS or localhost hacks — and
+  the reason the student portal can sit on that domain today without touching the cookie:
+  its first screen sends no credentials at all.
 - Two databases: `lms` for development, `lms_test` for tests, owned by a least-privilege
   `lms` role with `CREATEDB` (Prisma needs it for migration shadow databases). The test
   global setup **refuses to run** unless `DATABASE_URL` names `lms_test`, and redacts

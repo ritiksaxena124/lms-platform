@@ -14,7 +14,8 @@ const source = join(repoRoot, 'packages/ui/illustrations');
 
 const PORTALS = [
   { name: 'teacher', dir: join(repoRoot, 'apps/teacher/public/illustrations') },
-  // student and ops get the same line when their apps exist.
+  { name: 'student', dir: join(repoRoot, 'apps/student/public/illustrations') },
+  // ops gets the same line when its app exists.
 ];
 
 for (const portal of PORTALS) {

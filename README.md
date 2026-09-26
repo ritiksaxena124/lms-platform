@@ -10,9 +10,10 @@ profile and write, publish and archive courses in the teacher portal (`/courses`
 `/api/v1/courses/:id/modules`), and write the lessons inside a module — the page, its rough
 length, its slot in that block's order and its own draft/published flag
 (`/courses/[id]/modules/[moduleId]/lessons`, backed by `/api/v1/modules/:moduleId/lessons`).
-A stranger can already browse what that makes readable: `/api/v1/catalog/courses` lists the
-published courses and `/api/v1/catalog/courses/:id` shows their syllabus — titles, order and
-rough length, never the page itself. Enrollment, bookings and payments are still ahead.
+A stranger can already browse what that makes readable, on a second portal:
+<http://student.localtest.me:3001> is the shelf (`/api/v1/catalog/courses`) and a course's
+outline (`/api/v1/catalog/courses/:id`) — titles, order and rough length, never the page
+itself, and no account needed to look. Enrollment, bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -35,6 +36,7 @@ cp apps/api/.env.example apps/api/.env       # set DATABASE_URL for the lms data
 cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_test
 # JWT_SECRET has no default in either file; generate one:  openssl rand -hex 32
 cp apps/teacher/.env.example apps/teacher/.env.development   # where the portal finds the API
+cp apps/student/.env.example apps/student/.env.development   # the same, for the public shelf
 
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
@@ -43,12 +45,14 @@ bun run --filter @lms/api db:seed       # reference rows + the three demo accoun
 
 # 3. Everything else is derived from those two files
 bun run verify        # build + typecheck + lint + test across the workspace
-bun run dev           # API on :4000, teacher portal on :3000
+bun run dev           # API on :4000, teacher portal on :3000, student shelf on :3001
 ```
 
-Then open <http://teacher.localtest.me:3000>. `*.localtest.me` resolves to `127.0.0.1`
-and gives every portal a subdomain of one registrable domain, which is what lets the
-three apps share a session cookie in development without `localhost` CORS hacks.
+Open <http://teacher.localtest.me:3000> for the portal a teacher works in and
+<http://student.localtest.me:3001> for what a stranger sees of that work.
+`*.localtest.me` resolves to `127.0.0.1` and gives every portal a subdomain of one
+registrable domain, which is what lets the three apps share a session cookie in development
+without `localhost` CORS hacks.
 
 ### Signing in
 
@@ -62,19 +66,22 @@ is the entire reason they exist:
 | `ops@example.test`     | ops portal — the role the sign-up form will not hand out |
 
 All three sign in with `lms-demo-password`, at <http://teacher.localtest.me:3000/login> —
-the sign-in form has a button that fills the teacher one for you. They are created only in
-`lms` and `lms_test`: seeding refuses when `NODE_ENV=production`, and re-running `db:seed`
-after you have changed one leaves it changed. The addresses sit under the reserved `.test`
-domain, so a demo account can never be pointed at a real mailbox.
+the sign-in form has a button that fills the teacher one for you. The student portal is not
+on that list yet: its first screen is the shelf, and a shelf asks nothing of whoever walks up
+to it. Accounts are created only in `lms` and `lms_test`: seeding refuses when
+`NODE_ENV=production`, and re-running `db:seed` after you have changed one leaves it changed.
+The addresses sit under the reserved `.test` domain, so a demo account can never be pointed at
+a real mailbox.
 
 ## Commands
 
 | Command               | What it does                                                             |
 | --------------------- | ------------------------------------------------------------------------ |
 | `bun run verify`      | The gate: shared build, typecheck, lint, tests. Run before every commit. |
-| `bun run dev`         | API + teacher portal together.                                           |
+| `bun run dev`         | API + teacher portal + student shelf together.                           |
 | `bun run dev:api`     | NestJS API with watch mode.                                              |
 | `bun run dev:teacher` | Next.js teacher portal.                                                  |
+| `bun run dev:student` | Next.js student portal — the public catalog.                             |
 | `bun run dev:ui`      | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
 | `bun run test`        | All test suites (Vitest, per workspace package).                         |
 | `bun run format`      | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
@@ -85,6 +92,7 @@ domain, so a demo account can never be pointed at a real mailbox.
 apps/
   api/        NestJS modular monolith — the only writer to the database
   teacher/    Next.js App Router portal for teachers (built first)
+  student/    Next.js App Router portal for learners — the catalog shelf so far
 packages/
   shared/     Framework-free TypeScript: error codes, lookup codes, money, timezones
   ui/         Design tokens, primitives and motion shared by all three portals

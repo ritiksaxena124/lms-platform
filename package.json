@@ -16,6 +16,7 @@
     "dev": "bun run --filter '*' dev",
     "dev:api": "bun run --filter @lms/api dev",
     "dev:teacher": "bun run --filter @lms/teacher dev",
+    "dev:student": "bun run --filter @lms/student dev",
     "dev:ui": "bun run --filter @lms/ui dev"
   },
   "devDependencies": {

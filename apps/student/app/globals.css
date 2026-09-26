@@ -1,0 +1,6 @@
+@import 'tailwindcss';
+@import '@lms/ui/styles.css';
+
+/* Inter is loaded by @lms/ui itself (self-hosted, subset by unicode-range), so every portal
+ * gets the identical file with no third-party font request. The --lms-font-* hooks stay for a
+ * portal that needs to override them. */
