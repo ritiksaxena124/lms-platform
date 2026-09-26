@@ -100,6 +100,16 @@ describe('CourseList', () => {
     );
   });
 
+  it('links a row to the class that is inside it', async () => {
+    render(<CourseList />);
+    await screen.findAllByRole('listitem');
+
+    expect(within(rowOf('Verbs in passing')).getByRole('link', { name: 'Roster' })).toHaveAttribute(
+      'href',
+      '/courses/c2/roster',
+    );
+  });
+
   it('narrows to one status without asking the API again', async () => {
     render(<CourseList />);
     await screen.findAllByRole('listitem');

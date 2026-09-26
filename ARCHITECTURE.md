@@ -487,7 +487,8 @@ what an invitation is for.
   read of the same table — who is in the class, who is not, and what a roster is not allowed to
   say. The student portal reads the first set now — `lib/enrollments.ts`
   for the transport, `EnrollControl` for taking a place, `my-courses` for the roster and leaving
-  one — and the rules those screens keep are §13's.
+  one — the teacher portal reads the roster at `/courses/[id]/roster`, and the rules those screens
+  keep are §13's.
 
 ## 13. Frontend
 
@@ -531,6 +532,13 @@ what an invitation is for.
   decision the student can take again on the next screen — the same reasoning as a teacher's
   Archive — and the local list drops the row only after the cancel returns, so a refused leave
   cannot leave a shelf claiming a place the API still counts as open.
+- **The teacher's roster screen reads, and does not manage.** `/courses/[id]/roster` in the
+  teacher portal counts the class from `total` rather than from the rows on the page, and turning
+  to page two asks the API for it instead of slicing what already arrived — a course with ninety
+  places does not have ninety of them in the browser. The course title and its status pill travel
+  above the list because an empty roster on a draft and an empty roster on a published course are
+  two different news, and the screen offers no way to remove anybody: §12 never grew a route for
+  it, so a button would be a promise the portal could not keep.
 - **A day is shown in the reader's own zone, formatted in exactly one file.** `lib/dates.ts` holds
   the portal's only `Intl.DateTimeFormat`: an `enrolledAt` instant rendered as the day it landed in
   the signed-in user's IANA zone, falling back to the browser's when the profile has none or the

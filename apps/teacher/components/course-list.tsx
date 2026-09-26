@@ -169,13 +169,22 @@ export function CourseList() {
                 <p className="mt-1 truncate text-[0.8125rem] text-ink-faint">
                   /{course.slug} · updated {UPDATED.format(new Date(course.updatedAt))}
                 </p>
-                <Link
-                  href={`/courses/${course.id}/modules`}
-                  transitionTypes={['nav-forward']}
-                  className="mt-2 inline-block text-[0.8125rem] text-brand underline-offset-4 hover:underline"
-                >
-                  Syllabus
-                </Link>
+                <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
+                  <Link
+                    href={`/courses/${course.id}/modules`}
+                    transitionTypes={['nav-forward']}
+                    className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
+                  >
+                    Syllabus
+                  </Link>
+                  <Link
+                    href={`/courses/${course.id}/roster`}
+                    transitionTypes={['nav-forward']}
+                    className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
+                  >
+                    Roster
+                  </Link>
+                </div>
               </div>
 
               <div className="flex shrink-0 flex-col items-end gap-2">
