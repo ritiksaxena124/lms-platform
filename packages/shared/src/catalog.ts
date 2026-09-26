@@ -6,9 +6,9 @@
  * not in the catalog at all, so a field that could only ever hold one value would be a
  * question nobody can ask. And the syllabus carries no lesson `body`: a card says how many
  * pages there are and the detail says what they are called and roughly how long each costs,
- * which is enough for a person to decide. Reading one is what enrollment will be for — with
- * one exception, the page the teacher deliberately left the door open on, which is its own
- * endpoint rather than a syllabus row with a body slipped in.
+ * which is enough for a person to decide. Opening one is what enrollment is for, with one
+ * exception — the page a teacher deliberately left the door open on. Both cases are the same
+ * endpoint below, and neither is a syllabus row with a body slipped in.
  *
  * The counts are gated counts. A module is counted while it is still in the syllabus, and a
  * lesson only once both of its gates are open — the page published and the course around it
@@ -36,7 +36,8 @@ export interface CatalogCourse {
 }
 
 /** A page a student may read, named but not opened. `isFreePreview` says which rows the
- * endpoint below will actually open for them. */
+ * endpoint below opens for somebody with no place in the course; a student who holds one
+ * reads every published page of it either way. */
 export interface CatalogLesson {
   id: string;
   title: string;
@@ -87,23 +88,24 @@ export interface CatalogLessonCourse {
   title: string;
 }
 
-/** One page a teacher marked free to read, opened. `body` is nullable because the mark and
- * the writing are two separate acts: a teacher can publish a page and leave its text empty
- * while they rewrite it, and the flag says nothing about whether there is anything there. */
-export interface CatalogFreeLesson {
+/** One page of a published course, opened. Two things let that happen: the teacher marked
+ * it free to read, or the caller holds a place in the course. `isFreePreview` says which —
+ * and it is `false` for a page that opened because of who asked, because the flag is the
+ * teacher's statement about the page, not a description of why the reader got in. */
+export interface CatalogLessonPage {
   id: string;
   title: string;
   body: string | null;
   estimatedMinutes: number | null;
   position: number;
-  isFreePreview: true;
+  isFreePreview: boolean;
   updatedAt: string;
   module: CatalogLessonModule;
   course: CatalogLessonCourse;
 }
 
 export interface CatalogLessonResponse {
-  lesson: CatalogFreeLesson;
+  lesson: CatalogLessonPage;
 }
 
 export interface CatalogCourseListResponse {

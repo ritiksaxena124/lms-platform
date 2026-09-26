@@ -2,6 +2,7 @@ export * from './auth';
 export * from './catalog';
 export * from './course-modules';
 export * from './courses';
+export * from './enrollments';
 export * from './error-codes';
 export * from './lookup-codes';
 export * from './lessons';

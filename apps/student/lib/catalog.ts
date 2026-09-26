@@ -1,7 +1,7 @@
 import type {
   CatalogCourseDetail,
   CatalogCourseListResponse,
-  CatalogFreeLesson,
+  CatalogLessonPage,
   CatalogListInput,
   CourseChoice,
 } from '@lms/shared';
@@ -60,12 +60,15 @@ export async function readCatalogCourse(id: string): Promise<CatalogCourseDetail
  * Both halves of the address go up, because a page only exists inside the syllabus that lists
  * it — and a locked row, a withdrawn one and one nobody wrote all answer the same 404, which
  * is the distinction this portal is not allowed to invent.
+ *
+ * The route behind this also opens a page for a student who holds a place in the course; this
+ * portal brings no session, so all it reaches is the teacher's own open door.
  */
 export async function readFreeLesson(
   courseId: string,
   lessonId: string,
-): Promise<CatalogFreeLesson> {
-  const { lesson } = await apiGet<{ lesson: CatalogFreeLesson }>(
+): Promise<CatalogLessonPage> {
+  const { lesson } = await apiGet<{ lesson: CatalogLessonPage }>(
     `/catalog/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}`,
   );
   return lesson;

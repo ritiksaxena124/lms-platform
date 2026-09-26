@@ -14,6 +14,7 @@ import type { Request } from 'express';
 import { ACCESS_TOKENS, type AccessTokenPort } from './access-tokens.service';
 import { REQUIRED_ROLES } from './roles.decorator';
 import { IS_PUBLIC } from './public.decorator';
+import { OPTIONAL_SESSION } from './optional-session.decorator';
 import { UsersRepository } from './users.repository';
 
 /** What a handler may assume about whoever called it. Set by `JwtAuthGuard` or never. */
@@ -38,20 +39,28 @@ export class JwtAuthGuard implements CanActivate {
   ) {}
 
   async canActivate(context: ExecutionContext): Promise<boolean> {
+    const scopes = [context.getHandler(), context.getClass()];
+
+    // Checked before the public flag on purpose: a route that wants to know who is asking
+    // even though it will answer one anyway is the case `@Public()` would otherwise swallow.
+    // With no header this is exactly the public path — an absent caller is a stranger, not a
+    // refusal — and with one the token is resolved below, so `OptionalCurrentUser` can be
+    // `undefined` here and can never be a forged identity.
+    const optional = this.reflector.getAllAndOverride<boolean>(OPTIONAL_SESSION, scopes);
+
     // The public flag is only ever a statement about this route. Turning it off for
     // everything is a code change, not a header an attacker can send.
-    if (
-      this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, [
-        context.getHandler(),
-        context.getClass(),
-      ])
-    ) {
+    if (!optional && this.reflector.getAllAndOverride<boolean>(IS_PUBLIC, scopes)) {
       return true;
     }
 
     const request = context.switchToHttp().getRequest<Request>();
     const token = bearerToken(request.headers.authorization);
     if (!token) {
+      // A route that asked for the caller's identity without demanding it: nobody offered
+      // one, so the handler runs as a stranger.
+      if (optional) return true;
+
       throw new UnauthorizedException({
         code: API_ERROR_CODES.UNAUTHORIZED,
         message: 'Sign in to continue.',

@@ -16,7 +16,11 @@ A stranger can already browse what that makes readable, on a second portal:
 outline (`/api/v1/catalog/courses/:id`, and the same course by its slug) — titles, order and
 rough length, plus one page a teacher left open to read — on screen at
 `/courses/[id]/lessons/[lessonId]`, backed by `/api/v1/catalog/courses/:id/lessons/:lessonId` —
-and no account needed to look. Enrollment, bookings and payments are still ahead.
+and no account needed to look. Enrollment is in on the API side: a student can take a place in a
+published course, list the courses they are inside and leave one (`/api/v1/enrollments`), and the
+lesson route above opens that course's published pages to the students holding a place — the same
+route answers a stranger and an enrolled student, so there is only one list of gates to keep. The
+student portal's screens for it are next; bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---

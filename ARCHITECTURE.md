@@ -162,7 +162,9 @@ these rules hold:
 - **Both guards are global, registered in `AuthModule` as `APP_GUARD`.** A feature module
   added next month is authenticated before anyone remembers to ask; the way a route becomes
   public is `@Public()`, and forgetting it fails as a 401 in development rather than as an
-  open endpoint in production.
+  open endpoint in production. A route that would rather know who is asking than demand it is
+  `@OptionalSession()` — one exists today, §11 — and it still refuses a token that is present
+  and broken, so the optional part is only ever about an absent one.
 - **The token says who signed in; the row says who they are now.** The guard verifies the
   signature and then re-reads the account for its role and status, so a promotion, a
   demotion and a disable all take effect on the next request instead of on the next login.
@@ -331,14 +333,15 @@ domain module would only re-derive the same two hops.
 
 The catalog is the same course seen by somebody who cannot edit it — `GET
 /api/v1/catalog/courses`, `/catalog/courses/levels`, `/catalog/courses/:id` and `/catalog/courses/:id/lessons/:lessonId`, in their own Nest
-module (`modules/catalog`) because the question they answer is different in kind: no session, no
-ownership, no writes.
+module (`modules/catalog`) because the question they answer is different in kind: no ownership,
+no writes, and — but for the one route below — no session either.
 
 - **It is the only public surface in the API, deliberately.** A shop window has to be readable
-  before anybody is asked to sign in, and what it can reach is decided entirely by the rows' own
-  statuses. `@Public()` on the controller is the exception that the global guard exists to make
-  expensive, so the suite checks the absence of a session as carefully as the tests everywhere
-  else check its presence — and the teacher's routes still answer `401` without one.
+  before anybody is asked to sign in, and what it can reach is decided by the rows' own statuses
+  plus one relationship. `@Public()` on the controller is the exception that the global guard
+  exists to make expensive, so the suite checks the absence of a session as carefully as the
+  tests everywhere else check its presence — and the teacher's routes still answer `401` without
+  one. Opening a page is a third kind of route, `@OptionalSession()`, and its own bullet below.
 - **Both gates are applied here and nowhere else.** A course appears only while it is published
   (`archived` retires it from the catalog exactly as `draft` never admitted it), and a page inside
   it appears only while its own lesson is published too. §10 promised those two flags; this is the
@@ -351,20 +354,33 @@ ownership, no writes.
 - **The outline never hands over a page; one named endpoint does.** `body` is not selected by
   the syllabus query — a student browsing sees titles, order and each page's rough length, which
   is enough to decide. The exception is `GET /catalog/courses/:id/lessons/:lessonId`, which
-  returns a body only for a row where `isFreePreview` is true: the teacher's deliberate "read
-  this one before you enroll". It is one route, not a syllabus row with text slipped in, so the
-  outline keeps one shape whether or not any room on it happens to be open.
+  returns a body for a page its caller may open: one the teacher marked `isFreePreview`, or any
+  published page of a course they hold a place in. It is one route, not a syllabus row with text
+  slipped in, so the outline keeps one shape whether or not any room on it happens to be open.
 - **`isFreePreview` is a door, not a third visibility gate.** A page marked free still appears on
   the syllabus exactly as it did when it was locked, and a page that is free but still draft, or
   inside a course nobody published, appears nowhere and reads nothing. The flag decides whether
   the body can be opened; the two published statuses decide whether the row is on the shelf at
-  all. All three are written into one Prisma `where`, so a route cannot honour the door and
-  forget the wall behind it.
+  all. A student's place opens the same door for their own pages — and opens no door the
+  statuses shut, which is why enrolling cannot reach a draft. All of it is one Prisma `where`,
+  so a route cannot honour the door and forget the wall behind it.
+- **`@OptionalSession()` is the one route that reads who is calling without demanding it.** The
+  alternative was a second endpoint that repeats these gates for a signed-in student, and a copy
+  of a gate is a gate that drifts. Three rules keep it honest: a request with no header is a
+  stranger rather than a refusal; a header that is present and broken is refused exactly as on a
+  protected route, because quietly answering "you are a visitor" would let an expired session
+  read an enrolled student's pages forever while the refresh path never ran; and the handler asks
+  for the caller with `OptionalCurrentUser`, the only decorator in the API allowed to answer
+  `undefined`. The session supplies a value for one branch of the `where` and decides nothing by
+  itself, so both audiences are still answered by the same query.
 - **`NOT_FOUND` is one answer for several cases.** An unpublished course, a retired one, a slug
-  nobody typed and an id that never existed all read the same; so do a locked page, a draft page
-  and a page that is not inside the course named in the path. A malformed id is caught in the
-  service before Postgres is asked. A catalog that distinguished them would be a list of other
-  people's drafts — and a `403` on a locked page would be a catalogue of what to enroll for.
+  nobody typed and an id that never existed all read the same; so do a locked page, a draft page,
+  a published page of a course the caller is not inside, and a page that is not inside the course
+  named in the path. A malformed id is caught in the service before Postgres is asked. A catalog
+  that distinguished them would be a list of other people's drafts — and a `403` on a locked page
+  would be a catalogue of what to enroll for. The same silence has to hold with a session in the
+  hand, or the answer "sign in first, then we can tell you" leaks a syllabus to exactly the
+  people curious enough to make one.
 - **Paged, filtered, and searchable by the two fields a card shows.** `level` is a `CourseLevel`
   lookup code resolved at the edge (an unknown one is a field error, not an empty page), `q`
   matches title or summary — never the description, because a hit the list cannot explain is a
@@ -380,8 +396,9 @@ ownership, no writes.
   included, and a lesson title is a link only on a row the response marked free: the page itself
   is a second request (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape
   whether or not any room on it is open.
-- **What a student may read once they are inside a course is §12.** The catalog answers for
-  everybody who is not; the row that decides who counts as inside is the next subject.
+- **Both audiences are the catalog's.** A stranger reads the pages a teacher left open; a student
+  holding a place reads every published page of that course too (§12). One query answers both,
+  which is the only reason the second is not a superset of the first by accident.
 
 ## 12. Enrollment
 
@@ -398,16 +415,39 @@ what an invitation is for.
 - **An enrollment is never deleted, for the reason §2 gives and then some.** The row is why a
   student could open the pages they already worked through, so erasing it would erase the
   evidence of an access that happened.
-- **The table decides nothing about who may join.** The course has to be published and a
-  teacher cannot enroll in their own course, but both are rules an endpoint enforces — as
-  constraints they would freeze something a lookup row is meant to be able to change.
+- **The table decides nothing about who may join.** The course has to be published to take a
+  place, and that is a rule the endpoint enforces — as a constraint it would freeze something a
+  lookup row is meant to be able to change.
 - **Two indexes, one per question.** `ix_enrollment_student_list` answers "my courses", newest
   first, and `ix_enrollment_course_roster` answers a teacher's headcount and the gate's own
   lookup — "is this student inside this course" has to be an index probe, not a scan.
-- **Nothing reads it yet.** The routes that write and check this table are the next chunks of
-  this section, so as of now the catalog's two published statuses remain the only answer a
-  lesson gives a stranger. What shipped here is the promise, held by
-  `apps/api/test/enrollment-schema.spec.ts`.
+- **Three routes, a student's and nobody else's.** `GET /api/v1/enrollments` is "my courses",
+  `POST /api/v1/enrollments` takes a place by `courseId`, and `POST
+  /api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
+  place is *worth* stays the catalog's decision — this module writes the row §11 reads.
+- **The role is the whole of "a teacher cannot enroll in their own course."** The controller is
+  `@Roles(STUDENT)`, so that request never reaches a query to be checked. When a later phase
+  wants teachers to take places too, the decorator is the one line that changes, and the
+  ownership question it would raise is a decision somebody makes on purpose rather than a hole a
+  service forgot to plug.
+- **Both writes are idempotent and both answer `200`.** Enrolling twice returns the row that
+  already exists, with its original `enrolledAt`; cancelling a closed place returns it closed. A
+  button on a slow connection gets pressed twice, and a `201` with a second row — or a `409` the
+  portal has to interpret — is the API handing that problem to the client.
+- **A student's place is worth pages through the catalog's own route.** §11 folds it into one
+  `where` as the alternative to `isFreePreview`, which buys two things the suite checks directly:
+  enrolling cannot reach a draft or a retired page, and leaving cannot close a page the teacher
+  left open. A separate "read as an enrolled student" endpoint would have had to remember both.
+- **A retired course closes on the students inside it.** `archived` drops its pages for them
+  exactly as it drops the course from the shelf, and the course leaves "my courses" so the portal
+  is never handed a link to a page that will not open. The enrollment row stays: §2 covers the
+  access as much as the record of it.
+- **`enrolledAt` is the row's `createdAt`,** sent as an ISO instant like every other timestamp
+  here. It names the first day a student took a place, not the day they came back to it — the
+  reason this table keeps one row per pair.
+- **What holds it:** `apps/api/test/enrollment-schema.spec.ts` for the table's promises,
+  `apps/api/test/enrollments.spec.ts` for the routes, the gate they open and the silence they keep.
+  No portal screen reads them yet.
 
 ## 13. Frontend
 

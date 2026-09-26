@@ -6,6 +6,9 @@ import type {
   CourseChoice,
 } from '@lms/shared';
 
+import type { AuthenticatedUser } from '../auth/auth.guard';
+import { OptionalCurrentUser } from '../auth/current-user.decorator';
+import { OptionalSession } from '../auth/optional-session.decorator';
 import { Public } from '../auth/public.decorator';
 import { CatalogService } from './catalog.service';
 import { ListCatalogQueryDto } from './dto/list-catalog-query.dto';
@@ -19,6 +22,12 @@ import { ListCatalogQueryDto } from './dto/list-catalog-query.dto';
  * appears here is the row's own status rather than a relationship to a user. Keeping the two
  * kinds of read in different files is what stops "who owns this?" from becoming a question
  * every endpoint has to remember to answer.
+ *
+ * One route makes an exception with `@OptionalSession()`: opening a page. A stranger may open
+ * the one the teacher marked free, and a student who holds a place (§12) may open any
+ * published page of that course. It stays a catalog route rather than gaining a twin under
+ * the enrollment module because the question is the same one — which of these gates is
+ * open? — and a second copy of the answer is a second chance to get it wrong.
  */
 @Controller('catalog/courses')
 @Public()
@@ -42,14 +51,18 @@ export class CatalogController {
     return { course: await this.catalog.read(id) };
   }
 
-  /** The one catalog route that answers with a page's text, and only for a page the teacher
-   * marked free to read. The course in the path is not decoration: it is half the address, so
-   * a lesson id found in someone else's syllabus earns the same silence as one never written. */
+  /** The one catalog route that answers with a page's text. It opens for two reasons: a
+   * teacher marked the row free to read, or the caller holds a place in the course. The
+   * session is optional so a stranger can still reach the first, and the course in the path
+   * is not decoration — it is half the address, so a lesson id found in someone else's
+   * syllabus earns the same silence as one never written. */
   @Get(':id/lessons/:lessonId')
+  @OptionalSession()
   async lesson(
     @Param('id') id: string,
     @Param('lessonId') lessonId: string,
+    @OptionalCurrentUser() user?: AuthenticatedUser,
   ): Promise<CatalogLessonResponse> {
-    return { lesson: await this.catalog.freeLesson(id, lessonId) };
+    return { lesson: await this.catalog.lesson(id, lessonId, user?.id) };
   }
 }

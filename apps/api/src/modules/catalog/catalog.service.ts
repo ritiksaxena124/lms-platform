@@ -6,8 +6,8 @@ import {
   LKP_TYPE_CODES,
   type CatalogCourse,
   type CatalogCourseDetail,
-  type CatalogFreeLesson,
   type CatalogLessonModule,
+  type CatalogLessonPage,
   type CatalogListInput,
   type CatalogModule,
   type CourseChoice,
@@ -19,7 +19,7 @@ import type {
   CatalogFilters,
   CourseCardRow,
   CourseSyllabusRow,
-  FreeLessonRow,
+  ReadableLessonRow,
 } from './catalog.repository';
 import { CatalogRepository } from './catalog.repository';
 
@@ -97,10 +97,11 @@ function toDetail(course: CourseSyllabusRow): CatalogCourseDetail {
   };
 }
 
-/** The module and course a free page hangs from, taken from inside its own row. The block is
- * listed with its position rather than its whole syllabus: enough to say where the reader is
- * and how to get back to the outline, not enough to rebuild it. */
-function toFreeLesson(lesson: FreeLessonRow): CatalogFreeLesson {
+/** The module and course a page hangs from, sent with it because a reader who arrived here
+ * from a link has no syllabus on screen and needs both to go back. The block is listed with
+ * its position rather than its whole syllabus: enough to say where the reader is and how to
+ * get back to the outline, not enough to rebuild it. */
+function toLessonPage(lesson: ReadableLessonRow): CatalogLessonPage {
   const module: CatalogLessonModule = {
     id: lesson.module.id,
     title: lesson.module.title,
@@ -113,7 +114,10 @@ function toFreeLesson(lesson: FreeLessonRow): CatalogFreeLesson {
     body: lesson.body,
     estimatedMinutes: lesson.estimatedMinutes,
     position: lesson.position,
-    isFreePreview: true,
+    // The row's own statement, not a constant: a page that opened because of an enrollment
+    // is not one the teacher marked free, and a badge that said so would be a lie about
+    // which door the reader came through.
+    isFreePreview: lesson.isFreePreview,
     updatedAt: lesson.updatedAt.toISOString(),
     module,
     course: {
@@ -134,12 +138,17 @@ function toFreeLesson(lesson: FreeLessonRow): CatalogFreeLesson {
  * published page inside a live course is still invisible until its own flag is open, which
  * is what lets a teacher pull a half-written page out without archiving the course around it.
  *
- * Neither gate is a permission check, because there is nobody to check. This is the one
- * surface in the API with no session, so the only identity here is the row's own status.
+ * Neither gate is a permission check, because three of these four routes have nobody to
+ * check: this is the surface in the API a browser can read with no session at all, so the
+ * only identity in them is the row's own status.
  *
  * A third flag, `isFreePreview`, is not a gate on this visibility: it decides whether one
  * published page's body can be opened, and never whether the row appears on the syllabus.
- * That is why marking a page free changes nothing about the outline's shape.
+ * That is why marking a page free changes nothing about the outline's shape. The one route
+ * that can have a caller is opening a page, where a place in the course (§12) opens the same
+ * door from the other side — which is why `isFreePreview` on that response is the row's own
+ * answer rather than a constant, and a badge on the page can still tell a free sample from a
+ * page the reader earned.
  */
 @Injectable()
 export class CatalogService {
@@ -195,16 +204,26 @@ export class CatalogService {
   }
 
   /**
-   * One page a teacher left open for a stranger, body included.
+   * One page, opened — for a stranger if the teacher marked it free, for a student who holds
+   * a place in the course otherwise.
    *
-   * The repository's query has already decided the three gates, so everything that comes
-   * back `null` here gets the same answer an invented id gets. The message differs from the
+   * The repository's query has already decided every gate, so everything that comes back
+   * `null` here gets the same answer an invented id gets. The message differs from the
    * course's on purpose — "that page" is honest about which half of the address was wrong,
    * and says nothing about whether the page exists.
    */
-  async freeLesson(address: string, lessonId: string): Promise<CatalogFreeLesson> {
+  async lesson(
+    address: string,
+    lessonId: string,
+    viewerId?: string,
+  ): Promise<CatalogLessonPage> {
     const lesson = UUID.test(lessonId)
-      ? await this.catalog.findFreeLesson(courseRef(address), lessonId, await this.filters({}))
+      ? await this.catalog.findReadable(
+          courseRef(address),
+          lessonId,
+          await this.filters({}),
+          viewerId,
+        )
       : null;
 
     if (!lesson) {
@@ -214,7 +233,7 @@ export class CatalogService {
       });
     }
 
-    return toFreeLesson(lesson);
+    return toLessonPage(lesson);
   }
 
   /** The two published statuses, plus the level and phrase a caller filtered on. Codes are

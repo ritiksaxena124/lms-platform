@@ -10,7 +10,7 @@ import {
   SkeletonGroup,
   buttonClass,
 } from '@lms/ui';
-import type { CatalogFreeLesson } from '@lms/shared';
+import type { CatalogLessonPage } from '@lms/shared';
 
 import { describeFailure, isNotFound } from '@/lib/api';
 import { readFreeLesson } from '@/lib/catalog';
@@ -38,7 +38,7 @@ const UPDATED = new Intl.DateTimeFormat('en-GB', {
 
 type PageState =
   | { status: 'loading' }
-  | { status: 'ready'; lesson: CatalogFreeLesson }
+  | { status: 'ready'; lesson: CatalogLessonPage }
   | { status: 'not-found' }
   | { status: 'failed'; message: string };
 

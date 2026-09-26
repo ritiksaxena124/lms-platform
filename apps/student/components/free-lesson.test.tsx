@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CatalogFreeLesson } from '@lms/shared';
+import type { CatalogLessonPage } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { FreeLesson } from './free-lesson';
@@ -13,7 +13,7 @@ const api = vi.hoisted(() => ({
 
 vi.mock('@/lib/catalog', () => api);
 
-function page(overrides: Partial<CatalogFreeLesson> = {}): CatalogFreeLesson {
+function page(overrides: Partial<CatalogLessonPage> = {}): CatalogLessonPage {
   return {
     id: 'l2',
     title: 'Sum of n terms',

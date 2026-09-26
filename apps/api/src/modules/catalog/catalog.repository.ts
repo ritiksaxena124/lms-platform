@@ -10,9 +10,10 @@ import { PrismaService } from '../../common/prisma/prisma.service';
  * `isActive` and the published statuses are written into the `where` clauses here, so a
  * route cannot answer with a draft by forgetting a check afterwards — the same argument the
  * teacher-side repositories make about ownership, pointed at the publish gates instead. It
- * is also why the free-page read below carries all three gates in one query: the third gate
- * is only a door if the two above it are open, and a reader must not be able to get that
- * wrong by asking for the lesson alone.
+ * is also why the page read below carries every gate in one query: the two published
+ * statuses, and whichever door lets this caller in. A door is only a door if the wall behind
+ * it is standing, and a reader must not be able to get that wrong by asking for a lesson
+ * alone.
  */
 
 /** A course page: level and teacher travel as code plus label, so no portal keeps a
@@ -68,8 +69,10 @@ export type CourseSyllabusRow = Prisma.CourseGetPayload<{
   include: ReturnType<typeof SYLLABUS_INCLUDE>;
 }>;
 
-/** The one page a student may open, and the two places it hangs from. */
-const FREE_LESSON_SELECT = {
+/** One page a student may open, and the two places it hangs from. `isFreePreview` is
+ * selected rather than assumed, because the row it describes can have opened for either
+ * reason and the caller is owed the difference. */
+const READABLE_LESSON_SELECT = {
   id: true,
   title: true,
   body: true,
@@ -87,15 +90,16 @@ const FREE_LESSON_SELECT = {
   },
 } as const satisfies Prisma.LessonSelect;
 
-export type FreeLessonRow = Prisma.LessonGetPayload<{
-  select: typeof FREE_LESSON_SELECT;
+export type ReadableLessonRow = Prisma.LessonGetPayload<{
+  select: typeof READABLE_LESSON_SELECT;
 }>;
 
 /** A course as a browser addressed it: the id the API issued, or the slug its author chose.
  * Both name one row, so the two must never answer differently. */
 export type CatalogCourseRef = { id: string } | { slug: string };
 
-export interface CatalogFilters {  courseStatusValueId: string;
+export interface CatalogFilters {
+  courseStatusValueId: string;
   lessonStatusValueId: string;
   levelValueId: string | null;
   search: string | null;
@@ -161,26 +165,52 @@ export class CatalogRepository {
   }
 
   /**
-   * One page a teacher marked free to read, with its body.
+   * One page, with its body — the only query in this app that hands text over.
    *
-   * All three gates are in this single query rather than compared after the fact: the row
-   * must be free, published and live; its module live; its course published and live. A
-   * lesson that fails any of them returns nothing at all, which is what lets the service
-   * give the same 404 for "locked", "draft", "not yours to show" and "never written".
+   * Every gate is in this single query rather than compared after the fact: the row must be
+   * published and live, its module live, its course published and live. On top of those, one
+   * of two doors has to be open — the teacher marked the page free, or the caller holds a
+   * place in the course. A page that fails any of them returns nothing at all, which is what
+   * lets the service give the same 404 for "locked", "draft", "not yours to show" and "never
+   * written".
+   *
+   * The door is part of the `where` and not a check in the handler for the same reason the
+   * two gates are: a route that honoured the enrollment and forgot the published status
+   * would be reading a teacher's unfinished work to a student who happened to be early.
    */
-  async findFreeLesson(ref: CatalogCourseRef, lessonId: string, filters: CatalogFilters) {
+  async findReadable(
+    ref: CatalogCourseRef,
+    lessonId: string,
+    filters: CatalogFilters,
+    viewerUserId?: string,
+  ) {
+    const openTo = viewerUserId
+      ? {
+          OR: [
+            { isFreePreview: true },
+            {
+              module: {
+                course: {
+                  enrollments: { some: { studentUserId: viewerUserId, isActive: true } },
+                },
+              },
+            },
+          ],
+        }
+      : { isFreePreview: true };
+
     const lesson = await this.prisma.lesson.findFirst({
       where: {
         id: lessonId,
         isActive: true,
-        isFreePreview: true,
         statusValueId: filters.lessonStatusValueId,
         module: {
           isActive: true,
           course: { ...ref, isActive: true, statusValueId: filters.courseStatusValueId },
         },
+        ...openTo,
       },
-      select: FREE_LESSON_SELECT,
+      select: READABLE_LESSON_SELECT,
     });
     return lesson;
   }
