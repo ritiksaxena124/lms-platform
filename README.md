@@ -111,14 +111,18 @@ Storybook is the surface the design system is maintained in: `bun run dev:ui` af
 changing anything under `packages/ui/src`. The **Design System** story states the rules,
 not just the values, so an unlisted component can still be made to look like it belongs.
 
-Four rules outrank taste:
+Five rules outrank taste:
 
-- **One typeface.** Inter Variable, 100–900, self-hosted from `@fontsource-variable/inter`
-  and imported by `@lms/ui/styles.css`. Portals add no font request of their own.
+- **One typeface.** Inter Variable, 100–900, self-hosted from
+  `@fontsource-variable/inter/opsz.css` and imported by `@lms/ui/styles.css`. Portals add no
+  font request of their own.
 - **Borders separate, surfaces stack.** Flat layout gets a 1px line. The only shadow in the
   system (`--shadow-overlay`) belongs to things that float: menus, dialogs, toasts.
 - **Colour is meaningful.** Graphite neutrals do the structural work; brand emerald marks
   the primary action; semantic tones stay in their own hue families.
+- **Text tokens pass AA at the size they are used at.** `src/styles/tokens.test.ts`
+  re-derives every ink and accent contrast against both surfaces, so a gray cannot be
+  lightened by eye later.
 - **Gradient is a highlighter.** Exactly three exist (`--gradient-brand`, `-brand-wash`,
   `-paper-sheen`), each with a named job. A fourth needs a reason, not a taste.
 

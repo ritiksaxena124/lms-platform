@@ -32,10 +32,16 @@
   --color-surface-raised: #ffffff;
 
   /* Ink (text) ------------------------------------------------------------- */
+  /* Three steps, and the lightest one still carries words: a field hint, a timestamp or a
+   * lesson estimate is information, and at 12–13px an AA-failing gray is not a subtle choice
+   * but a legibility one. Every gray here is held to 4.5:1 against paper and surface by
+   * src/styles/tokens.test.ts, which reads this file rather than a copy of it — the ramp is
+   * what makes the text read as weight rather than haze, and the floor is what makes it
+   * readable. `--color-paper-sunk` is exempt: it is the well behind disabled fields. */
   --color-ink: #1f2328; /* body text */
   --color-ink-strong: #10131a; /* headings */
   --color-ink-muted: #5f6772; /* labels, metadata, disabled */
-  --color-ink-faint: #8b939e; /* placeholders, timestamps */
+  --color-ink-faint: #68707c; /* placeholders, hints, timestamps — AA on paper and surface */
   --color-ink-inverse: #ffffff;
 
   /* Lines ------------------------------------------------------------------ */
@@ -44,12 +50,15 @@
   --color-line-strong: #ccd2d8;
 
   /* Brand: emerald --------------------------------------------------------- */
-  --color-brand: #0f8a68; /* hover / active */
+  /* One shade deeper than the accent that reads best as a fill, because this is also the
+   * color every text link in the portals is painted with, and a green that is comfortable
+   * behind white text is not automatically comfortable as text. */
+  --color-brand: #0d7d5f; /* hover / active / links */
   --color-brand-deep: #0a6b52; /* primary action background, AA on white text */
   --color-brand-soft: #e6f3ef; /* selected rows, active nav, tints */
   --color-brand-line: #b7d9d0;
   /* Aliases kept because `ember` is the name every portal already speaks. */
-  --color-ember: #0f8a68;
+  --color-ember: #0d7d5f;
   --color-ember-deep: #0a6b52;
   --color-ember-soft: #e6f3ef;
   --color-ember-line: #b7d9d0;

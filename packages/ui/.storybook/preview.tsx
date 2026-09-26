@@ -1,7 +1,7 @@
 import type { Decorator } from '@storybook/react';
 import type { Preview } from '@storybook/react-vite';
 
-import '@fontsource-variable/inter/wght.css';
+import '@fontsource-variable/inter/opsz.css';
 import './tailwind.css';
 import './preview.css';
 

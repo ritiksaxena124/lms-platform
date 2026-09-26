@@ -51,7 +51,7 @@ const TYPE_STEPS = [
 const RULES = [
   [
     'One typeface',
-    'Inter Variable everywhere. Hierarchy comes from size, weight and colour — never from a second font.',
+    'Inter Variable everywhere, loaded in the build that carries its optical-size axis. Hierarchy comes from size, weight and colour — never from a second font.',
   ],
   [
     'Borders separate, surfaces stack',
@@ -60,6 +60,10 @@ const RULES = [
   [
     'Colour is meaningful',
     'Graphite does the structural work, brand emerald marks the primary action, and semantic tones stay in their own hue families.',
+  ],
+  [
+    'Text clears AA where it is used',
+    'Every ink and accent is contrast-checked against both surfaces by tokens.test.ts, at the 12–13px sizes the ramp actually appears at. A gray that fails is not subtle, it is unreadable.',
   ],
   [
     'Gradient is a highlighter',

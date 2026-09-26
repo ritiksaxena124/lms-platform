@@ -450,6 +450,10 @@ ownership, no writes.
   portal chrome is anchored so only content moves. `prefers-reduced-motion` downgrades
   slides to crossfades in one block — with the single exception of the spinner, because a
   frozen spinner reads as a hung app.
+- **`will-change` is not a permanent style.** `[data-reveal]` animates once on mount, so
+  promoting it to its own layer for the life of the page left every revealed heading rendered
+  at composite-plane rasterisation and then never demoted — crisper on the first frame than
+  on every frame after. Hints belong on the animation, not the element.
 - `@lms/ui` ships TypeScript source with no build step; apps compile it via
   `transpilePackages`. This keeps HMR honest and removes a publish-before-it-works class of
   bug.
@@ -459,6 +463,18 @@ ownership, no writes.
 - **One typeface, deliberately.** Inter Variable covers headings, UI and metrics. A second
   family would be a taste decision, and taste does not survive three portals and two
   maintainers. Hierarchy comes from size, weight and colour instead.
+- **The Inter build must carry the `opsz` axis.** `base.css` sets `font-optical-sizing: auto`,
+  and `@fontsource-variable/inter/wght.css` ships a weight-only face — the declaration was
+  present, the axis answering it was not, so every size rendered with one set of metrics:
+  too open at 12px for a dense table, too tight at display size for a heading. The import is
+  `opsz.css`, and `tokens.test.ts` fails if the kit's fontsource import ever names a build
+  without the axis again.
+- **Text tokens are contrast-tested, not eyeballed.** `src/styles/tokens.test.ts` parses the
+  hex values out of `tokens.css` and re-derives WCAG ratios for every ink and accent against
+  both surfaces it can sit on, at the small-text floor of 4.5:1 — a ramp's lightest step is
+  used for hints and timestamps at 12–13px, where a decorative gray is a legibility failure.
+  `--color-paper-sunk` is exempt because it only appears behind disabled fields and code
+  wells. Darkening a token is cheap; a test is what stops it drifting back.
 - **Borders carry structure; shadow is reserved for float.** Flat layout uses a 1px line, and
   only menus, dialogs and toasts get `--shadow-overlay`. A shadow on static layout is a
   rendering bug waiting for a dark theme.

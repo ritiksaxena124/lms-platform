@@ -13,8 +13,15 @@
  * ------------------------------------------------------------------------- */
 
 /* Inter, self-hosted and subset by unicode-range — every portal gets the same
- * file, offline-capable, with no third-party font request on first paint. */
-@import '@fontsource-variable/inter/wght.css';
+ * file, offline-capable, with no third-party font request on first paint.
+ *
+ * The `opsz` build rather than the smaller `wght` one, because `base.css` asks for
+ * `font-optical-sizing: auto` and a weight-only file has no optical axis to answer
+ * it: the 12–15px labels, rows and hints would be drawn from the 14–32pt letterforms,
+ * which are open and loose at UI sizes. With the axis loaded, the same text gets the
+ * tighter spacing and sturdier hints it was drawn for, and headings keep the wide
+ * optical size they look better at. */
+@import '@fontsource-variable/inter/opsz.css';
 
 @import './tokens.css';
 @import './base.css';

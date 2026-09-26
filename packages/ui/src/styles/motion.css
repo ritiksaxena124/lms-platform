@@ -117,7 +117,6 @@
 [data-reveal] {
   animation: lms-reveal var(--duration-slow) var(--ease-out) both;
   animation-delay: var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
 }
 
 /* 3. Component micro-motion ------------------------------------------------ */
