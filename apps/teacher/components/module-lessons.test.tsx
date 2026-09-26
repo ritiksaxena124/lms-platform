@@ -217,6 +217,9 @@ describe('ModuleLessons', () => {
         title: 'Halves, thirds and sixths',
         body: 'Sixths last.',
         estimatedMinutes: 12,
+        // Whole, every time: a save that left the flag out could not tell "unchanged" from
+        // "I unticked it", and the box would be unable to close a page.
+        isFreePreview: false,
       }),
     );
     const after = await rows();
@@ -411,5 +414,97 @@ describe('ModuleLessons', () => {
 
     await waitFor(() => expect(api.listLessons).toHaveBeenCalledTimes(2));
     expect((await rows())[0]?.querySelector('h3')?.textContent).toBe('Halves on a number line');
+  });
+
+  it('says which pages a stranger may already read, and which ones are only planned', async () => {
+    api.listLessons.mockResolvedValue([
+      lesson({ id: 'l1', status: PUBLISHED, isFreePreview: true }),
+      lesson({ id: 'l2', position: 2, isFreePreview: true }),
+      lesson({ id: 'l3', position: 3 }),
+    ]);
+
+    renderScreen();
+    const list = await rows();
+
+    // The mark and the page's own flag are two different decisions, and a teacher who set one
+    // without the other needs to see that: a draft marked free is a plan for a sample, not a
+    // page anybody outside the course can read.
+    expect(within(list[0] as HTMLElement).getByText('Free to read')).toBeInTheDocument();
+    expect(within(list[1] as HTMLElement).getByText(/free when published/i)).toBeInTheDocument();
+    expect(within(list[2] as HTMLElement).queryByText(/free/i)).not.toBeInTheDocument();
+  });
+
+  it('opens the free box from the row it edits, not from wherever the form last was', async () => {
+    api.listLessons.mockResolvedValue([
+      lesson({ id: 'l1', status: PUBLISHED, isFreePreview: true }),
+      lesson({ id: 'l2', position: 2 }),
+    ]);
+
+    renderScreen();
+    const list = await rows();
+
+    await userEvent.click(within(list[0] as HTMLElement).getByRole('button', { name: /edit/i }));
+    expect(await screen.findByLabelText('Free to read')).toBeChecked();
+    await userEvent.click(screen.getByRole('button', { name: /cancel/i }));
+
+    await userEvent.click(
+      within((await rows())[1] as HTMLElement).getByRole('button', { name: /edit/i }),
+    );
+    expect(await screen.findByLabelText('Free to read')).not.toBeChecked();
+  });
+
+  it('sends the mark with the rest of the page and repaints the row from the answer', async () => {
+    api.updateLesson.mockResolvedValue(
+      lesson({ id: 'l3', position: 3, status: PUBLISHED, isFreePreview: true }),
+    );
+
+    renderScreen();
+    const list = await rows();
+    await userEvent.click(
+      within(list[2] as HTMLElement).getByRole('button', {
+        name: /edit comparing unit fractions/i,
+      }),
+    );
+
+    await userEvent.click(await screen.findByLabelText('Free to read'));
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(api.updateLesson).toHaveBeenCalledWith(
+        'm1',
+        'l3',
+        expect.objectContaining({ isFreePreview: true }),
+      ),
+    );
+    expect(within((await rows())[2] as HTMLElement).getByText('Free to read')).toBeInTheDocument();
+  });
+
+  it('closes a page again when the box is cleared', async () => {
+    api.listLessons.mockResolvedValue([
+      lesson({ id: 'l1', status: PUBLISHED, isFreePreview: true }),
+    ]);
+    api.updateLesson.mockResolvedValue(
+      lesson({ id: 'l1', status: PUBLISHED, isFreePreview: false }),
+    );
+
+    renderScreen();
+    const before = await rows();
+    await userEvent.click(
+      within(before[0] as HTMLElement).getByRole('button', {
+        name: /edit halves on a number line/i,
+      }),
+    );
+
+    await userEvent.click(await screen.findByLabelText('Free to read'));
+    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+
+    await waitFor(() =>
+      expect(api.updateLesson).toHaveBeenCalledWith(
+        'm1',
+        'l1',
+        expect.objectContaining({ isFreePreview: false }),
+      ),
+    );
+    expect(within((await rows())[0] as HTMLElement).queryByText(/free/i)).not.toBeInTheDocument();
   });
 });

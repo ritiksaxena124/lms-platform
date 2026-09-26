@@ -406,6 +406,15 @@ ownership, no writes.
   skeleton while they disagree. Setting a `loading` boolean in an effect would flash a false
   "nothing here yet" every time a filter changed mid-flight, and a late reply from a search
   the visitor has already rewritten would land on top of the current one.
+- **The teacher's box says which of the two decisions it made.** `Checkbox` in `@lms/ui` is a
+  native input with `accent-color` pointed at the brand token rather than a drawn square, so the
+  tick, the keyboard and the platform's own spacing come free. The lesson row then words the
+  mark in two tenses — "Free to read" when the page is published, "Free when published" when it
+  is still a draft — because a teacher who ticked one box made only one of the two decisions the
+  API needs, and a row that said "Free" over a draft would be a promise about a stranger's
+  reading nobody made. The flag travels with every save rather than only when it changes: a box
+  the teacher cleared has to arrive as `false`, since leaving it out is how an open page stays
+  open by accident.
 - **One query, one request.** The shelf's search box waits 250ms after typing stops; the level
   chips are a toggle rather than a set, because a course has one level and pressing the chip
   you chose means "that was enough". Both filters clear the page they were applied to.

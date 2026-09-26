@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import Link from 'next/link';
 import {
   Button,
+  Checkbox,
   EmptyState,
   ErrorState,
   Illo,
@@ -43,6 +44,9 @@ interface EditValues {
   /** The text in the box. Empty means the teacher wants no estimate, which is a `null`, not an
    * absent field — the API keeps a number it was not asked to change. */
   estimatedMinutes: string;
+  /** Sent on every save rather than only when it changes, because a box the teacher cleared has
+   * to arrive as `false` — leaving it out would keep the page open. */
+  isFreePreview: boolean;
 }
 
 function valuesOf(lesson: Lesson): EditValues {
@@ -50,6 +54,7 @@ function valuesOf(lesson: Lesson): EditValues {
     title: lesson.title,
     body: lesson.body ?? '',
     estimatedMinutes: lesson.estimatedMinutes === null ? '' : String(lesson.estimatedMinutes),
+    isFreePreview: lesson.isFreePreview,
   };
 }
 
@@ -147,6 +152,7 @@ export function ModuleLessons({ courseId, moduleId }: { courseId: string; module
         // nothing" looks like from a form; the API stores it as no body at all.
         body: editing.values.body.trim(),
         estimatedMinutes: estimate === '' ? null : Number(estimate),
+        isFreePreview: editing.values.isFreePreview,
       });
       setLessons((current) => current.map((item) => (item.id === saved.id ? saved : item)));
       setEditing(null);
@@ -327,6 +333,20 @@ export function ModuleLessons({ courseId, moduleId }: { courseId: string; module
                           ? 'No time given'
                           : `About ${lesson.estimatedMinutes} min`}
                       </span>
+                      {lesson.isFreePreview ? (
+                        // Two tenses, because the teacher has made one decision and the API
+                        // needs two: the mark is theirs, the door also belongs to the page's
+                        // own status and the course's.
+                        <span
+                          className={
+                            published
+                              ? 'text-[0.8125rem] font-medium text-brand'
+                              : 'text-[0.8125rem] text-ink-faint'
+                          }
+                        >
+                          {published ? 'Free to read' : 'Free when published'}
+                        </span>
+                      ) : null}
                     </div>
                     <p
                       className={
@@ -482,6 +502,24 @@ export function ModuleLessons({ courseId, moduleId }: { courseId: string; module
                       error={fields.estimatedMinutes}
                       disabled={rowBusy}
                       containerClassName="max-w-48"
+                    />
+                    <Checkbox
+                      id={`lesson-free-${lesson.id}`}
+                      label="Free to read"
+                      hint="A stranger may open this page without enrolling — once the page and the course are both published. Until then it is a plan, and the row says so."
+                      checked={editing.values.isFreePreview}
+                      onChange={(event) =>
+                        setEditing((current) =>
+                          current
+                            ? {
+                                ...current,
+                                values: { ...current.values, isFreePreview: event.target.checked },
+                              }
+                            : current,
+                        )
+                      }
+                      error={fields.isFreePreview}
+                      disabled={rowBusy}
                     />
                     <div className="flex items-center gap-2">
                       <Button type="button" loading={rowBusy} onClick={() => void saveEdit(lesson)}>

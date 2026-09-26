@@ -58,6 +58,9 @@ export interface UpdateLessonInput {
   body?: string | null;
   estimatedMinutes?: number | null;
   moduleId?: string;
+  /** Set or cleared on an edit, never on a create: a page nobody has written yet has
+   * nothing to open up. */
+  isFreePreview?: boolean;
 }
 
 /** Every lesson a module currently shows, in the new order, and nothing else. */
