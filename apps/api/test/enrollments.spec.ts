@@ -159,6 +159,18 @@ function failureShape(body: Record<string, unknown>) {
   return { statusCode: body.statusCode, code: body.code, message: body.message };
 }
 
+/** One row of the catalog outline as these tests read it. Every field is named rather than
+ * a `toMatchObject` pattern, so an outline that started shipping a body would fail here for
+ * the right reason instead of matching a shape two tests agree on loosely. */
+interface OutlineRow {
+  id: string;
+  title: string;
+  position: number;
+  estimatedMinutes: number | null;
+  isFreePreview: boolean;
+  isReadable: boolean;
+}
+
 describe('enrollments', () => {
   let teacher: string;
   let otherTeacher: string;
@@ -498,5 +510,139 @@ describe('enrollments', () => {
 
     expect(list.body.code).toBe('UNAUTHORIZED');
     expect(cancel.body.code).toBe('UNAUTHORIZED');
+  });
+
+  describe('what the outline says about the caller', () => {
+    /**
+     * The course page is the map, and a map has to say which doors are open. These check that
+     * the answer is the same fact the page route already applies — free door, or a place in the
+     * course — rather than a second rule the outline invented for itself.
+     */
+    function readCourse(address: string, token?: string): request.Test {
+      const call = request(app.getHttpServer()).get(`/api/v1/catalog/courses/${address}`);
+      return token ? call.set('Authorization', `Bearer ${token}`) : call;
+    }
+
+    /** Every row on the syllabus, flattened, since a page's place in a block is not what is
+     * being asked here — its openness is. */
+    function outlineRows(res: request.Response): OutlineRow[] {
+      return (res.body.course.modules as { lessons: OutlineRow[] }[]).flatMap(
+        (module) => module.lessons,
+      );
+    }
+
+    /** A course with one of each kind of page: open to all, open to the students inside, and
+     * one nobody may read yet. */
+    async function courseWithEveryRow(): Promise<{
+      courseId: string;
+      locked: string;
+      free: string;
+      draft: string;
+    }> {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      return {
+        courseId,
+        locked: await createLockedLesson(moduleId, teacher),
+        free: await createFreeLesson(moduleId, teacher),
+        draft: await createDraftLesson(moduleId, teacher),
+      };
+    }
+
+    it('opens every published page of the outline to a student inside', async () => {
+      const { courseId, locked, free, draft } = await courseWithEveryRow();
+
+      const stranger = await readCourse(courseId).expect(200);
+      expect(
+        outlineRows(stranger).find((row) => row.id === locked)?.isReadable,
+      ).toBe(false);
+      expect(outlineRows(stranger).find((row) => row.id === free)?.isReadable).toBe(true);
+
+      await enroll(sam, courseId).expect(200);
+
+      const mine = await readCourse(courseId, sam).expect(200);
+      expect(outlineRows(mine)).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ id: locked, isReadable: true }),
+          expect.objectContaining({ id: free, isReadable: true }),
+        ]),
+      );
+      // The draft is not "locked" on this page — it is not there at all, enrolled or not. A
+      // place opens published pages, which is the same promise the page route keeps.
+      expect(outlineRows(mine).some((row) => row.id === draft)).toBe(false);
+    });
+
+    it('still names the rows rather than sending their text', async () => {
+      const { courseId, locked } = await courseWithEveryRow();
+      await enroll(sam, courseId).expect(200);
+
+      const res = await readCourse(courseId, sam).expect(200);
+      const row = outlineRows(res).find((each) => each.id === locked)!;
+
+      // A place is worth the pages, not the whole course in one response: `body` belongs to
+      // the page route, which is where the gate lives.
+      expect(row).not.toHaveProperty('body');
+      expect(Object.keys(row).sort()).toEqual(
+        ['estimatedMinutes', 'id', 'isFreePreview', 'isReadable', 'position', 'title'].sort(),
+      );
+    });
+
+    it('says the same thing about a slug and an id, whoever is asking', async () => {
+      const { courseId, locked } = await courseWithEveryRow();
+      const { slug } = await prisma.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: { slug: true },
+      });
+
+      await enroll(sam, courseId).expect(200);
+
+      const byId = await readCourse(courseId, sam).expect(200);
+      const bySlug = await readCourse(slug, sam).expect(200);
+
+      // The two addresses already had to agree for a stranger; a session must not be able to
+      // make them disagree, or one of them is a different course's rules.
+      expect(outlineRows(bySlug)).toEqual(outlineRows(byId));
+      expect(outlineRows(byId).find((row) => row.id === locked)?.isReadable).toBe(true);
+    });
+
+    it('closes the outline again when the student leaves', async () => {
+      const { courseId, locked, free } = await courseWithEveryRow();
+      const placed = await enroll(sam, courseId).expect(200);
+
+      await cancelEnrollment(sam, placed.body.enrollment.id).expect(200);
+
+      const after = await readCourse(courseId, sam).expect(200);
+      expect(outlineRows(after).find((row) => row.id === locked)?.isReadable).toBe(false);
+      // The teacher's own door never depended on the place, so leaving does not shut it.
+      expect(outlineRows(after).find((row) => row.id === free)?.isReadable).toBe(true);
+    });
+
+    it('will not open another student’s outline for a stranger with a session', async () => {
+      const { courseId, locked } = await courseWithEveryRow();
+      await enroll(second, courseId).expect(200);
+
+      const withSession = await readCourse(courseId, sam).expect(200);
+      const anonymous = await readCourse(courseId).expect(200);
+
+      // Handing over a real session that does not hold a place changes nothing: a place is a
+      // relationship, not a hint that opens doors.
+      expect(outlineRows(withSession).find((row) => row.id === locked)?.isReadable).toBe(false);
+      expect(outlineRows(withSession)).toEqual(outlineRows(anonymous));
+    });
+
+    it('refuses a broken session on the outline the way the page route does', async () => {
+      const { courseId } = await courseWithEveryRow();
+
+      const res = await request(app.getHttpServer())
+        .get(`/api/v1/catalog/courses/${courseId}`)
+        .set('Authorization', 'Bearer not-a-real-token')
+        .expect(401);
+
+      // An optional session is optional about an absent one only. Answering this as a stranger
+      // would let an expired token read an enrolled student's syllabus forever without the
+      // portal ever being told to sign in again.
+      expect(res.body.code).toBe('TOKEN_INVALID');
+      await readCourse(courseId).expect(200);
+    });
   });
 });

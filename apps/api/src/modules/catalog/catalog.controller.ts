@@ -14,19 +14,19 @@ import { CatalogService } from './catalog.service';
 import { ListCatalogQueryDto } from './dto/list-catalog-query.dto';
 
 /**
- * What a student may read before they are anybody's enrolled learner.
+ * What a student may read of a course they do not own, whether or not they hold a place in it.
  *
  * `@Public()` is the whole reason this controller is a separate module: every other route in
- * the API is a teacher's own work, addressed through who signed in. These are not — there is
- * no caller to identify, and so no ownership to resolve, and the gate that decides what
- * appears here is the row's own status rather than a relationship to a user. Keeping the two
- * kinds of read in different files is what stops "who owns this?" from becoming a question
- * every endpoint has to remember to answer.
+ * the API is a teacher's own work, addressed through who signed in. These are not — there is no
+ * ownership to resolve, and the gate that decides what appears here is the row's own status
+ * rather than a relationship to a user. Keeping the two kinds of read in different files is what
+ * stops "who owns this?" from becoming a question every endpoint has to remember to answer.
  *
- * One route makes an exception with `@OptionalSession()`: opening a page. A stranger may open
- * the one the teacher marked free, and a student who holds a place (§12) may open any
- * published page of that course. It stays a catalog route rather than gaining a twin under
- * the enrollment module because the question is the same one — which of these gates is
+ * Two routes make an exception with `@OptionalSession()`: a course's outline, and one of its
+ * pages. Both answer a second question that is about the caller — do you hold a place here
+ * (§12)? — and both take it without demanding it, so a stranger still reaches the shelf, the
+ * syllabus and the page the teacher left open. Neither gained a twin under the enrollment
+ * module, because the question is the same one in all three places — which of these gates is
  * open? — and a second copy of the answer is a second chance to get it wrong.
  */
 @Controller('catalog/courses')
@@ -46,9 +46,17 @@ export class CatalogController {
     return { items: await this.catalog.levels() };
   }
 
+  /** The course's own page: the syllabus, and on it which rows this reader may open. A place
+   * in the course is a fact about the caller rather than the course, so the session is
+   * optional here for the same reason it is on the page route below — and the answer changes
+   * one boolean, never the list of rows. */
   @Get(':id')
-  async read(@Param('id') id: string): Promise<CatalogCourseResponse> {
-    return { course: await this.catalog.read(id) };
+  @OptionalSession()
+  async read(
+    @Param('id') id: string,
+    @OptionalCurrentUser() user?: AuthenticatedUser,
+  ): Promise<CatalogCourseResponse> {
+    return { course: await this.catalog.read(id, user?.id) };
   }
 
   /** The one catalog route that answers with a page's text. It opens for two reasons: a

@@ -357,6 +357,13 @@ no writes, and — but for the one route below — no session either.
   returns a body for a page its caller may open: one the teacher marked `isFreePreview`, or any
   published page of a course they hold a place in. It is one route, not a syllabus row with text
   slipped in, so the outline keeps one shape whether or not any room on it happens to be open.
+- **Each outline row carries two flags, because they answer two questions.** `isFreePreview` is
+  the teacher's statement about the page — true whether or not anybody is signed in, and worth a
+  badge. `isReadable` is about the reader: it says the page route will hand *this* caller the
+  body. For a stranger they agree; for a student holding a place every published row reads true
+  while the teacher's marks stay put. A screen links what `isReadable` says and badges what
+  `isFreePreview` says, which is the only way the same component can be honest to both readers
+  without either one being inferred from the other.
 - **`isFreePreview` is a door, not a third visibility gate.** A page marked free still appears on
   the syllabus exactly as it did when it was locked, and a page that is free but still draft, or
   inside a course nobody published, appears nowhere and reads nothing. The flag decides whether
@@ -364,15 +371,17 @@ no writes, and — but for the one route below — no session either.
   all. A student's place opens the same door for their own pages — and opens no door the
   statuses shut, which is why enrolling cannot reach a draft. All of it is one Prisma `where`,
   so a route cannot honour the door and forget the wall behind it.
-- **`@OptionalSession()` is the one route that reads who is calling without demanding it.** The
-  alternative was a second endpoint that repeats these gates for a signed-in student, and a copy
-  of a gate is a gate that drifts. Three rules keep it honest: a request with no header is a
-  stranger rather than a refusal; a header that is present and broken is refused exactly as on a
-  protected route, because quietly answering "you are a visitor" would let an expired session
-  read an enrolled student's pages forever while the refresh path never ran; and the handler asks
-  for the caller with `OptionalCurrentUser`, the only decorator in the API allowed to answer
-  `undefined`. The session supplies a value for one branch of the `where` and decides nothing by
-  itself, so both audiences are still answered by the same query.
+- **`@OptionalSession()` is for the routes that read who is calling without demanding it** — a
+  course's outline and one of its pages. The alternative was a second endpoint that repeats these
+  gates for a signed-in student, and a copy of a gate is a gate that drifts. Three rules keep it
+  honest: a request with no header is a stranger rather than a refusal; a header that is present
+  and broken is refused exactly as on a protected route, because quietly answering "you are a
+  visitor" would let an expired session read an enrolled student's pages forever while the refresh
+  path never ran; and the handler asks for the caller with `OptionalCurrentUser`, the only
+  decorator in the API allowed to answer `undefined`. Where the answer is worth a page's text it
+  goes inside the same `where` as the publish gates; where it only colours a flag on rows that are
+  published already, it is a probe beside the read — a wrong answer there can never reveal a
+  draft, and the syllabus query stays the single statement of what is on the shelf.
 - **`NOT_FOUND` is one answer for several cases.** An unpublished course, a retired one, a slug
   nobody typed and an id that never existed all read the same; so do a locked page, a draft page,
   a published page of a course the caller is not inside, and a page that is not inside the course
@@ -393,9 +402,11 @@ no writes, and — but for the one route below — no session either.
   paste — and the two must return the identical body, which is a test rather than a hope. The
   portal still links by id, the field every catalog response has always carried and the one a
   retitling cannot move. The outline prints each module's position as the catalog sent it, gaps
-  included, and a lesson title is a link only on a row the response marked free: the page itself
-  is a second request (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape
-  whether or not any room on it is open.
+  included, and a lesson title is a link only on a row the response marks `isReadable` — which
+  for this portal still means the free ones, because it has no session of its own to send yet and
+  so is answered as a stranger. The page itself is a second request
+  (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape whether or not any room on
+  it is open.
 - **Both audiences are the catalog's.** A stranger reads the pages a teacher left open; a student
   holding a place reads every published page of that course too (§12). One query answers both,
   which is the only reason the second is not a superset of the first by accident.
@@ -434,10 +445,12 @@ what an invitation is for.
   already exists, with its original `enrolledAt`; cancelling a closed place returns it closed. A
   button on a slow connection gets pressed twice, and a `201` with a second row — or a `409` the
   portal has to interpret — is the API handing that problem to the client.
-- **A student's place is worth pages through the catalog's own route.** §11 folds it into one
-  `where` as the alternative to `isFreePreview`, which buys two things the suite checks directly:
-  enrolling cannot reach a draft or a retired page, and leaving cannot close a page the teacher
-  left open. A separate "read as an enrolled student" endpoint would have had to remember both.
+- **A student's place is worth pages through the catalog's own routes.** §11 folds it into the
+  page query's `where` as the alternative to `isFreePreview`, and answers it as a probe beside the
+  outline read to set each row's `isReadable`, which buys the things the suite checks directly:
+  enrolling cannot reach a draft or a retired page, leaving cannot close a page the teacher left
+  open, and the outline the student sees opens on exactly the rows the page route will hand over.
+  A separate "read as an enrolled student" endpoint would have had to remember both.
 - **A retired course closes on the students inside it.** `archived` drops its pages for them
   exactly as it drops the course from the shelf, and the course leaves "my courses" so the portal
   is never handed a link to a page that will not open. The enrollment row stays: §2 covers the
@@ -446,8 +459,8 @@ what an invitation is for.
   here. It names the first day a student took a place, not the day they came back to it — the
   reason this table keeps one row per pair.
 - **What holds it:** `apps/api/test/enrollment-schema.spec.ts` for the table's promises,
-  `apps/api/test/enrollments.spec.ts` for the routes, the gate they open and the silence they keep.
-  No portal screen reads them yet.
+  `apps/api/test/enrollments.spec.ts` for the routes, the gate they open, the outline rows they
+  light up and the silence they keep. No portal screen reads them yet.
 
 ## 13. Frontend
 
@@ -466,10 +479,11 @@ what an invitation is for.
   is answered by the row's own status. Sending a cookie would be the one way for a cached
   catalog response to carry one visitor's session to the next.
 - **A door appears only where the answer says there is one.** The outline links a lesson title
-  only on a row sent back with `isFreePreview`, and the page behind that link is its own request
-  rather than text carried in the list. Nothing is inferred — not position, not colour, not the
-  fact that the course is published — and the screen's refusal keeps the API's wording, because
-  a page that explained why it would not open is a list of what to enroll for.
+  only on a row sent back with `isReadable`, and badges `isFreePreview` as the teacher's own word
+  about the page rather than a description of how this reader got in. The page behind a link is
+  its own request rather than text carried in the list. Nothing is inferred — not position, not
+  colour, not the fact that the course is published — and the screen's refusal keeps the API's
+  wording, because a page that explained why it would not open is a list of what to enroll for.
 - **Loading is derived from the answer's key, not announced by a flag.** A screen keeps the
   request it is waiting on (`level|search|page`) beside the reply that earned it and shows a
   skeleton while they disagree. Setting a `loading` boolean in an effect would flash a false

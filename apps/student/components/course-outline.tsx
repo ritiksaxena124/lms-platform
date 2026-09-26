@@ -17,8 +17,8 @@ import { describeFailure, isNotFound } from '@/lib/api';
 import { readCatalogCourse } from '@/lib/catalog';
 
 /**
- * One course as a stranger reads it: what it covers, in the teacher's order, with roughly how
- * long each page takes, and which one of them they may already read.
+ * One course as its reader is shown it: what it covers, in the teacher's order, with roughly
+ * how long each page takes, and which of them this person may already read.
  *
  * The outline is the whole promise of this screen. A visitor is deciding whether to spend an
  * evening here, and the honest answer is a list of titles in order with a length beside each,
@@ -26,10 +26,12 @@ import { readCatalogCourse } from '@/lib/catalog';
  * a retired module keeps its slot in the syllabus, and renumbering 1 → 4 into 1 → 2 here would
  * be the portal editing somebody else's map.
  *
- * What the outline does not do is hand over a page. One row may be a link — the page its
- * teacher marked free to read, fetched by its own request when it is opened — and the rest are
- * names, because a screen where every title looked clickable would teach a visitor that none
- * of them are.
+ * What the outline does not do is hand over a page. A row may be a link — the API says which
+ * ones, and a screen that guessed would be wrong for exactly the readers it matters to — and
+ * the rest are names, because a screen where every title looked clickable would teach a
+ * visitor that none of them are. Two flags travel with each row and only one of them is a link
+ * rule: `isReadable` is about the reader, `isFreePreview` is about the page, and a student who
+ * holds a place sees the difference on every line.
  */
 
 const UPDATED = new Intl.DateTimeFormat('en-GB', {
@@ -132,8 +134,13 @@ export function CourseOutline({ courseId }: { courseId: string }) {
   }
 
   const course = state.course;
-  const lessonTotal = course.modules.reduce((sum, module) => sum + module.lessons.length, 0);
+  const lessons = course.modules.flatMap((module) => module.lessons);
+  const lessonTotal = lessons.length;
   const minutes = readingMinutes(course);
+  // Whether this reader holds a place shows up as every published row being open, which is the
+  // only shape of that fact the outline is given. The explainer below is a claim about what
+  // they may do, so it has to be read off the rows rather than assumed from a stranger's case.
+  const everythingOpens = lessons.every((lesson) => lesson.isReadable);
 
   return (
     <article>
@@ -187,8 +194,10 @@ export function CourseOutline({ courseId }: { courseId: string }) {
         )}
       >
         This is the outline: what the course covers, in order, with about how long each page
-        takes. Reading a page is what enrolling is for — unless the row beside it says it is
-        free to read.
+        takes.{' '}
+        {everythingOpens
+          ? 'Every page here is open to you.'
+          : 'A title without a link is what enrolling is for.'}
       </p>
 
       <div className="mt-8 flex flex-col gap-4">
@@ -216,10 +225,10 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                         data-icon-zone
                         className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-2 first:border-t-0 first:pt-0"
                       >
-                        {/* A page the teacher opened is a door, so its title is one. The rest
+                        {/* A page this reader may open is a door, so its title is one. The rest
                             are names, and the link is the row's own state rather than a guess
                             from where it sits in the list. */}
-                        {lesson.isFreePreview ? (
+                        {lesson.isReadable ? (
                           <Link
                             href={`/courses/${course.id}/lessons/${lesson.id}`}
                             className="inline-flex items-start gap-1.5 text-[0.9375rem] font-medium text-brand underline-offset-4 hover:underline"
@@ -243,9 +252,12 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                               {lesson.estimatedMinutes} min
                             </span>
                           )}
-                          {/* Which of the two a row is, said in words as well as in a shape —
-                              the two glyphs are the same silhouette at a glance, and a colour
-                              pair alone is not an answer for anybody. */}
+                          {/* Which of the states a row is in, said in words as well as in a
+                              shape — the two glyphs are the same silhouette at a glance, and a
+                              colour pair alone is not an answer for anybody. A row this reader
+                              holds a place in carries no glyph at all: it is open, and saying so
+                              on every line would be noise, while a lock on a page somebody can
+                              open is a lie. */}
                           {lesson.isFreePreview ? (
                             <Icon
                               name="unlock"
@@ -253,7 +265,7 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                               label="Free to read"
                               className="text-brand"
                             />
-                          ) : (
+                          ) : lesson.isReadable ? null : (
                             <Icon
                               name="lock"
                               size="sm"

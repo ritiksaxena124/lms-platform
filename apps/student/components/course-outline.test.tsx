@@ -30,10 +30,24 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
         summary: 'The nth term, and why it is where it is.',
         position: 1,
         lessons: [
-          { id: 'l1', title: 'The nth term', position: 1, estimatedMinutes: 12, isFreePreview: false },
+          {
+            id: 'l1',
+            title: 'The nth term',
+            position: 1,
+            estimatedMinutes: 12,
+            isFreePreview: false,
+            isReadable: false,
+          },
           // One of the three is open, so the counts below are a course in both states rather
           // than a screen that has only ever seen one.
-          { id: 'l2', title: 'Sum of n terms', position: 2, estimatedMinutes: null, isFreePreview: true },
+          {
+            id: 'l2',
+            title: 'Sum of n terms',
+            position: 2,
+            estimatedMinutes: null,
+            isFreePreview: true,
+            isReadable: true,
+          },
         ],
       },
       {
@@ -48,6 +62,7 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
             position: 1,
             estimatedMinutes: 8,
             isFreePreview: false,
+            isReadable: false,
           },
         ],
       },
@@ -55,6 +70,18 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
     createdAt: '2026-09-10T00:00:00.000Z',
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,
+  };
+}
+
+/** The same course as it arrives for a student who holds a place: the API's outline answers
+ * about the reader, so every published row is open while the teacher's own marks stay put. */
+function withPlace(course: CatalogCourseDetail): CatalogCourseDetail {
+  return {
+    ...course,
+    modules: course.modules.map((module) => ({
+      ...module,
+      lessons: module.lessons.map((lesson) => ({ ...lesson, isReadable: true })),
+    })),
   };
 }
 
@@ -122,6 +149,39 @@ describe('CourseOutline', () => {
     // clickable would teach a visitor that none of it is.
     expect(screen.queryByRole('link', { name: /the nth term/i })).not.toBeInTheDocument();
     expect(screen.queryByRole('link', { name: /why the denominator/i })).not.toBeInTheDocument();
+  });
+
+  it('opens the pages a place in the course unlocked, without calling them free', async () => {
+    api.readCatalogCourse.mockResolvedValue(withPlace(detail()));
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByText('The nth term');
+
+    // The reader's own doors are the link rule. These two were never marked free and are a
+    // door all the same; a screen that linked only the free ones would keep a student standing
+    // outside a room they already hold a place in.
+    expect(screen.getByRole('link', { name: /the nth term/i })).toHaveAttribute(
+      'href',
+      '/courses/b2a1/lessons/l1',
+    );
+    expect(screen.getByRole('link', { name: /why the denominator/i })).toBeInTheDocument();
+
+    // ...and none of them is "free to read", which is the teacher's word about the page rather
+    // than a description of how this reader got in. Only the one row the teacher opened wears
+    // it, and nothing on the screen still claims to be behind enrollment.
+    expect(screen.getAllByRole('img', { name: /free to read/i })).toHaveLength(1);
+    expect(screen.queryByRole('img', { name: /behind enrollment/i })).not.toBeInTheDocument();
+  });
+
+  it('does not pitch enrollment at somebody already inside', async () => {
+    api.readCatalogCourse.mockResolvedValue(withPlace(detail()));
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByText('The nth term');
+
+    // The explainer is a statement about what this reader may do, so it cannot stay true by
+    // accident: a page already open to them is not a thing enrollment is "for". The stranger's
+    // version of this line is held by the outline test below.
+    expect(screen.getByText(/every page here is open to you/i)).toBeInTheDocument();
+    expect(screen.queryByText(/enrolling is for/i)).not.toBeInTheDocument();
   });
 
   it('marks a timed page with a clock and leaves an untimed one bare', async () => {

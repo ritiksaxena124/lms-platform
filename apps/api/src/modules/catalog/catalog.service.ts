@@ -66,7 +66,7 @@ function toCard(course: CourseCardRow): CatalogCourse {
   };
 }
 
-function toDetail(course: CourseSyllabusRow): CatalogCourseDetail {
+function toDetail(course: CourseSyllabusRow, holdsPlace: boolean): CatalogCourseDetail {
   const modules: CatalogModule[] = course.modules
     .filter((module) => module.lessons.length > 0)
     .map((module) => ({
@@ -80,6 +80,10 @@ function toDetail(course: CourseSyllabusRow): CatalogCourseDetail {
         position: lesson.position,
         estimatedMinutes: lesson.estimatedMinutes,
         isFreePreview: lesson.isFreePreview,
+        // Two doors, one flag: what the teacher opened for anybody, and what this reader's own
+        // place opens for them. Nothing else about the row changes between the two readers —
+        // a syllabus is a map, and a map that rearranged itself per caller is not a map.
+        isReadable: lesson.isFreePreview || holdsPlace,
       })),
     }));
 
@@ -138,17 +142,22 @@ function toLessonPage(lesson: ReadableLessonRow): CatalogLessonPage {
  * published page inside a live course is still invisible until its own flag is open, which
  * is what lets a teacher pull a half-written page out without archiving the course around it.
  *
- * Neither gate is a permission check, because three of these four routes have nobody to
- * check: this is the surface in the API a browser can read with no session at all, so the
- * only identity in them is the row's own status.
+ * Neither gate is a permission check. The shelf and the level list have nobody to check at
+ * all — this is the surface in the API a browser reads with no session — so the only identity
+ * in them is the row's own status.
  *
  * A third flag, `isFreePreview`, is not a gate on this visibility: it decides whether one
  * published page's body can be opened, and never whether the row appears on the syllabus.
- * That is why marking a page free changes nothing about the outline's shape. The one route
- * that can have a caller is opening a page, where a place in the course (§12) opens the same
- * door from the other side — which is why `isFreePreview` on that response is the row's own
- * answer rather than a constant, and a badge on the page can still tell a free sample from a
- * page the reader earned.
+ * That is why marking a page free changes nothing about the outline's shape.
+ *
+ * Two routes here do have a caller: opening a page, and a course's outline. Both ask the same
+ * question — free door, or a place in the course (§12)? — and answer it the same way, which is
+ * what makes the outline a map a student can trust rather than a list of rows they will click
+ * to find out about. Where they differ is what the answer is worth: on the page it decides
+ * whether text leaves the database, so it sits inside that query's `where`; on the outline it
+ * only sets `isReadable` on rows that are published already. `isFreePreview` travels alongside
+ * it unchanged, because it is the teacher's statement about the page rather than a description
+ * of how this reader got in — a badge and a door are two different facts.
  */
 @Injectable()
 export class CatalogService {
@@ -185,7 +194,7 @@ export class CatalogService {
     return values.map(({ code, label }) => ({ code, label }));
   }
 
-  async read(address: string): Promise<CatalogCourseDetail> {
+  async read(address: string, viewerId?: string): Promise<CatalogCourseDetail> {
     const course = await this.catalog.findPublished(
       courseRef(address),
       await this.filters({}),
@@ -200,7 +209,11 @@ export class CatalogService {
       });
     }
 
-    return toDetail(course);
+    // Asked for after the course resolves rather than inside its query, so a stranger's page
+    // costs what it always did: one read and no probe for a place nobody holds.
+    const holdsPlace = viewerId ? await this.catalog.holdsPlace(course.id, viewerId) : false;
+
+    return toDetail(course, holdsPlace);
   }
 
   /**

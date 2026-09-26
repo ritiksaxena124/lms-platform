@@ -35,8 +35,9 @@ const CARD_INCLUDE = (lessonStatusValueId: string) =>
 
 /** The syllabus as a student is shown it: active blocks, and inside each one only the
  * pages whose own gate is open. The rows are named and not opened — `body` is selected by
- * exactly one query below, the one that has already proved all three gates — so the map of a
- * course is the same shape whether or not any room on it happens to be unlocked. */
+ * exactly one query below, the one that has already proved every gate — so the map of a
+ * course is the same shape whether or not any room on it happens to be unlocked. Which rooms
+ * unlock for a given reader is a flag on the row, not a second map: see `holdsPlace`. */
 const SYLLABUS_INCLUDE = (lessonStatusValueId: string) =>
   ({
     level: { select: { code: true, label: true } },
@@ -162,6 +163,23 @@ export class CatalogRepository {
       include: SYLLABUS_INCLUDE(filters.lessonStatusValueId),
     });
     return course;
+  }
+
+  /**
+   * Whether this reader holds a place in a course they are already looking at.
+   *
+   * A separate probe rather than a branch inside the syllabus query, which is where the page
+   * route put the same fact: there it decides whether a `body` leaves the database at all, so
+   * it has to share the gates' `where` and be impossible to forget. Here it only colours a
+   * flag on rows that are already published and live — no answer this probe gives can reveal
+   * a draft — so the syllabus query stays the single statement of what is on the shelf.
+   */
+  async holdsPlace(courseId: string, studentUserId: string) {
+    const place = await this.prisma.enrollment.findFirst({
+      where: { courseId, studentUserId, isActive: true },
+      select: { id: true },
+    });
+    return place !== null;
   }
 
   /**

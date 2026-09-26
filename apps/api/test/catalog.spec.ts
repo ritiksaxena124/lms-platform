@@ -376,6 +376,9 @@ describe('catalog', () => {
       position: 1,
       estimatedMinutes: 8,
       isFreePreview: false,
+      // Asked with no session, so the reader's door is the teacher's: nothing the author left
+      // shut stands open for a stranger. What a place changes here is §12's suite.
+      isReadable: false,
     });
     expect(JSON.stringify(res.body)).not.toContain('Cut the pie twice');
   });

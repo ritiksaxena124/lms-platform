@@ -1,6 +1,6 @@
 /**
- * The catalog wire contract: a course as a stranger reads it, before they are anybody's
- * enrolled learner.
+ * The catalog wire contract: a course as anybody reads it, from the shelf down to one page of
+ * its syllabus, whether or not they hold a place in it.
  *
  * Two absences define this shape. There is no `status` — a course that is not published is
  * not in the catalog at all, so a field that could only ever hold one value would be a
@@ -9,6 +9,10 @@
  * which is enough for a person to decide. Opening one is what enrollment is for, with one
  * exception — the page a teacher deliberately left the door open on. Both cases are the same
  * endpoint below, and neither is a syllabus row with a body slipped in.
+ *
+ * Two of these routes answer for whoever is asking, and one does not: the shelf is the same
+ * for everybody, while a course's outline and a page both take a session if one is offered,
+ * because a place in the course changes what their reader may open.
  *
  * The counts are gated counts. A module is counted while it is still in the syllabus, and a
  * lesson only once both of its gates are open — the page published and the course around it
@@ -35,15 +39,20 @@ export interface CatalogCourse {
   updatedAt: string;
 }
 
-/** A page a student may read, named but not opened. `isFreePreview` says which rows the
- * endpoint below opens for somebody with no place in the course; a student who holds one
- * reads every published page of it either way. */
+/** A page a student may read, named but not opened. Two flags, because they answer different
+ * questions: `isFreePreview` is the teacher's statement about the page — worth a badge, and
+ * true whether or not anybody is signed in — while `isReadable` is about the reader, and says
+ * the endpoint below will hand this row's body over to *them*. For a stranger the two agree; a
+ * student holding a place reads every published page of the course either way. */
 export interface CatalogLesson {
   id: string;
   title: string;
   position: number;
   estimatedMinutes: number | null;
   isFreePreview: boolean;
+  /** The link rule. Every row on a syllabus is published already, so this is only ever about
+   * the door, never about the wall behind it. */
+  isReadable: boolean;
 }
 
 export interface CatalogModule {
