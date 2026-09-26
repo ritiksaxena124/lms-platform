@@ -183,6 +183,37 @@ describe('CatalogShelf', () => {
     expect(screen.queryByRole('button', { name: /clear/i })).not.toBeInTheDocument();
   });
 
+  it('marks the search box as a search box', async () => {
+    render(<CatalogShelf />);
+    const field = await screen.findByLabelText(/search courses/i);
+    const zone = field.closest('[data-icon-zone]');
+
+    expect(zone).not.toBeNull();
+    expect(zone?.querySelector('svg[data-icon="search"]')).not.toBeNull();
+  });
+
+  it('gives a card one hoverable surface for its glyphs to answer to', async () => {
+    render(<CatalogShelf />);
+    const card = (await screen.findByRole('link', { name: /Algebra/ })).closest('li')!;
+    const surface = card.querySelector('[data-icon-zone]');
+
+    expect(surface).not.toBeNull();
+    // The teacher and the counts are the two lines a visitor skims, so they get a mark each;
+    // the date stays bare, because nothing about a date needs a picture.
+    expect(surface?.querySelectorAll('svg[data-icon="user"]')).toHaveLength(1);
+    expect(surface?.querySelectorAll('svg[data-icon="layers"]')).toHaveLength(1);
+    expect(surface?.querySelectorAll('svg[data-icon="clock"]')).toHaveLength(0);
+  });
+
+  it('keeps every glyph out of the way of anyone reading the page aloud', async () => {
+    render(<CatalogShelf />);
+    await screen.findByRole('heading', { name: /Algebra/ });
+
+    // Nothing here says more than its words do, so the whole set is decoration. A labelled
+    // icon would be read as an extra sentence on every card.
+    expect(screen.queryAllByRole('img')).toHaveLength(0);
+  });
+
   it('offers a retry that asks the API again', async () => {
     api.browseCatalog.mockRejectedValueOnce(notFound());
     render(<CatalogShelf />);

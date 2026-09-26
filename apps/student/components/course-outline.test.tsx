@@ -87,6 +87,26 @@ describe('CourseOutline', () => {
     expect(screen.getByText(/not timed|no estimate/i)).toBeInTheDocument();
   });
 
+  it('shows a locked page as locked, in words as well as in a glyph', async () => {
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByText('The nth term');
+
+    // Every page of a course is behind enrollment until a teacher marks one otherwise, so the
+    // count here is the lesson count. When free previews arrive in the API, this is the
+    // assertion that has to change — which is the point of writing it now.
+    expect(screen.getAllByRole('img', { name: /behind enrollment/i })).toHaveLength(3);
+  });
+
+  it('marks a timed page with a clock and leaves an untimed one bare', async () => {
+    const { container } = render(<CourseOutline courseId="b2a1" />);
+    await screen.findByText('The nth term');
+
+    // "Not timed" is words only: a clock beside a blank would claim a number the teacher never
+    // gave, and the whole value of the glyph is that it can be trusted at a glance.
+    expect(container.querySelectorAll('svg[data-icon="clock"]')).toHaveLength(2);
+    expect(container.querySelectorAll('svg[data-icon="lock"]')).toHaveLength(3);
+  });
+
   it('adds up the pages a student is signing up to read', async () => {
     render(<CourseOutline courseId="b2a1" />);
 

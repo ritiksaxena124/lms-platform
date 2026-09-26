@@ -5,6 +5,7 @@ import Link from 'next/link';
 import {
   EmptyState,
   ErrorState,
+  Icon,
   Illo,
   SkeletonGroup,
   buttonClass,
@@ -141,8 +142,14 @@ export function CourseOutline({ courseId }: { courseId: string }) {
       <header className="mt-3">
         <p className="eyebrow">{course.level.label}</p>
         <h1 className="mt-2 text-h1 text-ink-strong">{course.title}</h1>
-        <p className="mt-2 text-[0.9375rem] text-ink-muted">
-          with <span className="text-ink">{course.teacher.displayName}</span>
+        <p
+          data-icon-zone
+          className="mt-2 flex flex-wrap items-center gap-1.5 text-[0.9375rem] text-ink-muted"
+        >
+          <Icon name="user" size="sm" className="text-ink-faint" />
+          <span>
+            with <span className="text-ink">{course.teacher.displayName}</span>
+          </span>
         </p>
         <p className="tabular mt-4 flex flex-wrap gap-x-2 gap-y-1 text-[0.8125rem] text-ink-faint">
           <span>{plural(course.modules.length, 'module')}</span>
@@ -185,13 +192,10 @@ export function CourseOutline({ courseId }: { courseId: string }) {
         <h2 className="text-h2 text-ink-strong">Syllabus</h2>
         <ol className="flex flex-col gap-3">
           {course.modules.map((module) => (
-            <li
-              key={module.id}
-              className="rounded-card border border-line bg-surface p-5"
-            >
+            <li key={module.id} className="rounded-card border border-line bg-surface p-5">
               <div className="flex items-start gap-4">
                 <span
-                  className="tabular mt-0.5 w-6 shrink-0 text-[0.8125rem] font-semibold text-ink-faint"
+                  className="tabular mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-field border border-line bg-paper text-[0.8125rem] font-semibold text-ink-muted"
                   title={`Module ${module.position}`}
                 >
                   {module.position}
@@ -206,13 +210,28 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                     {module.lessons.map((lesson) => (
                       <li
                         key={lesson.id}
+                        data-icon-zone
                         className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-2 first:border-t-0 first:pt-0"
                       >
                         <span className="text-[0.9375rem] text-ink">{lesson.title}</span>
-                        <span className="tabular text-[0.8125rem] text-ink-faint">
-                          {lesson.estimatedMinutes === null
-                            ? 'Not timed'
-                            : `${lesson.estimatedMinutes} min`}
+                        <span className="flex items-center gap-3">
+                          {lesson.estimatedMinutes === null ? (
+                            <span className="text-[0.8125rem] text-ink-faint">Not timed</span>
+                          ) : (
+                            <span className="tabular inline-flex items-center gap-1.5 text-[0.8125rem] text-ink-faint">
+                              <Icon name="clock" size="sm" />
+                              {lesson.estimatedMinutes} min
+                            </span>
+                          )}
+                          {/* Every page of a published course is behind enrollment until a
+                              teacher says otherwise, so the mark is the row's real state —
+                              and the words underneath it, not a guess from the shape. */}
+                          <Icon
+                            name="lock"
+                            size="sm"
+                            label="Behind enrollment"
+                            className="text-ink-faint"
+                          />
                         </span>
                       </li>
                     ))}
