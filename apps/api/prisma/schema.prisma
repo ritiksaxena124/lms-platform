@@ -251,6 +251,12 @@ model Lesson {
   /// estimate, and an estimate a scheduling rule depended on would be a promise nobody made.
   estimatedMinutes Int? @map("estimated_minutes")
 
+  /// The teacher's own "read this one without enrolling". It is a flag on one row and it
+  /// opens nothing by itself: the catalog still requires the course to be published and this
+  /// lesson to be published, so marking a draft free is a plan, not a leak. Default false
+  /// because the alternative would publish every lesson ever written the moment it shipped.
+  isFreePreview Boolean @default(false) @map("is_free_preview")
+
   /// The slot inside the module, assigned by the service and never by a client. Gaps are
   /// normal and kept: a retired lesson still holds its number, so nothing can slide into a
   /// slot a student's note or bookmark once named.

@@ -280,6 +280,12 @@ domain module would only re-derive the same two hops.
 - **`estimatedMinutes` is shown, never enforced** (1–600, cleared with an explicit `null` rather
   than by leaving the field alone). A teacher's guess at how long a page takes is useful
   information and a promise the platform should not hold anyone to; no timer sits behind it.
+- **`isFreePreview` is a column, not a lifecycle stage.** The teacher's "a stranger may read this
+  one" — set by `PATCH` and deliberately absent from `POST`, since there is no such stranger
+  until the page exists. It is not an `Lkp*` row because it is not a stage something passes
+  through: it is one yes-or-no about visibility, it can be turned off as easily as on, and it has
+  exactly one place where it is honoured (§11). A draft page can carry the mark, which is a
+  teacher planning what the free sample will be; a plan is not a publication.
 - **`position` is not writable, and the slot is unique per module** (`uk_lesson_module_position`)
   rather than per course. A course-wide number would make every move inside one module a
   renumbering of the whole syllabus, and lessons are read inside their own block.
@@ -323,7 +329,7 @@ domain module would only re-derive the same two hops.
 ## 11. The catalog: what a stranger may read
 
 The catalog is the same course seen by somebody who cannot edit it — `GET
-/api/v1/catalog/courses`, `/catalog/courses/levels` and `/catalog/courses/:id`, in their own Nest
+/api/v1/catalog/courses`, `/catalog/courses/levels`, `/catalog/courses/:id` and `/catalog/courses/:id/lessons/:lessonId`, in their own Nest
 module (`modules/catalog`) because the question they answer is different in kind: no session, no
 ownership, no writes.
 
@@ -341,12 +347,23 @@ ownership, no writes.
   counts.** `moduleCount` and `lessonCount` on a card count the same rows the course page will
   list, not everything the teacher ever made. A card that promised nine pages and opened onto
   four would teach a student to distrust every number on the screen.
-- **Nothing here hands over a page.** `body` is not selected by any catalog query — the syllabus
-  a student sees before enrolling is titles, order and each page's rough length, which is enough
-  to decide. Reading is what enrollment will be for, and it will be the only way to a body.
-- **`NOT_FOUND` is one answer for three cases.** An unpublished course, a retired one and an id
-  that never existed all read the same, and a malformed id is caught in the service before
-  Postgres is asked. A catalog that distinguished them would be a list of other people's drafts.
+- **The outline never hands over a page; one named endpoint does.** `body` is not selected by
+  the syllabus query — a student browsing sees titles, order and each page's rough length, which
+  is enough to decide. The exception is `GET /catalog/courses/:id/lessons/:lessonId`, which
+  returns a body only for a row where `isFreePreview` is true: the teacher's deliberate "read
+  this one before you enroll". It is one route, not a syllabus row with text slipped in, so the
+  outline keeps one shape whether or not any room on it happens to be open.
+- **`isFreePreview` is a door, not a third visibility gate.** A page marked free still appears on
+  the syllabus exactly as it did when it was locked, and a page that is free but still draft, or
+  inside a course nobody published, appears nowhere and reads nothing. The flag decides whether
+  the body can be opened; the two published statuses decide whether the row is on the shelf at
+  all. All three are written into one Prisma `where`, so a route cannot honour the door and
+  forget the wall behind it.
+- **`NOT_FOUND` is one answer for several cases.** An unpublished course, a retired one, a slug
+  nobody typed and an id that never existed all read the same; so do a locked page, a draft page
+  and a page that is not inside the course named in the path. A malformed id is caught in the
+  service before Postgres is asked. A catalog that distinguished them would be a list of other
+  people's drafts — and a `403` on a locked page would be a catalogue of what to enroll for.
 - **Paged, filtered, and searchable by the two fields a card shows.** `level` is a `CourseLevel`
   lookup code resolved at the edge (an unknown one is a field error, not an empty page), `q`
   matches title or summary — never the description, because a hit the list cannot explain is a
@@ -354,11 +371,13 @@ ownership, no writes.
   comparing `'2'` to `2` cannot be a bug later. Newest first, since a ranking this phase has no
   signal for would be a guess with a sort button on it.
 - **The student portal is its first consumer**, at `apps/student`: the shelf at `/` and a
-  course's outline at `/courses/[id]`. The address is the id rather than the prettier slug
-  because the read route is keyed by id — a slug that survives a retitling is an API decision
-  first, and a portal does not get to invent one. The outline prints each module's position as
-  the catalog sent it, gaps included, and no lesson title is a link: there is no page a visitor
-  may open yet, and a title that looked clickable would teach them not to trust the day it is.
+  course's outline at `/courses/[id]`. A course read now takes either the id the API issued or
+  the slug its author chose — a slug is the nicer thing to put in a link somebody else will
+  paste — and the two must return the identical body, which is a test rather than a hope. The
+  portal still links by id, the field every catalog response has always carried and the one a
+  retitling cannot move. The outline prints each module's position as the catalog sent it, gaps
+  included, and no lesson title is a link yet: the rows now say whether a stranger may read
+  them, and the screen has not been given that answer.
 
 ## 12. Frontend
 

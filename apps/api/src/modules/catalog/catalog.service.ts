@@ -6,17 +6,33 @@ import {
   LKP_TYPE_CODES,
   type CatalogCourse,
   type CatalogCourseDetail,
+  type CatalogFreeLesson,
+  type CatalogLessonModule,
   type CatalogListInput,
   type CatalogModule,
   type CourseChoice,
 } from '@lms/shared';
 
 import { ReferenceService } from '../../reference/reference.service';
-import type { CatalogFilters, CourseCardRow, CourseSyllabusRow } from './catalog.repository';
+import type {
+  CatalogCourseRef,
+  CatalogFilters,
+  CourseCardRow,
+  CourseSyllabusRow,
+  FreeLessonRow,
+} from './catalog.repository';
 import { CatalogRepository } from './catalog.repository';
 
-/** A course row is addressed by its id and nothing else, so this is the whole of it. */
+/**
+ * A course is addressed two ways: the id the API issued, and the slug its author chose for
+ * links. This decides which one a caller meant. A non-UUID is read as a slug rather than
+ * refused, since a slug is written by hand and pasted into a URL — and both spellings reach
+ * one row, which is the property the tests keep them to.
+ */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+const courseRef = (address: string): CatalogCourseRef =>
+  UUID.test(address) ? { id: address } : { slug: address };
 
 const DEFAULT_PAGE_SIZE = 12;
 
@@ -63,6 +79,7 @@ function toDetail(course: CourseSyllabusRow): CatalogCourseDetail {
         title: lesson.title,
         position: lesson.position,
         estimatedMinutes: lesson.estimatedMinutes,
+        isFreePreview: lesson.isFreePreview,
       })),
     }));
 
@@ -80,6 +97,33 @@ function toDetail(course: CourseSyllabusRow): CatalogCourseDetail {
   };
 }
 
+/** The module and course a free page hangs from, taken from inside its own row. The block is
+ * listed with its position rather than its whole syllabus: enough to say where the reader is
+ * and how to get back to the outline, not enough to rebuild it. */
+function toFreeLesson(lesson: FreeLessonRow): CatalogFreeLesson {
+  const module: CatalogLessonModule = {
+    id: lesson.module.id,
+    title: lesson.module.title,
+    position: lesson.module.position,
+  };
+
+  return {
+    id: lesson.id,
+    title: lesson.title,
+    body: lesson.body,
+    estimatedMinutes: lesson.estimatedMinutes,
+    position: lesson.position,
+    isFreePreview: true,
+    updatedAt: lesson.updatedAt.toISOString(),
+    module,
+    course: {
+      id: lesson.module.course.id,
+      slug: lesson.module.course.slug,
+      title: lesson.module.course.title,
+    },
+  };
+}
+
 /**
  * The catalog: published courses, and inside them only what a student may already read.
  *
@@ -92,6 +136,10 @@ function toDetail(course: CourseSyllabusRow): CatalogCourseDetail {
  *
  * Neither gate is a permission check, because there is nobody to check. This is the one
  * surface in the API with no session, so the only identity here is the row's own status.
+ *
+ * A third flag, `isFreePreview`, is not a gate on this visibility: it decides whether one
+ * published page's body can be opened, and never whether the row appears on the syllabus.
+ * That is why marking a page free changes nothing about the outline's shape.
  */
 @Injectable()
 export class CatalogService {
@@ -128,10 +176,11 @@ export class CatalogService {
     return values.map(({ code, label }) => ({ code, label }));
   }
 
-  async read(id: string): Promise<CatalogCourseDetail> {
-    const course = UUID.test(id)
-      ? await this.catalog.findPublished(id, await this.filters({}))
-      : null;
+  async read(address: string): Promise<CatalogCourseDetail> {
+    const course = await this.catalog.findPublished(
+      courseRef(address),
+      await this.filters({}),
+    );
 
     if (!course) {
       // One message for "not published", "retired" and "never there": a browser that could
@@ -143,6 +192,29 @@ export class CatalogService {
     }
 
     return toDetail(course);
+  }
+
+  /**
+   * One page a teacher left open for a stranger, body included.
+   *
+   * The repository's query has already decided the three gates, so everything that comes
+   * back `null` here gets the same answer an invented id gets. The message differs from the
+   * course's on purpose — "that page" is honest about which half of the address was wrong,
+   * and says nothing about whether the page exists.
+   */
+  async freeLesson(address: string, lessonId: string): Promise<CatalogFreeLesson> {
+    const lesson = UUID.test(lessonId)
+      ? await this.catalog.findFreeLesson(courseRef(address), lessonId, await this.filters({}))
+      : null;
+
+    if (!lesson) {
+      throw new NotFoundException({
+        code: API_ERROR_CODES.NOT_FOUND,
+        message: 'We cannot find that page.',
+      });
+    }
+
+    return toFreeLesson(lesson);
   }
 
   /** The two published statuses, plus the level and phrase a caller filtered on. Codes are

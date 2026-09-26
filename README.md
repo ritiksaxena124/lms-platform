@@ -8,12 +8,15 @@ library.
 profile and write, publish and archive courses in the teacher portal (`/courses`, backed by
 `/api/v1/courses`), order a course's syllabus of modules (`/courses/[id]/modules`, backed by
 `/api/v1/courses/:id/modules`), and write the lessons inside a module — the page, its rough
-length, its slot in that block's order and its own draft/published flag
+length, its slot in that block's order, its own draft/published flag and whether one of them is
+free to read before enrolling
 (`/courses/[id]/modules/[moduleId]/lessons`, backed by `/api/v1/modules/:moduleId/lessons`).
 A stranger can already browse what that makes readable, on a second portal:
 <http://student.localtest.me:3001> is the shelf (`/api/v1/catalog/courses`) and a course's
-outline (`/api/v1/catalog/courses/:id`) — titles, order and rough length, never the page
-itself, and no account needed to look. Enrollment, bookings and payments are still ahead.
+outline (`/api/v1/catalog/courses/:id`, and the same course by its slug) — titles, order and
+rough length, plus one page a teacher left open to read
+(`/api/v1/catalog/courses/:id/lessons/:lessonId`) — and no account needed to look. Enrollment,
+bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---

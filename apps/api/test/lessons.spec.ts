@@ -131,6 +131,7 @@ interface WrittenLesson {
   id: string;
   position: number;
   estimatedMinutes: number | null;
+  isFreePreview: boolean;
   status: { code: string };
 }
 
@@ -335,6 +336,40 @@ describe('lessons', () => {
       estimatedMinutes: 12,
     });
     expect(res.body.lesson.body).toContain('Same denominator first');
+  });
+
+  it('marks one page free to read, and takes the mark back off', async () => {
+    const moduleId = await createModule(await createCourse(teacher), teacher);
+    const lesson = await createLesson(
+      moduleId,
+      teacher,
+      'Equivalent fractions',
+      'One pie, cut twice. Nothing about the pie changed.',
+    );
+
+    // Born closed. A default of `true` would have handed every page ever written to the
+    // public catalog the day this shipped, so silence has to mean the opposite of a promise.
+    expect(lesson.isFreePreview).toBe(false);
+
+    const marked = await patchLesson(moduleId, lesson.id, { isFreePreview: true }, teacher).expect(
+      200,
+    );
+    expect(marked.body.lesson.isFreePreview).toBe(true);
+
+    // The same rule the estimate holds to, and the one that stops a title fix from quietly
+    // locking a page a stranger was already reading.
+    const renamed = await patchLesson(
+      moduleId,
+      lesson.id,
+      { title: 'Equivalent fractions, slowly' },
+      teacher,
+    ).expect(200);
+    expect(renamed.body.lesson.isFreePreview).toBe(true);
+
+    const closed = await patchLesson(moduleId, lesson.id, { isFreePreview: false }, teacher).expect(
+      200,
+    );
+    expect(closed.body.lesson.isFreePreview).toBe(false);
   });
 
   it('clears an estimate by sending it back, rather than by leaving it out', async () => {

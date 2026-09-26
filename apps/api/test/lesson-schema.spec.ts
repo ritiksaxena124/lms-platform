@@ -176,6 +176,30 @@ describe('lesson table', () => {
     expect(created).toMatchObject({ isActive: true, body: null, estimatedMinutes: null });
   });
 
+  it('holds every page behind enrollment until somebody says otherwise', async () => {
+    const owner = await createTeacher(emailFor('free-preview'));
+    const course = await createCourse(owner.id, `free-${RUN}`);
+    const module = await createModule(course.id);
+
+    const created = await createLesson(module.id, 1);
+    // A default of `true` would hand every lesson ever written to the public catalog the
+    // moment this shipped. Free is something a teacher decides about one page, so it has to
+    // be said, and silence has to mean the opposite.
+    expect(created.isFreePreview).toBe(false);
+
+    const marked = await prisma.lesson.update({
+      where: { id: created.id },
+      data: { isFreePreview: true },
+    });
+    expect(marked.isFreePreview).toBe(true);
+
+    // And it is only a flag on one row: a second lesson in a second module is untouched by
+    // it, because "free" is a statement about a page, never about a course or a block.
+    const otherModule = await createModule(course.id, 2);
+    const other = await createLesson(otherModule.id, 1);
+    expect(other.isFreePreview).toBe(false);
+  });
+
   it('holds a lesson status as a reference row of the LessonStatus type', async () => {
     const owner = await createTeacher(emailFor('status-lookup'));
     const course = await createCourse(owner.id, `status-${RUN}`);

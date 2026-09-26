@@ -4,9 +4,11 @@
  *
  * Two absences define this shape. There is no `status` — a course that is not published is
  * not in the catalog at all, so a field that could only ever hold one value would be a
- * question nobody can ask. And there is no lesson `body` anywhere: a card says how many
+ * question nobody can ask. And the syllabus carries no lesson `body`: a card says how many
  * pages there are and the detail says what they are called and roughly how long each costs,
- * which is enough for a person to decide. Reading one is what enrollment will be for.
+ * which is enough for a person to decide. Reading one is what enrollment will be for — with
+ * one exception, the page the teacher deliberately left the door open on, which is its own
+ * endpoint rather than a syllabus row with a body slipped in.
  *
  * The counts are gated counts. A module is counted while it is still in the syllabus, and a
  * lesson only once both of its gates are open — the page published and the course around it
@@ -33,12 +35,14 @@ export interface CatalogCourse {
   updatedAt: string;
 }
 
-/** A page a student may read, named but not opened. */
+/** A page a student may read, named but not opened. `isFreePreview` says which rows the
+ * endpoint below will actually open for them. */
 export interface CatalogLesson {
   id: string;
   title: string;
   position: number;
   estimatedMinutes: number | null;
+  isFreePreview: boolean;
 }
 
 export interface CatalogModule {
@@ -67,6 +71,39 @@ export interface CatalogCourseDetail {
 
 export interface CatalogCourseResponse {
   course: CatalogCourseDetail;
+}
+
+/** The two places a free page hangs from, sent with it because a reader who arrived here
+ * from a link has no syllabus on screen and needs both to go back. */
+export interface CatalogLessonModule {
+  id: string;
+  title: string;
+  position: number;
+}
+
+export interface CatalogLessonCourse {
+  id: string;
+  slug: string;
+  title: string;
+}
+
+/** One page a teacher marked free to read, opened. `body` is nullable because the mark and
+ * the writing are two separate acts: a teacher can publish a page and leave its text empty
+ * while they rewrite it, and the flag says nothing about whether there is anything there. */
+export interface CatalogFreeLesson {
+  id: string;
+  title: string;
+  body: string | null;
+  estimatedMinutes: number | null;
+  position: number;
+  isFreePreview: true;
+  updatedAt: string;
+  module: CatalogLessonModule;
+  course: CatalogLessonCourse;
+}
+
+export interface CatalogLessonResponse {
+  lesson: CatalogFreeLesson;
 }
 
 export interface CatalogCourseListResponse {

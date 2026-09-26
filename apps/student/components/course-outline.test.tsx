@@ -30,8 +30,8 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
         summary: 'The nth term, and why it is where it is.',
         position: 1,
         lessons: [
-          { id: 'l1', title: 'The nth term', position: 1, estimatedMinutes: 12 },
-          { id: 'l2', title: 'Sum of n terms', position: 2, estimatedMinutes: null },
+          { id: 'l1', title: 'The nth term', position: 1, estimatedMinutes: 12, isFreePreview: false },
+          { id: 'l2', title: 'Sum of n terms', position: 2, estimatedMinutes: null, isFreePreview: false },
         ],
       },
       {
@@ -39,7 +39,15 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
         title: 'Quadratic equations',
         summary: null,
         position: 4,
-        lessons: [{ id: 'l3', title: 'Why the denominator stays put', position: 1, estimatedMinutes: 8 }],
+        lessons: [
+          {
+            id: 'l3',
+            title: 'Why the denominator stays put',
+            position: 1,
+            estimatedMinutes: 8,
+            isFreePreview: false,
+          },
+        ],
       },
     ],
     createdAt: '2026-09-10T00:00:00.000Z',

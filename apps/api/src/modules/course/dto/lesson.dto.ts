@@ -4,6 +4,7 @@ import {
   ArrayMinSize,
   ArrayUnique,
   IsArray,
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -74,6 +75,12 @@ export class UpdateLessonDto {
   @Min(1)
   @Max(600)
   estimatedMinutes?: number | null;
+
+  /** Deliberately absent from `CreateLessonDto`: a page opens to strangers by decision, and
+   * a form that never showed the box should not be able to leave one unlocked. */
+  @IsOptional()
+  @IsBoolean()
+  isFreePreview?: boolean;
 
   @IsOptional()
   @IsUUID('4')

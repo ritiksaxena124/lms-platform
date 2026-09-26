@@ -24,6 +24,10 @@ export interface Lesson {
    * whichever client shows it; the API only ever promises the characters. */
   body: string | null;
   estimatedMinutes: number | null;
+  /** The teacher's "read this one without enrolling". It is a flag on the page, not a door:
+   * the catalog only honours it on a published lesson inside a published course, so a draft
+   * can carry the intention without leaking anything. */
+  isFreePreview: boolean;
   position: number;
   status: LessonChoice;
   createdAt: string;

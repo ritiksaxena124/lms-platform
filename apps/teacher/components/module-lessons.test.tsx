@@ -77,6 +77,9 @@ function lesson(overrides: Partial<Lesson> = {}): Lesson {
     createdAt: '2026-09-25T00:00:00.000Z',
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,
+    // After the spread because a fixture that said nothing about the flag is a locked page,
+    // and `Partial<Lesson>` would otherwise make "not mentioned" read as "unknown".
+    isFreePreview: overrides.isFreePreview ?? false,
   };
 }
 

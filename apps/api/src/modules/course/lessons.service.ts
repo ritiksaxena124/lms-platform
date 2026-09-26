@@ -28,6 +28,7 @@ function toDocument(lesson: LessonWithStatus): Lesson {
     title: lesson.title,
     body: lesson.body,
     estimatedMinutes: lesson.estimatedMinutes,
+    isFreePreview: lesson.isFreePreview,
     position: lesson.position,
     status: { code: lesson.status.code, label: lesson.status.label },
     createdAt: lesson.createdAt.toISOString(),
@@ -110,6 +111,7 @@ export class LessonsService {
       ...(dto.estimatedMinutes === undefined
         ? {}
         : { estimatedMinutes: dto.estimatedMinutes }),
+      ...(dto.isFreePreview === undefined ? {} : { isFreePreview: dto.isFreePreview }),
     };
 
     return toDocument(await this.lessons.updateColumns(lesson.id, columns));

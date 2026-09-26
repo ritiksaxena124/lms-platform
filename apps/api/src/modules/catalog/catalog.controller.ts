@@ -2,6 +2,7 @@ import { Controller, Get, Param, Query } from '@nestjs/common';
 import type {
   CatalogCourseListResponse,
   CatalogCourseResponse,
+  CatalogLessonResponse,
   CourseChoice,
 } from '@lms/shared';
 
@@ -39,5 +40,16 @@ export class CatalogController {
   @Get(':id')
   async read(@Param('id') id: string): Promise<CatalogCourseResponse> {
     return { course: await this.catalog.read(id) };
+  }
+
+  /** The one catalog route that answers with a page's text, and only for a page the teacher
+   * marked free to read. The course in the path is not decoration: it is half the address, so
+   * a lesson id found in someone else's syllabus earns the same silence as one never written. */
+  @Get(':id/lessons/:lessonId')
+  async lesson(
+    @Param('id') id: string,
+    @Param('lessonId') lessonId: string,
+  ): Promise<CatalogLessonResponse> {
+    return { lesson: await this.catalog.freeLesson(id, lessonId) };
   }
 }

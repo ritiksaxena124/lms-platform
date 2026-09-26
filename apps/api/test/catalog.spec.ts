@@ -140,6 +140,34 @@ async function writePublishedLesson(moduleId: string, token: string, title: stri
   return lesson.id;
 }
 
+/** The teacher's own mark on a page: "a stranger may read this one". */
+async function markFree(
+  moduleId: string,
+  lessonId: string,
+  token: string,
+  isFreePreview = true,
+) {
+  await request(app.getHttpServer())
+    .patch(`/api/v1/modules/${moduleId}/lessons/${lessonId}`)
+    .set('Authorization', `Bearer ${token}`)
+    .send({ isFreePreview })
+    .expect(200);
+}
+
+function catalogLesson(courseId: string, lessonId: string, token?: string): request.Test {
+  const call = request(app.getHttpServer()).get(
+    `/api/v1/catalog/courses/${courseId}/lessons/${lessonId}`,
+  );
+  return token ? call.set('Authorization', `Bearer ${token}`) : call;
+}
+
+/** The parts of a failure that must match. `requestId` is deliberately not one of them: it
+ * is per request, and comparing it would make every "these two are the same answer" check
+ * below pass for the wrong reason or fail for the right one. */
+function failureShape(body: Record<string, unknown>) {
+  return { statusCode: body.statusCode, code: body.code, message: body.message };
+}
+
 async function itemsMatching(query: string): Promise<Array<Record<string, unknown>>> {
   const res = await catalogList(`?q=${query}`).expect(200);
   return res.body.items;
@@ -340,13 +368,14 @@ describe('catalog', () => {
       },
       { title: 'Adding and subtracting', lessons: [[1, 'Same denominator first']] },
     ]);
-    // The contract in words: a student sees that a page exists and how long it costs, and
-    // sees none of it.
+    // The contract in words: a student sees that a page exists, what it costs and whether it
+    // stands open — and sees none of the writing on it either way.
     expect(res.body.course.modules[0].lessons[0]).toEqual({
       id: expect.any(String),
       title: 'Why the denominator stays put',
       position: 1,
       estimatedMinutes: 8,
+      isFreePreview: false,
     });
     expect(JSON.stringify(res.body)).not.toContain('Cut the pie twice');
   });
@@ -423,5 +452,157 @@ describe('catalog', () => {
 
     expect(byStudent.body).toEqual(anonymous.body);
     expect(byTeacher.body).toEqual(anonymous.body);
+  });
+
+  describe('a page the teacher set free', () => {
+    it('hands its body to a stranger, with no session asked for', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const lessonId = await writePublishedLesson(moduleId, teacher, 'Adding halves');
+      await markFree(moduleId, lessonId, teacher);
+
+      const res = await catalogLesson(courseId, lessonId).expect(200);
+
+      // The page and the two places it hangs from, because a reader who arrived at one free
+      // page needs the syllabus it sits in to decide whether to stay.
+      expect(res.body.lesson).toMatchObject({
+        id: lessonId,
+        title: 'Adding halves',
+        body: 'Cut the pie twice. Nothing about the pie changed.',
+        estimatedMinutes: 8,
+        position: 1,
+        module: { id: moduleId, title: 'Equivalent fractions', position: 1 },
+        course: { id: courseId, title: expect.stringContaining(MARK) },
+      });
+
+      const asStudent = await catalogLesson(courseId, lessonId, student).expect(200);
+      expect(asStudent.body).toEqual(res.body);
+    });
+
+    it('answers a locked page exactly as it answers one that is not there', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const held = await writePublishedLesson(moduleId, teacher, 'Adding halves');
+      const absent = await catalogLesson(courseId, randomUUID()).expect(404);
+      const locked = await catalogLesson(courseId, held).expect(404);
+
+      // A 403 would be a courtesy to nobody and a catalogue to whoever probed: "this page
+      // exists and you may not read it" is a teacher's list of what to enroll for, and
+      // publishing that list is not this API's decision to make.
+      expect(failureShape(locked.body)).toEqual(failureShape(absent.body));
+      expect(locked.body.code).toBe('NOT_FOUND');
+      expect(JSON.stringify(locked.body)).not.toMatch(/enroll|free|lock/i);
+    });
+
+    it('keeps the outer gate shut: a free page of a course nobody published', async () => {
+      const courseId = await createCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const lessonId = await writePublishedLesson(moduleId, teacher, 'Adding halves');
+      await markFree(moduleId, lessonId, teacher);
+
+      // The teacher said "free" about the page and never said "live" about the course, and
+      // the course's word is the one that decides whether either is on the shelf.
+      await catalogRead(courseId).expect(404);
+      await catalogLesson(courseId, lessonId).expect(404);
+    });
+
+    it('keeps the inner gate shut: a free mark on a page still being written', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const draft = (await createLesson(moduleId, teacher, 'Adding thirds')).id;
+      await markFree(moduleId, draft, teacher);
+
+      await catalogLesson(courseId, draft).expect(404);
+
+      // Marking a draft free is a plan for what the free sample will be, and a plan is not a
+      // publication — which is why the flag can be set before the page is ready at all.
+      const published = await writePublishedLesson(moduleId, teacher, 'Adding quarters');
+      await markFree(moduleId, published, teacher);
+      await catalogLesson(courseId, published).expect(200);
+    });
+
+    it('will not read a page through a course that does not hold it', async () => {
+      const mine = await createPublishedCourse(teacher);
+      const mineModule = await createModule(mine, teacher);
+      const lesson = await writePublishedLesson(mineModule, teacher, 'Adding halves');
+      await markFree(mineModule, lesson, teacher);
+
+      const theirs = await createPublishedCourse(otherTeacher);
+      const theirModule = await createModule(theirs, otherTeacher);
+      const theirLesson = await writePublishedLesson(theirModule, otherTeacher, 'Adding halves');
+
+      // The pair is the address: a page only exists inside the syllabus that lists it, so an
+      // id found anywhere else earns the same silence as one never written.
+      await catalogLesson(theirs, lesson).expect(404);
+      await catalogLesson(mine, theirLesson).expect(404);
+      await catalogLesson(mine, lesson).expect(200);
+    });
+
+    it('still sends no body in the outline, free or locked', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const free = await writePublishedLesson(moduleId, teacher, 'Adding halves');
+      await writePublishedLesson(moduleId, teacher, 'Adding thirds');
+      await markFree(moduleId, free, teacher);
+
+      const res = await catalogRead(courseId).expect(200);
+
+      // One door, one shape behind it. The outline is the map, and the map does not change
+      // because one of the rooms is open — a visitor reads the same list either way and the
+      // free page is fetched, not slipped in.
+      const lessonRows = res.body.course.modules[0].lessons;
+      expect(lessonRows).toHaveLength(2);
+      expect(lessonRows.every((row: Record<string, unknown>) => !('body' in row))).toBe(true);
+      expect(JSON.stringify(res.body)).not.toContain('Cut the pie twice');
+    });
+
+    it('tells the outline which pages a stranger may already read', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const free = await writePublishedLesson(moduleId, teacher, 'Adding halves');
+      const held = await writePublishedLesson(moduleId, teacher, 'Adding thirds');
+      await markFree(moduleId, free, teacher);
+
+      const res = await catalogRead(courseId).expect(200);
+      const rows = res.body.course.modules[0].lessons as Array<{
+        id: string;
+        isFreePreview: boolean;
+      }>;
+
+      expect(rows.find((row) => row.id === free)?.isFreePreview).toBe(true);
+      expect(rows.find((row) => row.id === held)?.isFreePreview).toBe(false);
+    });
+  });
+
+  describe('addressing a course', () => {
+    it('reads a published course by the slug its author chose', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      await writePublishedLesson(moduleId, teacher, 'Adding halves');
+      const { slug } = await prisma.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: { slug: true },
+      });
+
+      const byId = await catalogRead(courseId).expect(200);
+      const bySlug = await catalogRead(slug).expect(200);
+
+      // The same answer, because the slug is a nicer thing to put in a link and nothing more
+      // — a course is one row, and two addresses to the same row must not read differently.
+      expect(bySlug.body).toEqual(byId.body);
+    });
+
+    it('answers a draft course by its slug the way it answers one never written', async () => {
+      const courseId = await createCourse(teacher);
+      const { slug } = await prisma.course.findUniqueOrThrow({
+        where: { id: courseId },
+        select: { slug: true },
+      });
+
+      const draft = await catalogRead(slug).expect(404);
+      const absent = await catalogRead('no-such-slug-anywhere').expect(404);
+
+      expect(failureShape(draft.body)).toEqual(failureShape(absent.body));
+    });
   });
 });
