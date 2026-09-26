@@ -406,8 +406,11 @@ no writes, and — but for the one route below — no session either.
   the teacher's free pages for a visitor and every published page for a student who is signed in
   to this portal and holds a place, because that is exactly what its transport now sends. The
   page itself is a second request
-  (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape whether or not any room on
-  it is open.
+  (`/courses/[id]/lessons/[lessonId]`, `components/course-lesson.tsx`), so the syllabus keeps one
+  shape whether or not any room on it is open — and the screen has to be one screen, because two
+  doors now reach the same page: a teacher's free page and a place the student holds. It says which
+  door it came through in its closing line, and a refusal to show a page keeps the API's single
+  `NOT_FOUND`, since a message that named the reason would be a list of what to enroll for.
 - **Both audiences are the catalog's.** A stranger reads the pages a teacher left open; a student
   holding a place reads every published page of that course too (§12). One query answers both,
   which is the only reason the second is not a superset of the first by accident.
@@ -461,7 +464,9 @@ what an invitation is for.
   reason this table keeps one row per pair.
 - **What holds it:** `apps/api/test/enrollment-schema.spec.ts` for the table's promises,
   `apps/api/test/enrollments.spec.ts` for the routes, the gate they open, the outline rows they
-  light up and the silence they keep. No portal screen reads them yet.
+  light up and the silence they keep. The student portal reads all three now — `lib/enrollments.ts`
+  for the transport, `EnrollControl` for taking a place, `my-courses` for the roster and leaving
+  one — and the rules those screens keep are §13's.
 
 ## 13. Frontend
 
@@ -493,6 +498,33 @@ what an invitation is for.
   its own request rather than text carried in the list. Nothing is inferred — not position, not
   colour, not the fact that the course is published — and the screen's refusal keeps the API's
   wording, because a page that explained why it would not open is a list of what to enroll for.
+- **A place is asked for, never guessed from the door.** `EnrollControl` reads the reader's
+  roster (`GET /enrollments`) and offers the button only for a course missing from it; a course
+  present becomes "In this course since …" and a link to the shelf. `isReadable` says what a
+  reader may open, which is not the same question — inferring a place from an open page would
+  report every free lesson as an enrollment. When the roster read itself fails the button stays,
+  because the write is idempotent and the worst a pressed button can do is return the place that
+  already exists. The id sent is the loaded `course.id`, never the path segment: an address may
+  carry a slug, and a slug is a second valid-looking name for the same thing.
+- **Leaving is one press, and the row goes when the server says it went.** No confirmation for a
+  decision the student can take again on the next screen — the same reasoning as a teacher's
+  Archive — and the local list drops the row only after the cancel returns, so a refused leave
+  cannot leave a shelf claiming a place the API still counts as open.
+- **A day is shown in the reader's own zone, formatted in exactly one file.** `lib/dates.ts` holds
+  the portal's only `Intl.DateTimeFormat`: an `enrolledAt` instant rendered as the day it landed in
+  the signed-in user's IANA zone, falling back to the browser's when the profile has none or the
+  stored name no longer validates. A relative "2 days ago" beside an absolute date would put two
+  calendars on one shelf.
+- **A session change re-reads what the session decided.** The outline keys its request on the
+  course, a retry counter and the session's state, so signing in re-fetches the same address and
+  the locked rows become links without a reload; keyed on the address alone, the screen would go
+  on showing a stranger's outline to a student who has just taken a place in it.
+- **A settled read is written through the functional updater.** The roster arrives in a
+  microtask and the component keeps `{key, roster}` as one value, so the write is
+  `setSettled(current => current?.key === key ? current : {key, roster})` — one expression that
+  discards a reply from a reader who has since changed, retries a failed read, and forces the
+  render that shows the answer. An `alive` flag or a separate retry boolean would be a second
+  source of truth for a fact already in the key.
 - **Loading is derived from the answer's key, not announced by a flag.** A screen keeps the
   request it is waiting on (`level|search|page`) beside the reply that earned it and shows a
   skeleton while they disagree. Setting a `loading` boolean in an effect would flash a false
@@ -593,9 +625,14 @@ what an invitation is for.
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:3001`, `ops:…` and `api:4000` share one registrable domain and therefore one
   `Domain=localtest.me` session cookie. This is the reason auth will work across portals in
-  development exactly the way it will in production, with no CORS or localhost hacks — and
-  the reason the student portal can sit on that domain today without touching the cookie:
-  its first screen sends no credentials at all.
+  development exactly the way it will in production, with no CORS or localhost hacks.
+- **One browser profile holds one session, because that is what one cookie slot means.** The
+  shared cookie is what makes a teacher's login readable to the student portal too, and the same
+  mechanism means a second sign-in in the same profile replaces the first — visibly, on reload:
+  the tab that signed in later keeps the slot, while a stale access token goes on working in the
+  other portal's memory until something needs the cookie. Verifying two roles at once is two
+  profiles (or one normal plus one private window), not two tabs, and a screen that shows the
+  wrong name after a reload is that fact rather than a bug in the portal.
 - Two databases: `lms` for development, `lms_test` for tests, owned by a least-privilege
   `lms` role with `CREATEDB` (Prisma needs it for migration shadow databases). The test
   global setup **refuses to run** unless `DATABASE_URL` names `lms_test`, and redacts

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_ERROR_CODES } from '@lms/shared';
 
-import { browseCatalog, catalogLevels, readCatalogCourse, readFreeLesson } from './catalog';
+import { browseCatalog, catalogLevels, readCatalogCourse, readLessonPage } from './catalog';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -110,7 +110,11 @@ describe('readCatalogCourse', () => {
   it('lets a refusal travel up with its code, because the screen answers 404 differently', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse(
-        { statusCode: 404, code: API_ERROR_CODES.NOT_FOUND, message: 'We cannot find that course.' },
+        {
+          statusCode: 404,
+          code: API_ERROR_CODES.NOT_FOUND,
+          message: 'We cannot find that course.',
+        },
         404,
       ),
     );
@@ -121,18 +125,18 @@ describe('readCatalogCourse', () => {
   });
 });
 
-describe('readFreeLesson', () => {
+describe('readLessonPage', () => {
   it('asks for the pair the page belongs to, and unwraps the lesson', async () => {
     fetchMock.mockResolvedValueOnce(
       jsonResponse({ lesson: { id: 'l9', title: 'Adding halves', body: 'Cut the pie twice.' } }),
     );
 
-    await expect(readFreeLesson('b2a1', 'l9')).resolves.toMatchObject({ id: 'l9' });
+    await expect(readLessonPage('b2a1', 'l9')).resolves.toMatchObject({ id: 'l9' });
     expect(urlAt(0)).toBe(`${BASE_URL}/api/v1/catalog/courses/b2a1/lessons/l9`);
   });
 
   it('encodes both halves of the address rather than trusting either', async () => {
-    await readFreeLesson('c 1', 'l/2');
+    await readLessonPage('c 1', 'l/2');
 
     expect(urlAt(0)).toBe(`${BASE_URL}/api/v1/catalog/courses/c%201/lessons/l%2F2`);
   });
@@ -147,7 +151,7 @@ describe('readFreeLesson', () => {
 
     // The API cannot tell these two apart and neither may the portal: a screen that said
     // "this page is locked" would be a list of pages to enroll for.
-    await expect(readFreeLesson('b2a1', 'l9')).rejects.toMatchObject({
+    await expect(readLessonPage('b2a1', 'l9')).rejects.toMatchObject({
       code: API_ERROR_CODES.NOT_FOUND,
     });
   });
@@ -156,7 +160,9 @@ describe('readFreeLesson', () => {
 describe('which calls ask who is calling', () => {
   function sentCookies(index: number): RequestCredentials | undefined {
     const call = fetchMock.mock.calls[index];
-    return call ? ((call[1] as RequestInit | undefined)?.credentials as RequestCredentials) : undefined;
+    return call
+      ? ((call[1] as RequestInit | undefined)?.credentials as RequestCredentials)
+      : undefined;
   }
 
   it('sends the session on a course outline, because its rows answer for the reader', async () => {
@@ -173,7 +179,7 @@ describe('which calls ask who is calling', () => {
   it('sends the session on a page, which is the route that decides whether text leaves', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ lesson: { id: 'l9' } }));
 
-    await readFreeLesson('b2a1', 'l9');
+    await readLessonPage('b2a1', 'l9');
 
     expect(sentCookies(0)).toBe('include');
   });

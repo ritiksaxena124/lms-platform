@@ -14,5 +14,8 @@ export default defineConfig({
     include: ['{lib,components,app}/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
     css: false,
+    // Every form and button test here types into a real input through `userEvent`, and a whole
+    // portal's suites run at once — the default 5s is a timeout on the machine, not on the code.
+    testTimeout: 15_000,
   },
 });

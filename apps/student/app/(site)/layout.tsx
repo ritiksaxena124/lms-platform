@@ -29,14 +29,17 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
         </div>
       </header>
 
-      <main id="main" className="mx-auto w-full max-w-(--container-page) px-5 py-8 lg:px-8 lg:py-12">
+      <main
+        id="main"
+        className="mx-auto w-full max-w-(--container-page) px-5 py-8 lg:px-8 lg:py-12"
+      >
         {children}
       </main>
 
       <footer className="mt-8 border-t border-line">
         <div className="mx-auto w-full max-w-(--container-page) px-5 py-8 text-[0.8125rem] text-ink-faint lg:px-8">
-          Courses are written by the teachers who publish them. Booking, enrollment and payment
-          are still being built on this portal.
+          Courses are written by the teachers who publish them. Booking and payment are still being
+          built on this portal.
         </div>
       </footer>
     </>

@@ -16,14 +16,15 @@ A stranger can already browse what that makes readable, on a second portal:
 outline (`/api/v1/catalog/courses/:id`, and the same course by its slug) — titles, order and
 rough length, plus one page a teacher left open to read — on screen at
 `/courses/[id]/lessons/[lessonId]`, backed by `/api/v1/catalog/courses/:id/lessons/:lessonId` —
-and no account needed to look. Enrollment is in on the API side: a student can take a place in a
+and no account needed to look. Enrollment is in on both sides now: a student can take a place in a
 published course, list the courses they are inside and leave one (`/api/v1/enrollments`), and both
 catalog routes above answer a stranger and an enrolled student — the page opens, and each outline
 row says whether it is a door (`isReadable`) beside what the teacher marked free (`isFreePreview`).
 One pair of routes, so there is only one list of gates to keep. The student portal has a session
-of its own now (`/login`, `/register` on :3001) and sends it on the two reads that answer who is
-asking; the screens a place unlocks — an enroll button, a "my courses" shelf — are next, and
-bookings and payments are still ahead.
+of its own now (`/login`, `/register` on :3001) and sends it on the reads whose answer depends on
+who is asking. That session is on screen too: an enroll button on a course outline, the outline
+rows it unlocks, a lesson that reads like a member's page, and a `/my-courses` shelf where a place
+can be left. Bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -62,7 +63,9 @@ Open <http://teacher.localtest.me:3000> for the portal a teacher works in and
 <http://student.localtest.me:3001> for what a stranger sees of that work.
 `*.localtest.me` resolves to `127.0.0.1` and gives every portal a subdomain of one
 registrable domain, which is what lets the three apps share a session cookie in development
-without `localhost` CORS hacks.
+without `localhost` CORS hacks. One shared cookie means one signed-in account per browser
+profile: open a second profile (or a private window) to watch the same course as the teacher
+who published it.
 
 ### Signing in
 

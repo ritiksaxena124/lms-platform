@@ -2,19 +2,14 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import {
-  EmptyState,
-  ErrorState,
-  Icon,
-  Illo,
-  SkeletonGroup,
-  buttonClass,
-  cn,
-} from '@lms/ui';
+import { EmptyState, ErrorState, Icon, Illo, SkeletonGroup, buttonClass, cn } from '@lms/ui';
 import type { CatalogCourseDetail } from '@lms/shared';
 
 import { describeFailure, isNotFound } from '@/lib/api';
 import { readCatalogCourse } from '@/lib/catalog';
+
+import { EnrollControl } from './enroll-control';
+import { useSession } from './session-provider';
 
 /**
  * One course as its reader is shown it: what it covers, in the teacher's order, with roughly
@@ -64,11 +59,20 @@ type OutlineState =
   | { status: 'failed'; message: string };
 
 export function CourseOutline({ courseId }: { courseId: string }) {
+  const { status } = useSession();
   const [settled, setSettled] = useState<{ key: string; state: OutlineState } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const key = `${courseId}:${attempt}`;
+  // Two readers, two answers: the same outline arrives with different doors, so the session is
+  // part of what a reply is an answer *to*. A key that left it out would keep showing a
+  // stranger's syllabus under a student who had just signed in.
+  const key = `${courseId}:${attempt}:${status === 'signed-in' ? 'member' : 'visitor'}`;
 
   useEffect(() => {
+    // Until the boot read lands there is no answer to ask for: an outline fetched as a visitor
+    // would be re-fetched a moment later, and the first of those is a wasted round trip that
+    // paints doors nobody is looking at.
+    if (status === 'bootstrapping') return;
+
     let alive = true;
 
     readCatalogCourse(courseId)
@@ -87,9 +91,9 @@ export function CourseOutline({ courseId }: { courseId: string }) {
     return () => {
       alive = false;
     };
-    // `key` carries `attempt`, and a course id never changes while this screen is open — so
-    // these two together are the whole request.
-  }, [key, courseId]);
+    // `key` carries `attempt` and which reader this is, and a course id never changes while
+    // this screen is open — so these together are the whole request.
+  }, [key, courseId, status]);
 
   // Loading is derived from that pairing: an answer tagged with some earlier key has not
   // arrived yet, so the skeleton stays up instead of showing a stale course under a new url.
@@ -193,12 +197,16 @@ export function CourseOutline({ courseId }: { courseId: string }) {
           'text-[0.9375rem] text-ink',
         )}
       >
-        This is the outline: what the course covers, in order, with about how long each page
-        takes.{' '}
+        This is the outline: what the course covers, in order, with about how long each page takes.{' '}
         {everythingOpens
           ? 'Every page here is open to you.'
-          : 'A title without a link is what enrolling is for.'}
+          : 'A title without a link is one you cannot open yet.'}
       </p>
+
+      {/* What to do about a locked title is a different question from what the syllabus holds,
+          and it has a different answer for each of the three people who can be looking at it.
+          The control below owns that; this paragraph only describes the list. */}
+      <EnrollControl courseId={course.id} onPlaceTaken={() => setAttempt((c) => c + 1)} />
 
       <div className="mt-8 flex flex-col gap-4">
         <h2 className="text-h2 text-ink-strong">Syllabus</h2>
@@ -234,11 +242,7 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                             className="inline-flex items-start gap-1.5 text-[0.9375rem] font-medium text-brand underline-offset-4 hover:underline"
                           >
                             {lesson.title}
-                            <Icon
-                              name="arrow-right"
-                              size="sm"
-                              className="mt-1 text-ink-faint"
-                            />
+                            <Icon name="arrow-right" size="sm" className="mt-1 text-ink-faint" />
                           </Link>
                         ) : (
                           <span className="text-[0.9375rem] text-ink">{lesson.title}</span>

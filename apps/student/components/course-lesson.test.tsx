@@ -5,10 +5,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CatalogLessonPage } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
-import { FreeLesson } from './free-lesson';
+import { CourseLesson } from './course-lesson';
 
 const api = vi.hoisted(() => ({
-  readFreeLesson: vi.fn(),
+  readLessonPage: vi.fn(),
 }));
 
 vi.mock('@/lib/catalog', () => api);
@@ -38,19 +38,37 @@ const unreadable = () =>
   new ApiError({ statusCode: 404, code: 'NOT_FOUND', message: 'We cannot find that page.' });
 
 beforeEach(() => {
-  api.readFreeLesson.mockResolvedValue(page());
+  api.readLessonPage.mockReset().mockResolvedValue(page());
 });
 
-describe('FreeLesson', () => {
+describe('CourseLesson', () => {
   it('hands a stranger the page a teacher left open', async () => {
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
 
     await screen.findByRole('heading', { name: 'Sum of n terms' });
     expect(screen.getByText(/watch the middle vanish/i)).toBeInTheDocument();
+    expect(screen.getByText('Free to read')).toBeInTheDocument();
+  });
+
+  it('says nothing about enrolling to somebody reading as a member', async () => {
+    // The same page, arrived at through the other door. `isFreePreview` is the teacher's word
+    // about the page, so it is the only thing that may say how the reader got in — and a
+    // student already inside is not being pitched at.
+    api.readLessonPage.mockResolvedValue(page({ isFreePreview: false }));
+    render(<CourseLesson courseId="b2a1" lessonId="l1" />);
+
+    await screen.findByRole('heading', { name: 'Sum of n terms' });
+    expect(screen.queryByText('Free to read')).not.toBeInTheDocument();
+    expect(screen.queryByText(/enrolling is for/i)).not.toBeInTheDocument();
+    expect(screen.getByText(/you hold a place in this course/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /back to the syllabus/i })).toHaveAttribute(
+      'href',
+      '/courses/b2a1',
+    );
   });
 
   it('keeps the writing as it was written, line breaks included', async () => {
-    const { container } = render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    const { container } = render(<CourseLesson courseId="b2a1" lessonId="l2" />);
     await screen.findByText(/Write the series out twice/);
 
     // Tailwind is not compiled in a unit test, so the class is what is checkable; the point is
@@ -61,7 +79,7 @@ describe('FreeLesson', () => {
   });
 
   it('says where the page sits and links back to the outline it came from', async () => {
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
     await screen.findByRole('heading', { name: 'Sum of n terms' });
 
     expect(screen.getByText(/Arithmetic progressions/i)).toBeInTheDocument();
@@ -76,18 +94,18 @@ describe('FreeLesson', () => {
   });
 
   it('shows the teacher’s estimate beside the page, and says nothing when there was none', async () => {
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
     await screen.findByText(/12 min/i);
 
-    api.readFreeLesson.mockResolvedValue(page({ estimatedMinutes: null }));
-    render(<FreeLesson courseId="b2a1" lessonId="l9" />);
+    api.readLessonPage.mockResolvedValue(page({ estimatedMinutes: null }));
+    render(<CourseLesson courseId="b2a1" lessonId="l9" />);
 
     expect(await screen.findByText(/not timed/i)).toBeInTheDocument();
   });
 
   it('says so when the page is open but empty', async () => {
-    api.readFreeLesson.mockResolvedValue(page({ body: null }));
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    api.readLessonPage.mockResolvedValue(page({ body: null }));
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
 
     // The flag and the writing are two separate acts, so this is a real state: an open door
     // onto a blank page. Saying "nothing here yet" is kinder than an empty box.
@@ -95,8 +113,8 @@ describe('FreeLesson', () => {
   });
 
   it('answers a page it cannot open the way it answers one never written', async () => {
-    api.readFreeLesson.mockRejectedValue(unreadable());
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    api.readLessonPage.mockRejectedValue(unreadable());
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
 
     await screen.findByText(/not here/i);
     // No "this page is locked", no "ask the teacher to open it": the API refused to make that
@@ -110,25 +128,23 @@ describe('FreeLesson', () => {
   });
 
   it('offers a retry when the request failed rather than the page', async () => {
-    api.readFreeLesson
+    api.readLessonPage
       .mockRejectedValueOnce(
         new ApiError({ statusCode: 500, code: 'INTERNAL', message: 'Try again shortly.' }),
       )
       .mockResolvedValue(page());
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
 
-    const attemptsBeforeClick = api.readFreeLesson.mock.calls.length;
+    const attemptsBeforeClick = api.readLessonPage.mock.calls.length;
     await userEvent.click(await screen.findByRole('button', { name: /try again/i }));
 
-    await waitFor(() =>
-      expect(api.readFreeLesson.mock.calls.length).toBe(attemptsBeforeClick + 1),
-    );
+    await waitFor(() => expect(api.readLessonPage.mock.calls.length).toBe(attemptsBeforeClick + 1));
     await screen.findByRole('heading', { name: 'Sum of n terms' });
   });
 
   it('says the page is arriving before it arrives', async () => {
-    api.readFreeLesson.mockReturnValue(new Promise(() => {}));
-    render(<FreeLesson courseId="b2a1" lessonId="l2" />);
+    api.readLessonPage.mockReturnValue(new Promise(() => {}));
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
 
     expect(await screen.findByText(/loading this page/i)).toBeInTheDocument();
   });

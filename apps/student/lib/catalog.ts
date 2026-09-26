@@ -9,18 +9,17 @@ import type {
 import { apiGet } from './api';
 
 /**
- * The four calls the student portal makes, one per catalog route — plus the roster, which is
- * where a place in a course is taken and left.
+ * The four catalog calls — one per route the API opens to a reader.
  *
  * Nothing here decides what a course is: the types come from `@lms/shared`, so a field the
  * API renames is a compile error in this portal rather than a card that quietly stops
  * showing it.
  *
  * Which calls send the session is the API's own split, stated in `lib/api.ts`: the shelf and
- * the level list are the same list for every visitor, while a course's outline, one of its
- * pages and the roster answer a question about the caller. A read that withheld the session
- * would answer a member as a stranger — and a shelf that carried it would be a cached page
- * pointing at the wrong person.
+ * the level list are the same list for every visitor, while a course's outline and one of its
+ * pages answer a question about the caller. A read that withheld the session would answer a
+ * member as a stranger — and a shelf that carried it would be a cached page pointing at the
+ * wrong person. `lib/enrollments.ts` holds the three calls that speak of places.
  */
 
 /** What a browsing visitor can ask for. `pageSize` is not among them: twelve is the shelf's
@@ -73,7 +72,7 @@ export async function readCatalogCourse(id: string): Promise<CatalogCourseDetail
  * The route opens for two reasons: a door the teacher left open for anybody, or a place this
  * reader holds in the course. Hence the session — without it the second reason cannot be heard.
  */
-export async function readFreeLesson(
+export async function readLessonPage(
   courseId: string,
   lessonId: string,
 ): Promise<CatalogLessonPage> {

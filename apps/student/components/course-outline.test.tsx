@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CatalogCourseDetail } from '@lms/shared';
+import type { AuthUser, CatalogCourseDetail, Enrollment } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { CourseOutline } from './course-outline';
@@ -11,7 +11,49 @@ const api = vi.hoisted(() => ({
   readCatalogCourse: vi.fn(),
 }));
 
+const roster = vi.hoisted(() => ({
+  myPlaces: vi.fn(),
+  takePlace: vi.fn(),
+}));
+
+const session = vi.hoisted(() => ({
+  value: { status: 'signed-out' as string, user: null as AuthUser | null },
+}));
+
 vi.mock('@/lib/catalog', () => api);
+vi.mock('@/lib/enrollments', () => roster);
+vi.mock('./session-provider', () => ({ useSession: () => session.value }));
+
+const SAM: AuthUser = {
+  id: 'u1',
+  email: 'sam@example.test',
+  fullName: 'Sam Iyer',
+  role: 'student',
+  status: 'active',
+  timezone: 'UTC',
+  emailVerifiedAt: null,
+  lastLoginAt: null,
+  createdAt: '2026-09-25T00:00:00.000Z',
+};
+
+/** The session the member-shaped fixtures describe: signed in, and holding a place in `b2a1`.
+ * An outline that says every row is open arrives together with the roster that explains it —
+ * the two are one reader's answer, not two things a test may mix freely. */
+function memberHoldingAPlace() {
+  session.value = { status: 'signed-in', user: SAM };
+  const place: Enrollment = {
+    id: 'e7f2',
+    course: {
+      id: 'b2a1',
+      slug: 'algebra-for-the-cbse-boards',
+      title: 'Algebra for the CBSE boards',
+    },
+    isActive: true,
+    enrolledAt: '2026-09-20T09:00:00.000Z',
+    updatedAt: '2026-09-25T00:00:00.000Z',
+  };
+  roster.myPlaces.mockResolvedValue([place]);
+}
 
 function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDetail {
   return {
@@ -89,7 +131,10 @@ const unreadable = () =>
   new ApiError({ statusCode: 404, code: 'NOT_FOUND', message: 'We cannot find that course.' });
 
 beforeEach(() => {
-  api.readCatalogCourse.mockResolvedValue(detail());
+  session.value = { status: 'signed-out', user: null };
+  // Reset rather than only re-stubbing: the call counts are what some of these tests read.
+  roster.myPlaces.mockReset().mockResolvedValue([]);
+  api.readCatalogCourse.mockReset().mockResolvedValue(detail());
 });
 
 describe('CourseOutline', () => {
@@ -152,6 +197,10 @@ describe('CourseOutline', () => {
   });
 
   it('opens the pages a place in the course unlocked, without calling them free', async () => {
+    // Both halves of a member's read: the session that makes the answer and the roster that
+    // says a place is held. `withPlace` alone would be an outline for a stranger, which is the
+    // mismatch the enroll control exists to refuse to guess about.
+    memberHoldingAPlace();
     api.readCatalogCourse.mockResolvedValue(withPlace(detail()));
     render(<CourseOutline courseId="b2a1" />);
     await screen.findByText('The nth term');
@@ -173,15 +222,48 @@ describe('CourseOutline', () => {
   });
 
   it('does not pitch enrollment at somebody already inside', async () => {
+    memberHoldingAPlace();
     api.readCatalogCourse.mockResolvedValue(withPlace(detail()));
     render(<CourseOutline courseId="b2a1" />);
     await screen.findByText('The nth term');
 
     // The explainer is a statement about what this reader may do, so it cannot stay true by
-    // accident: a page already open to them is not a thing enrollment is "for". The stranger's
-    // version of this line is held by the outline test below.
-    expect(screen.getByText(/every page here is open to you/i)).toBeInTheDocument();
-    expect(screen.queryByText(/enrolling is for/i)).not.toBeInTheDocument();
+    // accident: a page already open to them is not one they are being asked to unlock. The ask
+    // below it has to go quiet too — a button for a place this student already holds.
+    await screen.findByText(/every page here is open to you/i);
+    expect(screen.queryByText(/cannot open yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /enroll/i })).not.toBeInTheDocument();
+    expect(await screen.findByText(/in this course since/i)).toBeInTheDocument();
+  });
+
+  it('asks the course, not the address, what somebody is being enrolled into', async () => {
+    // The page takes a slug in the url and the roster speaks in course ids, so the ask has to
+    // carry the id the outline came back with. A shared link would otherwise enroll a student
+    // in a course nobody named in the request.
+    render(<CourseOutline courseId="algebra-for-the-cbse-boards" />);
+    await screen.findByText('The nth term');
+
+    expect(screen.getByRole('link', { name: /sign in to enroll/i })).toHaveAttribute(
+      'href',
+      '/login?next=%2Fcourses%2Fb2a1',
+    );
+  });
+
+  it('waits for the session before it reads who may open what', async () => {
+    session.value = { status: 'bootstrapping', user: null };
+    const { rerender } = render(<CourseOutline courseId="b2a1" />);
+
+    // A stranger's outline fetched now would be painted and then contradicted a moment later,
+    // with a member's doors missing from under a cursor that had already moved in.
+    expect(api.readCatalogCourse).not.toHaveBeenCalled();
+    expect(screen.getByText(/loading this course/i)).toBeInTheDocument();
+
+    memberHoldingAPlace();
+    api.readCatalogCourse.mockResolvedValue(withPlace(detail()));
+    rerender(<CourseOutline courseId="b2a1" />);
+
+    await screen.findByRole('link', { name: /the nth term/i });
+    expect(api.readCatalogCourse).toHaveBeenCalledTimes(1);
   });
 
   it('marks a timed page with a clock and leaves an untimed one bare', async () => {
@@ -219,7 +301,7 @@ describe('CourseOutline', () => {
     render(<CourseOutline courseId="b2a1" />);
     await screen.findByRole('heading', { name: 'Arithmetic progressions' });
 
-    expect(screen.getByText(/enroll/i));
+    expect(screen.getByRole('link', { name: /sign in to enroll/i })).toBeInTheDocument();
     // The list is the map. A free row adds a link and nothing else — no body, no preview
     // paragraph — so the syllabus reads the same whether or not a room happens to be open.
     expect(screen.queryByText(/cut the pie/i)).not.toBeInTheDocument();
