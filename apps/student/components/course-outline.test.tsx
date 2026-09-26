@@ -31,7 +31,9 @@ function detail(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDeta
         position: 1,
         lessons: [
           { id: 'l1', title: 'The nth term', position: 1, estimatedMinutes: 12, isFreePreview: false },
-          { id: 'l2', title: 'Sum of n terms', position: 2, estimatedMinutes: null, isFreePreview: false },
+          // One of the three is open, so the counts below are a course in both states rather
+          // than a screen that has only ever seen one.
+          { id: 'l2', title: 'Sum of n terms', position: 2, estimatedMinutes: null, isFreePreview: true },
         ],
       },
       {
@@ -99,10 +101,27 @@ describe('CourseOutline', () => {
     render(<CourseOutline courseId="b2a1" />);
     await screen.findByText('The nth term');
 
-    // Every page of a course is behind enrollment until a teacher marks one otherwise, so the
-    // count here is the lesson count. When free previews arrive in the API, this is the
-    // assertion that has to change — which is the point of writing it now.
-    expect(screen.getAllByRole('img', { name: /behind enrollment/i })).toHaveLength(3);
+    // Two of the three nobody opened. The mark is the row's own state, said in a label a
+    // screen reader hears as well as a shape a sighted visitor glances at.
+    expect(screen.getAllByRole('img', { name: /behind enrollment/i })).toHaveLength(2);
+  });
+
+  it('marks the page a teacher opened as open, and links it to the page itself', async () => {
+    render(<CourseOutline courseId="b2a1" />);
+    await screen.findByText('The nth term');
+
+    expect(screen.getAllByRole('img', { name: /behind enrollment/i })).toHaveLength(2);
+    expect(screen.getAllByRole('img', { name: /free to read/i })).toHaveLength(1);
+
+    // The door is the title, because that is the thing a visitor wanted to open; the glyph
+    // only says a door exists.
+    const link = screen.getByRole('link', { name: /sum of n terms/i });
+    expect(link.getAttribute('href')).toBe('/courses/b2a1/lessons/l2');
+
+    // And the other two are still names, not doors — a screen where everything looked
+    // clickable would teach a visitor that none of it is.
+    expect(screen.queryByRole('link', { name: /the nth term/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /why the denominator/i })).not.toBeInTheDocument();
   });
 
   it('marks a timed page with a clock and leaves an untimed one bare', async () => {
@@ -112,7 +131,8 @@ describe('CourseOutline', () => {
     // "Not timed" is words only: a clock beside a blank would claim a number the teacher never
     // gave, and the whole value of the glyph is that it can be trusted at a glance.
     expect(container.querySelectorAll('svg[data-icon="clock"]')).toHaveLength(2);
-    expect(container.querySelectorAll('svg[data-icon="lock"]')).toHaveLength(3);
+    expect(container.querySelectorAll('svg[data-icon="lock"]')).toHaveLength(2);
+    expect(container.querySelectorAll('svg[data-icon="unlock"]')).toHaveLength(1);
   });
 
   it('adds up the pages a student is signing up to read', async () => {
@@ -135,13 +155,14 @@ describe('CourseOutline', () => {
     expect(paragraph?.textContent).toContain('\nNo shortcuts');
   });
 
-  it('names what the outline is not: the pages themselves stay shut until enrollment', async () => {
+  it('still says what an outline is: the open page is fetched, not slipped in', async () => {
     render(<CourseOutline courseId="b2a1" />);
     await screen.findByRole('heading', { name: 'Arithmetic progressions' });
 
     expect(screen.getByText(/enroll/i));
-    // A lesson title is a name, not a door: there is no link to a page this portal cannot open.
-    expect(screen.queryByRole('link', { name: /the nth term/i })).not.toBeInTheDocument();
+    // The list is the map. A free row adds a link and nothing else — no body, no preview
+    // paragraph — so the syllabus reads the same whether or not a room happens to be open.
+    expect(screen.queryByText(/cut the pie/i)).not.toBeInTheDocument();
   });
 
   it('goes back to the shelf from the header, not from the middle of a block', async () => {

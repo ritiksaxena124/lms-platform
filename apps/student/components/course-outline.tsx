@@ -18,7 +18,7 @@ import { readCatalogCourse } from '@/lib/catalog';
 
 /**
  * One course as a stranger reads it: what it covers, in the teacher's order, with roughly how
- * long each page takes — and no page.
+ * long each page takes, and which one of them they may already read.
  *
  * The outline is the whole promise of this screen. A visitor is deciding whether to spend an
  * evening here, and the honest answer is a list of titles in order with a length beside each,
@@ -26,8 +26,10 @@ import { readCatalogCourse } from '@/lib/catalog';
  * a retired module keeps its slot in the syllabus, and renumbering 1 → 4 into 1 → 2 here would
  * be the portal editing somebody else's map.
  *
- * What is deliberately missing is any door into a lesson. There is no such route yet, and a
- * title that looked clickable would teach a visitor not to trust the ones that are.
+ * What the outline does not do is hand over a page. One row may be a link — the page its
+ * teacher marked free to read, fetched by its own request when it is opened — and the rest are
+ * names, because a screen where every title looked clickable would teach a visitor that none
+ * of them are.
  */
 
 const UPDATED = new Intl.DateTimeFormat('en-GB', {
@@ -185,7 +187,8 @@ export function CourseOutline({ courseId }: { courseId: string }) {
         )}
       >
         This is the outline: what the course covers, in order, with about how long each page
-        takes. Reading the pages is what enrolling is for.
+        takes. Reading a page is what enrolling is for — unless the row beside it says it is
+        free to read.
       </p>
 
       <div className="mt-8 flex flex-col gap-4">
@@ -213,7 +216,24 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                         data-icon-zone
                         className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-t border-line py-2 first:border-t-0 first:pt-0"
                       >
-                        <span className="text-[0.9375rem] text-ink">{lesson.title}</span>
+                        {/* A page the teacher opened is a door, so its title is one. The rest
+                            are names, and the link is the row's own state rather than a guess
+                            from where it sits in the list. */}
+                        {lesson.isFreePreview ? (
+                          <Link
+                            href={`/courses/${course.id}/lessons/${lesson.id}`}
+                            className="inline-flex items-start gap-1.5 text-[0.9375rem] font-medium text-brand underline-offset-4 hover:underline"
+                          >
+                            {lesson.title}
+                            <Icon
+                              name="arrow-right"
+                              size="sm"
+                              className="mt-1 text-ink-faint"
+                            />
+                          </Link>
+                        ) : (
+                          <span className="text-[0.9375rem] text-ink">{lesson.title}</span>
+                        )}
                         <span className="flex items-center gap-3">
                           {lesson.estimatedMinutes === null ? (
                             <span className="text-[0.8125rem] text-ink-faint">Not timed</span>
@@ -223,15 +243,24 @@ export function CourseOutline({ courseId }: { courseId: string }) {
                               {lesson.estimatedMinutes} min
                             </span>
                           )}
-                          {/* Every page of a published course is behind enrollment until a
-                              teacher says otherwise, so the mark is the row's real state —
-                              and the words underneath it, not a guess from the shape. */}
-                          <Icon
-                            name="lock"
-                            size="sm"
-                            label="Behind enrollment"
-                            className="text-ink-faint"
-                          />
+                          {/* Which of the two a row is, said in words as well as in a shape —
+                              the two glyphs are the same silhouette at a glance, and a colour
+                              pair alone is not an answer for anybody. */}
+                          {lesson.isFreePreview ? (
+                            <Icon
+                              name="unlock"
+                              size="sm"
+                              label="Free to read"
+                              className="text-brand"
+                            />
+                          ) : (
+                            <Icon
+                              name="lock"
+                              size="sm"
+                              label="Behind enrollment"
+                              className="text-ink-faint"
+                            />
+                          )}
                         </span>
                       </li>
                     ))}

@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_ERROR_CODES } from '@lms/shared';
 
-import { browseCatalog, catalogLevels, readCatalogCourse } from './catalog';
+import { browseCatalog, catalogLevels, readCatalogCourse, readFreeLesson } from './catalog';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -116,6 +116,38 @@ describe('readCatalogCourse', () => {
     );
 
     await expect(readCatalogCourse('b2a1')).rejects.toMatchObject({
+      code: API_ERROR_CODES.NOT_FOUND,
+    });
+  });
+});
+
+describe('readFreeLesson', () => {
+  it('asks for the pair the page belongs to, and unwraps the lesson', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ lesson: { id: 'l9', title: 'Adding halves', body: 'Cut the pie twice.' } }),
+    );
+
+    await expect(readFreeLesson('b2a1', 'l9')).resolves.toMatchObject({ id: 'l9' });
+    expect(urlAt(0)).toBe(`${BASE_URL}/api/v1/catalog/courses/b2a1/lessons/l9`);
+  });
+
+  it('encodes both halves of the address rather than trusting either', async () => {
+    await readFreeLesson('c 1', 'l/2');
+
+    expect(urlAt(0)).toBe(`${BASE_URL}/api/v1/catalog/courses/c%201/lessons/l%2F2`);
+  });
+
+  it('says nothing different about a locked page and a missing one', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { statusCode: 404, code: API_ERROR_CODES.NOT_FOUND, message: 'We cannot find that page.' },
+        404,
+      ),
+    );
+
+    // The API cannot tell these two apart and neither may the portal: a screen that said
+    // "this page is locked" would be a list of pages to enroll for.
+    await expect(readFreeLesson('b2a1', 'l9')).rejects.toMatchObject({
       code: API_ERROR_CODES.NOT_FOUND,
     });
   });

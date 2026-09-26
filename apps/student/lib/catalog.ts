@@ -1,6 +1,7 @@
 import type {
   CatalogCourseDetail,
   CatalogCourseListResponse,
+  CatalogFreeLesson,
   CatalogListInput,
   CourseChoice,
 } from '@lms/shared';
@@ -8,7 +9,7 @@ import type {
 import { apiGet } from './api';
 
 /**
- * The three calls the student portal makes, one per catalog route.
+ * The four calls the student portal makes, one per catalog route.
  *
  * Nothing here decides what a course is: the types come from `@lms/shared`, so a field the
  * API renames is a compile error in this portal rather than a card that quietly stops
@@ -51,4 +52,21 @@ export async function readCatalogCourse(id: string): Promise<CatalogCourseDetail
     `/catalog/courses/${encodeURIComponent(id)}`,
   );
   return course;
+}
+
+/**
+ * One page a teacher left open to read.
+ *
+ * Both halves of the address go up, because a page only exists inside the syllabus that lists
+ * it — and a locked row, a withdrawn one and one nobody wrote all answer the same 404, which
+ * is the distinction this portal is not allowed to invent.
+ */
+export async function readFreeLesson(
+  courseId: string,
+  lessonId: string,
+): Promise<CatalogFreeLesson> {
+  const { lesson } = await apiGet<{ lesson: CatalogFreeLesson }>(
+    `/catalog/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}`,
+  );
+  return lesson;
 }

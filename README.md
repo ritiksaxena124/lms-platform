@@ -14,9 +14,9 @@ free to read before enrolling
 A stranger can already browse what that makes readable, on a second portal:
 <http://student.localtest.me:3001> is the shelf (`/api/v1/catalog/courses`) and a course's
 outline (`/api/v1/catalog/courses/:id`, and the same course by its slug) — titles, order and
-rough length, plus one page a teacher left open to read
-(`/api/v1/catalog/courses/:id/lessons/:lessonId`) — and no account needed to look. Enrollment,
-bookings and payments are still ahead.
+rough length, plus one page a teacher left open to read — on screen at
+`/courses/[id]/lessons/[lessonId]`, backed by `/api/v1/catalog/courses/:id/lessons/:lessonId` —
+and no account needed to look. Enrollment, bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -95,7 +95,7 @@ a real mailbox.
 apps/
   api/        NestJS modular monolith — the only writer to the database
   teacher/    Next.js App Router portal for teachers (built first)
-  student/    Next.js App Router portal for learners — the catalog shelf so far
+  student/    Next.js App Router portal for learners — shelf, outline, one free page
 packages/
   shared/     Framework-free TypeScript: error codes, lookup codes, money, timezones
   ui/         Design tokens, primitives and motion shared by all three portals

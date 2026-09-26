@@ -376,8 +376,9 @@ ownership, no writes.
   paste — and the two must return the identical body, which is a test rather than a hope. The
   portal still links by id, the field every catalog response has always carried and the one a
   retitling cannot move. The outline prints each module's position as the catalog sent it, gaps
-  included, and no lesson title is a link yet: the rows now say whether a stranger may read
-  them, and the screen has not been given that answer.
+  included, and a lesson title is a link only on a row the response marked free: the page itself
+  is a second request (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape
+  whether or not any room on it is open.
 
 ## 12. Frontend
 
@@ -395,6 +396,11 @@ ownership, no writes.
   `credentials: 'include'`, and no refresh to retry a `401`, because every route it can reach
   is answered by the row's own status. Sending a cookie would be the one way for a cached
   catalog response to carry one visitor's session to the next.
+- **A door appears only where the answer says there is one.** The outline links a lesson title
+  only on a row sent back with `isFreePreview`, and the page behind that link is its own request
+  rather than text carried in the list. Nothing is inferred — not position, not colour, not the
+  fact that the course is published — and the screen's refusal keeps the API's wording, because
+  a page that explained why it would not open is a list of what to enroll for.
 - **Loading is derived from the answer's key, not announced by a flag.** A screen keeps the
   request it is waiting on (`level|search|page`) beside the reply that earned it and shows a
   skeleton while they disagree. Setting a `loading` boolean in an effect would flash a false
