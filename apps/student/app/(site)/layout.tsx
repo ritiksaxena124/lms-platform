@@ -1,12 +1,15 @@
 import Link from 'next/link';
 
+import { SiteAccount } from '@/components/site-account';
+
 /**
- * The public frame: a header that says whose shelf this is, and a column that stops short of
- * the viewport edges.
+ * The public frame: a header that says whose shelf this is and who is standing in front of it,
+ * and a column that stops short of the viewport edges.
  *
  * The teacher portal is a viewport-height frame with one scrolling column, because it is a
  * tool somebody sits in for hours. This is a shelf a visitor walks past, so it scrolls as a
- * document does — which is also why there is no sidebar to hold still.
+ * document does — which is also why there is no sidebar to hold still, and why the account
+ * corner is one line in a header rather than a column of its own.
  */
 export default function SiteLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -22,9 +25,7 @@ export default function SiteLayout({ children }: { children: React.ReactNode }) 
             Learn
           </Link>
 
-          <p className="hidden text-[0.8125rem] text-ink-muted sm:block">
-            Everything published, nothing enrolled yet
-          </p>
+          <SiteAccount />
         </div>
       </header>
 

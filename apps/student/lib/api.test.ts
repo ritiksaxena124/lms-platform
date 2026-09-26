@@ -2,7 +2,16 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_ERROR_CODES } from '@lms/shared';
 
-import { ApiError, apiGet, describeFailure } from './api';
+import {
+  ApiError,
+  apiGet,
+  apiJson,
+  describeFailure,
+  fieldErrors,
+  onSessionLost,
+  refreshSession,
+  setAccessToken,
+} from './api';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -17,12 +26,39 @@ function requestAt(index: number): { url: string; init: RequestInit } {
   return { url: String(call[0]), init: (call[1] ?? {}) as RequestInit };
 }
 
+function headerNames(index: number): Record<string, string> {
+  return (requestAt(index).init.headers ?? {}) as Record<string, string>;
+}
+
+function authHeaderOf(index: number): string | null {
+  const headers = headerNames(index);
+  const key = Object.keys(headers).find((name) => name.toLowerCase() === 'authorization');
+  return (key && headers[key]) || null;
+}
+
+/** The body a successful `/auth/refresh` answers with. */
+const sessionBody = (accessToken: string) => ({
+  user: { id: 'u1', email: 'student@example.test', fullName: 'Sam Iyer', role: 'student' },
+  accessToken,
+  tokenType: 'Bearer' as const,
+  expiresIn: 900,
+});
+
+const unauthorized = () =>
+  jsonResponse(
+    { statusCode: 401, code: API_ERROR_CODES.UNAUTHORIZED, message: 'Sign in again.' },
+    401,
+  );
+const expired = () =>
+  jsonResponse({ statusCode: 401, code: API_ERROR_CODES.TOKEN_EXPIRED, message: 'Expired.' }, 401);
+
 let fetchMock: ReturnType<typeof vi.fn>;
 
 beforeEach(() => {
   process.env.NEXT_PUBLIC_API_URL = BASE_URL;
   fetchMock = vi.fn();
   vi.stubGlobal('fetch', fetchMock);
+  setAccessToken(null);
 });
 
 afterEach(() => {
@@ -60,15 +96,13 @@ describe('apiGet', () => {
     );
   });
 
-  it('carries nothing that identifies the visitor', async () => {
+  it('carries nothing that identifies the visitor by default', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
 
     await apiGet('/catalog/courses');
 
     const { init } = requestAt(0);
-    const headers = (init.headers ?? {}) as Record<string, string>;
-    const authKey = Object.keys(headers).find((name) => name.toLowerCase() === 'authorization');
-    expect(authKey).toBeUndefined();
+    expect(authHeaderOf(0)).toBeNull();
     // A catalog read is answered by the row's own status, so a cookie would only be a way
     // for a cached page to leak one stranger's session to the next.
     expect(init.credentials).toBeUndefined();
@@ -115,7 +149,233 @@ describe('apiGet', () => {
   });
 });
 
+describe('a call that asks who is asking', () => {
+  it('sends the token it holds, next to the cookies', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ course: { id: 'c1' } }));
+
+    await apiGet('/catalog/courses/c1', '', { withSession: true });
+
+    const { init } = requestAt(0);
+    expect(init.credentials).toBe('include');
+    expect(authHeaderOf(0)).toBe('Bearer token-abc');
+  });
+
+  it('still sends the cookies with no token, because the cookie is what decides', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ course: { id: 'c1' } }));
+
+    await apiGet('/catalog/courses/c1', '', { withSession: true });
+
+    // A reload onto a deep link leaves the access token nowhere and the cookie intact, so the
+    // absence of a header is not evidence of an absent session.
+    expect(authHeaderOf(0)).toBeNull();
+    expect(requestAt(0).init.credentials).toBe('include');
+  });
+
+  it('leaves a shelf request a stranger’s request even when a token is held', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
+
+    await apiGet('/catalog/courses', '?q=algebra');
+
+    // The list is the same for everybody, so a session on it would only be a way for one
+    // cached page to answer the next visitor as somebody else.
+    expect(authHeaderOf(0)).toBeNull();
+    expect(requestAt(0).init.credentials).toBeUndefined();
+  });
+
+  it('posts a place in a course with the session that entitles it', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValueOnce(jsonResponse({ enrollment: { id: 'e1' } }));
+
+    await apiJson('/enrollments', {
+      method: 'POST',
+      body: { courseId: 'c1' },
+      withSession: true,
+    });
+
+    const { init } = requestAt(0);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(JSON.stringify({ courseId: 'c1' }));
+    expect(headerNames(0)['content-type']).toBe('application/json');
+    expect(authHeaderOf(0)).toBe('Bearer token-abc');
+  });
+
+  it('does not revive a session for a request whose route has no caller', async () => {
+    setAccessToken('stale');
+    fetchMock.mockResolvedValueOnce(expired());
+
+    // A stale token on a public read is nobody's business: the route answers the same for
+    // anybody, and refreshing to find out would spend a rotation for nothing.
+    await expect(apiGet('/catalog/courses')).rejects.toThrow(ApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('token refresh', () => {
+  const read = () => ({ id: 'c1', title: 'Algebra slowly' });
+
+  it('replays a rejected read once with the fresh token', async () => {
+    setAccessToken('stale');
+    fetchMock
+      .mockResolvedValueOnce(expired())
+      .mockResolvedValueOnce(jsonResponse(sessionBody('fresh')))
+      .mockResolvedValueOnce(jsonResponse({ course: read() }));
+
+    await expect(apiGet('/catalog/courses/c1', '', { withSession: true })).resolves.toEqual({
+      course: read(),
+    });
+
+    expect(requestAt(1).url).toBe(`${BASE_URL}/api/v1/auth/refresh`);
+    expect(requestAt(1).init.method).toBe('POST');
+    expect(authHeaderOf(1)).toBeNull();
+    expect(authHeaderOf(2)).toBe('Bearer fresh');
+  });
+
+  it('gives up after one replay instead of looping', async () => {
+    setAccessToken('stale');
+    fetchMock
+      .mockResolvedValueOnce(expired())
+      .mockResolvedValueOnce(jsonResponse(sessionBody('fresh')))
+      .mockResolvedValueOnce(expired());
+
+    await expect(apiGet('/catalog/courses/c1', '', { withSession: true })).rejects.toThrow(
+      ApiError,
+    );
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('does not refresh for an error the cookie cannot fix', async () => {
+    setAccessToken('stale');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        { statusCode: 403, code: API_ERROR_CODES.FORBIDDEN, message: 'Not for this account.' },
+        403,
+      ),
+    );
+
+    await expect(
+      apiJson('/enrollments', { method: 'POST', body: { courseId: 'c1' }, withSession: true }),
+    ).rejects.toThrow(ApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not revive a session for the call that starts or ends one', async () => {
+    fetchMock.mockResolvedValueOnce(unauthorized());
+
+    // A wrong password is an answer, not a stale token, and a replayed logout would put a
+    // session back after the person asked for it to end.
+    await expect(
+      apiJson('/auth/login', {
+        method: 'POST',
+        body: { email: 'a@b.test', password: 'x' },
+        withSession: true,
+        reviveSession: false,
+      }),
+    ).rejects.toThrow(ApiError);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('shares one refresh between reads that expire together', async () => {
+    setAccessToken('stale');
+    fetchMock
+      .mockResolvedValueOnce(expired())
+      .mockResolvedValueOnce(expired())
+      .mockResolvedValueOnce(jsonResponse(sessionBody('fresh')))
+      .mockResolvedValueOnce(jsonResponse({ course: read() }))
+      .mockResolvedValueOnce(jsonResponse({ lesson: { id: 'l1' } }));
+
+    const withSession = { withSession: true } as const;
+    const [outline, page] = await Promise.all([
+      apiGet('/catalog/courses/c1', '', withSession),
+      apiGet('/catalog/courses/c1/lessons/l1', '', withSession),
+    ]);
+
+    expect(outline).toEqual({ course: read() });
+    expect(page).toEqual({ lesson: { id: 'l1' } });
+    const refreshCalls = fetchMock.mock.calls.filter(([url]) =>
+      String(url).endsWith('/auth/refresh'),
+    );
+    expect(refreshCalls).toHaveLength(1);
+  });
+
+  it('clears the dead token and says so when the cookie is rejected', async () => {
+    const lost = vi.fn();
+    const unsubscribe = onSessionLost(lost);
+    setAccessToken('stale');
+    fetchMock.mockResolvedValueOnce(expired()).mockResolvedValueOnce(unauthorized());
+
+    await expect(apiGet('/catalog/courses/c1', '', { withSession: true })).rejects.toThrow(
+      ApiError,
+    );
+
+    expect(lost).toHaveBeenCalledTimes(1);
+    unsubscribe();
+
+    fetchMock.mockResolvedValueOnce(jsonResponse({ items: [] }));
+    await apiGet('/catalog/courses/c1', '', { withSession: true });
+    expect(authHeaderOf(2)).toBeNull();
+  });
+
+  it('refreshSession resolves to nothing when there is no session to revive', async () => {
+    fetchMock.mockResolvedValueOnce(unauthorized());
+
+    await expect(refreshSession()).resolves.toBeNull();
+  });
+
+  it('refreshSession keeps the new token for the request after it', async () => {
+    fetchMock
+      .mockResolvedValueOnce(jsonResponse(sessionBody('bootstrapped')))
+      .mockResolvedValueOnce(jsonResponse({ course: read() }));
+
+    await expect(refreshSession()).resolves.toMatchObject({ accessToken: 'bootstrapped' });
+    await apiGet('/catalog/courses/c1', '', { withSession: true });
+
+    // Bootstrapping authenticates with the cookie alone; the read after it has a token.
+    expect(authHeaderOf(0)).toBeNull();
+    expect(authHeaderOf(1)).toBe('Bearer bootstrapped');
+  });
+});
+
+describe('fieldErrors', () => {
+  it('normalises single messages into lists the form can render', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          statusCode: 400,
+          code: API_ERROR_CODES.VALIDATION_FAILED,
+          message: 'Check the highlighted fields.',
+          details: {
+            validation: {
+              email: 'An account with that address already exists',
+              password: ['Use at least 12 characters', 'Add a number or symbol'],
+            },
+          },
+        },
+        400,
+      ),
+    );
+
+    const error = await apiJson('/auth/register', {
+      method: 'POST',
+      body: {},
+      reviveSession: false,
+    }).catch((caught: unknown) => caught);
+
+    expect(fieldErrors(error)).toEqual({
+      email: ['An account with that address already exists'],
+      password: ['Use at least 12 characters', 'Add a number or symbol'],
+    });
+  });
+
+  it('is empty for anything that is not a validation failure', () => {
+    expect(fieldErrors(new Error('boom'))).toEqual({});
+    expect(fieldErrors(undefined)).toEqual({});
+  });
+});
+
 describe('describeFailure', () => {
+
   it('has something to show for a failure with no message', () => {
     expect(describeFailure(new ApiError({ statusCode: 500, code: 'X', message: '   '}))).toBe(
       'Something went wrong. Please try again.',

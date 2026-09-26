@@ -20,8 +20,10 @@ and no account needed to look. Enrollment is in on the API side: a student can t
 published course, list the courses they are inside and leave one (`/api/v1/enrollments`), and both
 catalog routes above answer a stranger and an enrolled student — the page opens, and each outline
 row says whether it is a door (`isReadable`) beside what the teacher marked free (`isFreePreview`).
-One pair of routes, so there is only one list of gates to keep. The student portal's own session
-and screens for it are next; bookings and payments are still ahead.
+One pair of routes, so there is only one list of gates to keep. The student portal has a session
+of its own now (`/login`, `/register` on :3001) and sends it on the two reads that answer who is
+asking; the screens a place unlocks — an enroll button, a "my courses" shelf — are next, and
+bookings and payments are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -74,10 +76,11 @@ is the entire reason they exist:
 | `ops@example.test`     | ops portal — the role the sign-up form will not hand out |
 
 All three sign in with `lms-demo-password`, at <http://teacher.localtest.me:3000/login> —
-the sign-in form has a button that fills the teacher one for you. The student portal is not
-on that list yet: its first screen is the shelf, and a shelf asks nothing of whoever walks up
-to it. Accounts are created only in `lms` and `lms_test`: seeding refuses when
-`NODE_ENV=production`, and re-running `db:seed` after you have changed one leaves it changed.
+the sign-in form has a button that fills the teacher one for you. The student portal has its own
+sign-in at <http://student.localtest.me:3001/login> and still opens on the shelf, because a shelf
+asks nothing of whoever walks up to it. Accounts are created only in `lms` and `lms_test`: seeding
+refuses when `NODE_ENV=production`, and re-running `db:seed` after you have changed one leaves it
+changed.
 The addresses sit under the reserved `.test` domain, so a demo account can never be pointed at
 a real mailbox.
 

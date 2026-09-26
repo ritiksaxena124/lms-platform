@@ -9,11 +9,18 @@ import type {
 import { apiGet } from './api';
 
 /**
- * The four calls the student portal makes, one per catalog route.
+ * The four calls the student portal makes, one per catalog route — plus the roster, which is
+ * where a place in a course is taken and left.
  *
  * Nothing here decides what a course is: the types come from `@lms/shared`, so a field the
  * API renames is a compile error in this portal rather than a card that quietly stops
  * showing it.
+ *
+ * Which calls send the session is the API's own split, stated in `lib/api.ts`: the shelf and
+ * the level list are the same list for every visitor, while a course's outline, one of its
+ * pages and the roster answer a question about the caller. A read that withheld the session
+ * would answer a member as a stranger — and a shelf that carried it would be a cached page
+ * pointing at the wrong person.
  */
 
 /** What a browsing visitor can ask for. `pageSize` is not among them: twelve is the shelf's
@@ -50,19 +57,21 @@ export async function catalogLevels(): Promise<CourseChoice[]> {
 export async function readCatalogCourse(id: string): Promise<CatalogCourseDetail> {
   const { course } = await apiGet<{ course: CatalogCourseDetail }>(
     `/catalog/courses/${encodeURIComponent(id)}`,
+    '',
+    { withSession: true },
   );
   return course;
 }
 
 /**
- * One page a teacher left open to read.
+ * One page of a course, with its text.
  *
  * Both halves of the address go up, because a page only exists inside the syllabus that lists
  * it — and a locked row, a withdrawn one and one nobody wrote all answer the same 404, which
  * is the distinction this portal is not allowed to invent.
  *
- * The route behind this also opens a page for a student who holds a place in the course; this
- * portal brings no session, so all it reaches is the teacher's own open door.
+ * The route opens for two reasons: a door the teacher left open for anybody, or a place this
+ * reader holds in the course. Hence the session — without it the second reason cannot be heard.
  */
 export async function readFreeLesson(
   courseId: string,
@@ -70,6 +79,8 @@ export async function readFreeLesson(
 ): Promise<CatalogLessonPage> {
   const { lesson } = await apiGet<{ lesson: CatalogLessonPage }>(
     `/catalog/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}`,
+    '',
+    { withSession: true },
   );
   return lesson;
 }

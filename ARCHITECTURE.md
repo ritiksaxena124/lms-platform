@@ -402,9 +402,10 @@ no writes, and — but for the one route below — no session either.
   paste — and the two must return the identical body, which is a test rather than a hope. The
   portal still links by id, the field every catalog response has always carried and the one a
   retitling cannot move. The outline prints each module's position as the catalog sent it, gaps
-  included, and a lesson title is a link only on a row the response marks `isReadable` — which
-  for this portal still means the free ones, because it has no session of its own to send yet and
-  so is answered as a stranger. The page itself is a second request
+  included, and a lesson title is a link only on a row the response marks `isReadable` — which is
+  the teacher's free pages for a visitor and every published page for a student who is signed in
+  to this portal and holds a place, because that is exactly what its transport now sends. The
+  page itself is a second request
   (`/courses/[id]/lessons/[lessonId]`), so the syllabus keeps one shape whether or not any room on
   it is open.
 - **Both audiences are the catalog's.** A stranger reads the pages a teacher left open; a student
@@ -473,11 +474,19 @@ what an invitation is for.
   and a page that moves — no held-still sidebar, because the frame above is for somebody who
   sits in a tool for hours and this is a shelf somebody walks past. The tokens are the same
   ones; the difference is only chrome.
-- **A stranger's transport carries nothing.** `apps/student/lib/api.ts` is not the teacher's
-  file with the session code deleted: there is no access token in a module variable, no
-  `credentials: 'include'`, and no refresh to retry a `401`, because every route it can reach
-  is answered by the row's own status. Sending a cookie would be the one way for a cached
-  catalog response to carry one visitor's session to the next.
+- **A call says whether it is asking as somebody.** `apps/student/lib/api.ts` is the teacher's
+  transport with one addition rather than a copy: every request carries a `withSession` flag, and
+  only the flagged ones attach the bearer, send cookies and revive a dead access token. The shelf
+  and the level chips are deliberately unflagged, because sending a cookie there would be the one
+  way for a cached catalog response to carry one visitor's session to the next; the outline, a
+  page and the roster are flagged, because the API's answer for those depends on who is asking.
+  The token itself stays in a module variable, so no render ever reads it out of a component tree.
+- **A session is the student portal's own, and it is small.** `SessionProvider` holds the profile
+  and nothing else, `RequireSession` wraps the routes that cannot be shown without one, and the
+  header account is a link when signed out, a name and a sign-out when in, and a skeleton while it
+  decides — three states, and no moment where the screen claims to know. The refresh cookie is
+  `HttpOnly` and scoped to `/api/v1/auth`, so nothing outside the API can read it and the gating
+  that would otherwise live in middleware lives in the client instead.
 - **A door appears only where the answer says there is one.** The outline links a lesson title
   only on a row sent back with `isReadable`, and badges `isFreePreview` as the teacher's own word
   about the page rather than a description of how this reader got in. The page behind a link is

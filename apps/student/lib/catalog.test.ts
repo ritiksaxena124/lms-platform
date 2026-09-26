@@ -152,3 +152,37 @@ describe('readFreeLesson', () => {
     });
   });
 });
+
+describe('which calls ask who is calling', () => {
+  function sentCookies(index: number): RequestCredentials | undefined {
+    const call = fetchMock.mock.calls[index];
+    return call ? ((call[1] as RequestInit | undefined)?.credentials as RequestCredentials) : undefined;
+  }
+
+  it('sends the session on a course outline, because its rows answer for the reader', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ course: { id: 'b2a1', modules: [] } }));
+
+    await readCatalogCourse('b2a1');
+
+    // `isReadable` on each row is only true for the reader it was computed for. A read that
+    // withheld the session would answer an enrolled student as a stranger, which is the bug
+    // this portal's sign-in exists to close.
+    expect(sentCookies(0)).toBe('include');
+  });
+
+  it('sends the session on a page, which is the route that decides whether text leaves', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ lesson: { id: 'l9' } }));
+
+    await readFreeLesson('b2a1', 'l9');
+
+    expect(sentCookies(0)).toBe('include');
+  });
+
+  it('withholds it from the shelf and the level list, which are the same for everybody', async () => {
+    await browseCatalog({ q: 'algebra' });
+    await catalogLevels();
+
+    expect(sentCookies(0)).toBeUndefined();
+    expect(sentCookies(1)).toBeUndefined();
+  });
+});
