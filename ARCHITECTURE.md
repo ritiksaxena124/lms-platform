@@ -43,8 +43,8 @@ was ready to run.
   `users.email` is unique forever — reusing a deleted account's address would resurrect
   history. A `(teacher_id, title)` style key gets a partial unique index
   `WHERE is_active`, so an archived row cannot block a new one.
-- Append-only ledgers (payments, moderation decisions, status transitions) never update in
-  place; a correction is a new row pointing at the old one.
+- Append-only ledgers (payments, moderation decisions, status transitions, the Phase 7 action
+  log) never update in place; a correction is a new row pointing at the old one.
 - A join row follows the same rule: removing a subject from a teacher's profile deactivates
   the row, and adding it back revives that same row. That is what makes
   `@@unique([profile_id, subject_value_id])` safe — an unconditional delete-then-insert
@@ -137,10 +137,29 @@ by environment (`STORAGE_PROVIDER`, `PAYMENT_PROVIDER`, `VIDEO_PROVIDER`, `SMTP_
 Domain code depends on the port, never on a vendor SDK.
 
 `PAYMENT_PROVIDER` and `VIDEO_PROVIDER` currently default to `none`: those integrations are
-**on hold** until a genuinely free option is chosen. The ports exist so that choosing one
-later is an adapter plus an env change, not a refactor — and so nothing pretends to take a
-payment or start a call in the meantime. `STORAGE_PROVIDER=s3` throws at boot rather than
-silently doing nothing.
+**not built yet**. The ports exist so that choosing a vendor later is an adapter plus an env
+change, not a refactor — and so nothing pretends to take a payment or start a call in the
+meantime. `STORAGE_PROVIDER=s3` throws at boot rather than silently doing nothing.
+
+The choice has now been made, which is why these are phases rather than open questions:
+
+- **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API
+  names and both portals open in an iframe; the port returns a URL and the meeting identity,
+  never a vendor SDK type. The same phase carries a teacher's **uploaded** video through
+  `STORAGE_PROVIDER`, which is the second reason storage gets built before either is demoed —
+  a recorded lesson and a live room are one field apart on a page, and two completely
+  different promises about where the bytes live.
+- **Money stays `none` until Phase 9**, and it arrives together with **coupons**: a discount
+  code is meaningless on a course nothing charges for. A teacher issues many codes per course
+  from the course itself, each carrying its own discount and its own lifetime (an
+  `LkpCouponValidityUnit` interval rather than a wall-clock enum, so "48 hours" and "the end
+  of the month" are data), and a student redeems one on the way to a place. Because
+  redemption is a decision about money, it belongs after every portal exists — a code entered
+  in one app and honoured in another is exactly the drift this system keeps to one API.
+- **Every entity's writes will be recorded** (Phase 7): an append-only `ActionLog` of who did
+  what, to which row, and in which part of the app. It is a phase rather than a column added
+  now because a record needs to name the screen an action came from, and several of those
+  screens do not exist yet.
 
 ## 7. Sessions and passwords
 
@@ -293,8 +312,9 @@ domain module would only re-derive the same two hops.
   for which of the three wins.
 - **The content is one markdown `body`, capped at 20 000 characters.** No embedded video, no file
   attachments, no block editor: those are the shapes that need a provider, and a provider is a
-  decision for later. A plain-text body is a column today and one migration away from whatever the
-  editor turns out to be.
+  decision for later. That later is now Phase 5 (§6), which adds a lesson's video through the
+  storage and Jitsi ports — so the body stays a plain column and a page gains a *second* thing
+  rather than growing an editor that has to parse its own content.
 - **`estimatedMinutes` is shown, never enforced** (1–600, cleared with an explicit `null` rather
   than by leaving the field alone). A teacher's guess at how long a page takes is useful
   information and a promise the platform should not hold anyone to; no timer sits behind it.

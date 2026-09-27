@@ -30,8 +30,8 @@ took it, and the portal shows it at `/courses/[id]/roster` — a headcount, a na
 row, and no button that removes somebody. A course can now carry a price the teacher sets in the
 editor and the shelf prints — a quote rather than a checkout (`PAYMENT_PROVIDER` is still `none`),
 stored as minor units plus a `Currency` lookup value, `null` when nobody has quoted it and `0` when
-the teacher says free, and enrollment still grants a place for nothing. Bookings and payments are
-still ahead.
+the teacher says free, and enrollment still grants a place for nothing. Bookings, live video,
+the action log, the ops portal and coupons are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -129,7 +129,7 @@ window) so the teacher and the student are signed in as different people at the 
 
 That is the whole loop Phase 3 closes: a teacher writes and prices a course, a stranger reads
 enough of it to want it, enrolling turns that want into a place, and both sides see the same
-decision. Bookings, video and payments are Phase 4 and later.
+decision. Bookings, live video, the action log, the ops portal and coupons are Phase 4 and later.
 
 ## Commands
 
@@ -200,16 +200,23 @@ decision was made, and what was deliberately left out.
 
 ## Phases
 
-| Phase | Scope                                                        | Status      |
-| ----- | ------------------------------------------------------------ | ----------- |
-| 0     | Plan, architecture, data model                               | Approved    |
-| 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell | **Done**    |
-| 2     | Auth, accounts, roles, teacher profile                       | **Done**    |
-| 3     | Courses, lessons, enrollment                                 | **Done**    |
-| 4     | Availability, bookings, scheduling across timezones          | Not started |
-| 5     | Video + storage + email behind provider ports                | On hold     |
-| 6     | Payments (free-tier provider only)                           | On hold     |
-| 7     | Student and ops portals                                      | Not started |
+| Phase | Scope                                                                     | Status      |
+| ----- | ------------------------------------------------------------------------- | ----------- |
+| 0     | Plan, architecture, data model                                            | Approved    |
+| 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell              | **Done**    |
+| 2     | Auth, accounts, roles, teacher profile                                    | **Done**    |
+| 3     | Courses, lessons, enrollment                                              | **Done**    |
+| 4     | Availability, bookings and scheduling across timezones — with a calendar  | Not started |
+| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | Not started |
+| 6     | Email notifications behind the SMTP port                                  | Not started |
+| 7     | Action log — who did what, to what, in which part of the app              | Not started |
+| 8     | Ops portal — moderation and the read-side of everything above             | Not started |
+| 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
+
+Phase 4 is next. Phases 5–9 are the ordered backlog: a live class needs a booked slot to
+attach to, the action log wants every kind of write to exist before it fixes what a record
+looks like, and coupons land last because a discount only means something next to a price
+that is charged — which is the same reason they sit after the portals are complete.
 
 ## Environment variables
 
@@ -220,8 +227,9 @@ decision was made, and what was deliberately left out.
   Generate with `openssl rand -hex 32`.
 - `COOKIE_DOMAIN=localtest.me` is what lets one login cover all three portals. Left unset
   the session cookie belongs to the API host alone.
-- `PAYMENT_PROVIDER` and `VIDEO_PROVIDER` default to `none`. Those integrations are on
-  hold until a free option is chosen; the ports exist so nothing else has to change when
-  they land.
+- `PAYMENT_PROVIDER` and `VIDEO_PROVIDER` default to `none` and are still unset work: video
+  is planned as Jitsi (a live class, plus a teacher's uploaded lesson through
+  `STORAGE_PROVIDER`) in Phase 5, and money — with the coupon codes a teacher issues per
+  course — is Phase 9. The ports exist so neither costs a refactor when it lands.
 - `STORAGE_PROVIDER=local` writes uploads to `storage/` (gitignored). `s3` is rejected at
   boot until it is actually implemented.
