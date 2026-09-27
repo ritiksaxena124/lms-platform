@@ -1,5 +1,21 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { ROLE_CODES, type Booking, type BookingRequest, type OpenSlotsResponse } from '@lms/shared';
+import {
+  Body,
+  Controller,
+  Get,
+  Header,
+  HttpCode,
+  HttpStatus,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
+import {
+  ROLE_CODES,
+  type Booking,
+  type BookingRequest,
+  type BookingRoomResponse,
+  type OpenSlotsResponse,
+} from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -123,5 +139,27 @@ export class BookingsController {
     @Param('id') id: string,
   ): Promise<{ booking: Booking }> {
     return { booking: await this.bookings.answer(user.id, id, 'reject') };
+  }
+
+  /**
+   * Ask for the room of a live class, and get the address if the answer is yes.
+   *
+   * The one route in this module with no `@Roles`, because it is not a door belonging to one side
+   * of the class: the student who booked it and the teacher who teaches it are both checked against
+   * the row, and everybody else — a stranger, a classmate with a place in the same course, another
+   * teacher — gets the silence a class that never existed gets.
+   *
+   * A `POST` for a read, on purpose. Its response is a secret with a URL's shape and the only lock
+   * on the room, and a `GET` is an invitation to a browser's prefetch, a history entry and any
+   * proxy that keeps responses. `no-store` is said on the way out for the same reason.
+   */
+  @Post(':id/room')
+  @HttpCode(HttpStatus.OK)
+  @Header('Cache-Control', 'no-store')
+  async room(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<BookingRoomResponse> {
+    return { room: await this.bookings.roomFor(user.id, id) };
   }
 }

@@ -699,6 +699,19 @@ offered at, and everything else about the hour happens somewhere else.
   no room yet and a cancelled one has no class — while the address stays server-side, because a
   room's name is its only lock and a list is something a browser keeps, caches and logs. Giving
   the address out is the join endpoint's job, one checked person at a time (§6).
+- **The address itself is handed out one person at a time** (step 5e). `POST /bookings/:id/room` is
+  the only route that turns a `roomName` into a URL, and it is a `POST` for a read: its response is
+  the room's only lock, and a `GET` would be an invitation to a browser's prefetch, a history entry
+  and any proxy that keeps responses — so it also leaves with `Cache-Control: no-store`. It carries
+  no `@Roles`, because the two accounts it opens for are read off the row rather than claimed by a
+  role, and everybody else — a stranger, a classmate holding a place in the same course, another
+  teacher — gets the identical 404 an invented id gets. The gates run in that order: are you on it,
+  does the class stand, does it have a room, is it *now*. Early answers with the same `opensAt` the
+  lists publish, so a portal with a wrong clock still counts down to the minute the server unlocks;
+  late answers the same way as having never been let in, with the room left on the row, because a
+  class that was taught is not un-taught. Asking twice is the same answer and writes nothing, and a
+  `VIDEO_PROVIDER=none` deployment answers `409` rather than `503` — nothing failed, this box just
+  has no rooms.
 - **Unanswered requests expire on a clock, because nobody is coming to answer them.**
   `booking-request-expiry` runs hourly (`@nestjs/schedule`, the only job registered) and ends rows
   older than `PENDING_REQUEST_HOURS` or whose class minute has arrived, into `expired` with the hold
@@ -710,21 +723,25 @@ offered at, and everything else about the hour happens somewhere else.
   student asking for the same minute of the same course replays their existing row instead of
   adding one; cancelling a cancelled class and confirming a confirmed one both answer `200` with
   the row as it now reads.
-- **Four student routes and four teacher ones, on one table.** `GET slots`, `POST /bookings`,
-  `GET /bookings` and `POST /bookings/:id/cancel` for the student; `GET /bookings/requests`,
-  `GET /bookings/classes`, `POST /bookings/:id/confirm` and `POST /bookings/:id/reject` for the
-  teacher — both teacher lists read from the teacher rather than the course, because a teacher with
+- **Four student routes, four teacher ones and one they share, on one table.** `GET slots`,
+  `POST /bookings`, `GET /bookings` and `POST /bookings/:id/cancel` for the student;
+  `GET /bookings/requests`, `GET /bookings/classes`, `POST /bookings/:id/confirm` and
+  `POST /bookings/:id/reject` for the teacher — both teacher lists read from the teacher rather
+  than the course, because a teacher with
   four courses keeps one list of people wanting Thursday. Each list returns every active row
   soonest-first and lets the screen decide what "upcoming" means; `requests` is pending-only,
   because answered ones are not a queue, and `classes` keeps them all, because an answered Tuesday
   is still a Tuesday. Both carry the student's name, which the student's own list does not: a
-  teacher's six o'clock is somebody's lesson.
+  teacher's six o'clock is somebody's lesson. The fifth, `POST /bookings/:id/room`, belongs to
+  neither door and is the reason the roles are asserted per-route in this module instead of on the
+  controller.
 - **What holds it:** `apps/api/test/booking-schema.spec.ts` for the table,
   `booking-slots.spec.ts` for the grid and the entitlement that picks it, `booking-create.spec.ts`
   for the hold and the race, `booking-cancel.spec.ts`, `booking-answer.spec.ts` and
   `booking-expiry.spec.ts` for the three ways a request stops being one, `booking-classes.spec.ts`
   for the teacher's own calendar, `booking-room.spec.ts` for the room a confirmation brings and the
-  window that list carries, and `packages/shared/src/schedule.test.ts` for the expansion all
+  window that list carries, `booking-join.spec.ts` for the door that turns the window into an
+  address, and `packages/shared/src/schedule.test.ts` for the expansion all
   of them agree on.
 
 ## 15. Frontend

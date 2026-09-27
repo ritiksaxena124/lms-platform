@@ -249,8 +249,10 @@ of the same phase: a Jitsi room address built from a name the API mints, with `n
 adapter rather than an `if` in every route. A teacher's yes now gives that class its own room
 name — minted from a uuid, written beside the status, stored and never sent — and every class
 list carries the window its door opens in, so a screen can draw a Join button and say when it
-works. The endpoint that hands the address out, the gate on a recorded lesson and both portals'
-players are still to come. What is left of Phases 5–10 is the ordered backlog: a
+works. The endpoint that hands the address out is now the other half of that: one POST, answered
+only for the two accounts a standing class is about and only while its window is open
+(ARCHITECTURE.md §14). The gate on a recorded lesson and both portals' players are still to come.
+What is left of Phases 5–10 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and
 coupons land last among the things a student touches, because a discount only means something

@@ -57,6 +57,21 @@ export type BookingRequestRow = Prisma.BookingGetPayload<{
   select: typeof BOOKING_REQUEST_SELECT;
 }>;
 
+/** The four facts the join gate needs, and the one column no list of this table ever carries.
+ *
+ * `BOOKING_SELECT` says whether a class has a room; this says what its address is built from, for
+ * the two accounts the class is about. A separate read rather than a wider booking select, because
+ * the row it returns leaves the process only as a URL. */
+const BOOKING_ROOM_SELECT = {
+  id: true,
+  startsAt: true,
+  durationMinutes: true,
+  roomName: true,
+  status: { select: { code: true } },
+} as const satisfies Prisma.BookingSelect;
+
+export type BookingRoomRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_ROOM_SELECT }>;
+
 /**
  * What the write decided, in the two ways a request can end without a new row.
  *
@@ -310,6 +325,27 @@ export class BookingsRepository {
       where: { teacherUserId, isActive: true },
       orderBy: { startsAt: 'asc' },
       select: BOOKING_REQUEST_SELECT,
+    });
+  }
+
+  /**
+   * The room on a class this account is one of the two parties to.
+   *
+   * Ownership is the `where` clause rather than a check afterwards, and it is deliberately
+   * symmetrical: the student who booked the class and the teacher whose calendar carries it are
+   * both asked for and both answered, because a live class has two people who may walk in and a
+   * role claim is not one of them. Every other account — a stranger, another student holding a
+   * place in the same course, a teacher of a different course — gets `null`, which is the same
+   * answer the service gives for a class that was never written.
+   */
+  async findRoomFor(bookingId: string, userId: string): Promise<BookingRoomRow | null> {
+    return this.prisma.booking.findFirst({
+      where: {
+        id: bookingId,
+        isActive: true,
+        OR: [{ studentUserId: userId }, { teacherUserId: userId }],
+      },
+      select: BOOKING_ROOM_SELECT,
     });
   }
 

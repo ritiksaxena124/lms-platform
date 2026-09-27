@@ -22,6 +22,7 @@ import {
   slotAt,
   type Booking,
   type BookingRequest,
+  type BookingRoom,
   type BookingStatusCode,
   type BookingTypeCode,
   type OpenSlot,
@@ -160,6 +161,46 @@ function changedElsewhere(): ConflictException {
   return new ConflictException({
     code: API_ERROR_CODES.CONFLICT,
     message: 'This class changed while you were deciding. Refresh to see it.',
+  });
+}
+
+/** A class that does not stand has nobody to let in: the request still waiting for its answer, the
+ * one refused, the one given up, the one that expired. One message for all of them, because the
+ * list already says which it is and this route is not the place to relitigate the difference. */
+function nothingToJoin(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This class is not standing, so there is no room to join.',
+  });
+}
+
+/** Inside the five-minute leash before the first minute, which is the only reason the leash exists:
+ * a student arriving at 08:58 for a 09:00 class is on time. The instant travels so a portal whose
+ * clock disagrees still counts down to the minute the server will unlock. */
+function doorNotYet(opensAt: Date): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: "This class's room is not open yet.",
+    details: { opensAt: opensAt.toISOString() },
+  });
+}
+
+/** Past the class and its grace. The room is still on the row — a class that was taught is not
+ * un-taught — but nobody arriving now is arriving for it. */
+function doorShut(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This class is over, and its room is closed.',
+  });
+}
+
+/** `VIDEO_PROVIDER=none` is a deployment rather than a fault: the class stands and there is
+ * nowhere to be. A conflict about the platform, not a 500, because nothing failed — and a
+ * participant only reaches this route by asking, since the list gives them no door to draw. */
+function noLiveRoom(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This platform does not run live classes.',
   });
 }
 
@@ -444,6 +485,40 @@ export class BookingsService {
     if (outcome.outcome === 'changed') throw changedElsewhere();
 
     return toBooking(outcome.booking);
+  }
+
+  /**
+   * Ask for the address of a live class, and be told whether you may have it.
+   *
+   * This is the only route in the platform that turns a stored room name into a URL, and the four
+   * questions it asks are asked in the order that costs least: is this one of the two accounts the
+   * class is about (the same silence for "not yours" as for "never there", so walking ids earns
+   * nothing); does the class stand; does this deployment have rooms at all; and is it *now*.
+   *
+   * The window is the last one and it is enforced here rather than left to the screen, because a
+   * portal that opened the door early would open it for anybody holding the name — which, on a
+   * bridge with no password, is everybody. The refusal says which side of the window the caller is
+   * on, and the too-early one carries the opening instant so a clock that disagrees with the
+   * server's still counts down to the same minute.
+   *
+   * Nothing here is written: asking is a read of a fact the confirmation already settled, which is
+   * why a second press answers with the same address rather than a new room.
+   */
+  async roomFor(userId: string, bookingId: string): Promise<BookingRoom> {
+    const row = UUID.test(bookingId) ? await this.bookings.findRoomFor(bookingId, userId) : null;
+    if (!row) throw notFoundBooking();
+    if (row.status.code !== BOOKING_STATUS_CODES.CONFIRMED) throw nothingToJoin();
+    if (!row.roomName) throw noLiveRoom();
+
+    const endsAt = new Date(row.startsAt.getTime() + row.durationMinutes * MS_PER_MINUTE);
+    const door = liveClassWindow(row.startsAt, endsAt);
+    const now = new Date();
+    if (now < door.opensAt) throw doorNotYet(door.opensAt);
+    if (now > door.closesAt) throw doorShut();
+
+    const room = this.video.room(row.roomName);
+    if (!room) throw noLiveRoom();
+    return { url: room.url };
   }
 
   /** A course this platform can take a booking for: published, live, and addressed either way. */

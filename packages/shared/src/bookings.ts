@@ -92,6 +92,21 @@ export interface LiveClassDoor {
 }
 
 /**
+ * What the join endpoint hands to a person it has just checked: the address, and nothing else.
+ *
+ * No room name, no window, no id — a portal that asked has already been told which class this is,
+ * and every extra field on this response is another copy of a secret whose only lock is being hard
+ * to guess. This is the shape the booking list deliberately does not carry.
+ */
+export interface BookingRoom {
+  url: string;
+}
+
+export interface BookingRoomResponse {
+  room: BookingRoom;
+}
+
+/**
  * A class a student has asked for.
  *
  * `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a
