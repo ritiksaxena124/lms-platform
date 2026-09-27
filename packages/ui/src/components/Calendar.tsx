@@ -189,46 +189,53 @@ export function Calendar({
         ) : null}
       </div>
 
-      <ul className="grid grid-cols-1 gap-px bg-line sm:grid-cols-7">
-        {days.map((day) => {
-          const state = day.state ?? 'default';
-          const chips = day.chips ?? [];
+      {/* Seven columns have to be wide enough to hold a time each. Where the container cannot
+          manage that, the week scrolls sideways rather than cutting a clock face in half —
+          a truncated "09:30–11:…" is a time a teacher cannot book against. */}
+      <div className="overflow-x-auto">
+        <ul className="grid grid-cols-1 gap-px bg-line sm:min-w-[52.5rem] sm:grid-cols-7">
+          {days.map((day) => {
+            const state = day.state ?? 'default';
+            const chips = day.chips ?? [];
 
-          return (
-            <li
-              key={day.key}
-              data-key={day.key}
-              data-state={state}
-              className={cn('flex flex-col gap-1.5 p-2', DAY[state])}
-            >
-              <div className="flex items-baseline justify-between gap-1">
-                <span
-                  className={cn(
-                    'text-eyebrow uppercase',
-                    state === 'today' ? 'text-brand-deep' : 'text-ink-faint',
-                  )}
-                >
-                  {day.weekday}
-                </span>
-                {state === 'today' ? <span className="text-eyebrow text-brand-deep">Today</span> : null}
-              </div>
-              {day.date ? (
-                <span className="-mt-1 text-[0.6875rem] text-ink-faint tabular">{day.date}</span>
-              ) : null}
-
-              {chips.length === 0 ? (
-                day.empty ? (
-                  <span className="rounded-field border border-dashed border-line px-2 py-1.5 text-center text-[0.6875rem] text-ink-faint">
-                    {day.empty}
+            return (
+              <li
+                key={day.key}
+                data-key={day.key}
+                data-state={state}
+                className={cn('flex flex-col gap-1.5 p-2', DAY[state])}
+              >
+                <div className="flex items-baseline justify-between gap-1">
+                  <span
+                    className={cn(
+                      'text-eyebrow uppercase',
+                      state === 'today' ? 'text-brand-deep' : 'text-ink-faint',
+                    )}
+                  >
+                    {day.weekday}
                   </span>
-                ) : null
-              ) : (
-                chips.map((chip) => <Chip key={chip.id} chip={chip} busy={busy} />)
-              )}
-            </li>
-          );
-        })}
-      </ul>
+                  {state === 'today' ? (
+                    <span className="text-eyebrow text-brand-deep">Today</span>
+                  ) : null}
+                </div>
+                {day.date ? (
+                  <span className="-mt-1 text-[0.6875rem] text-ink-faint tabular">{day.date}</span>
+                ) : null}
+
+                {chips.length === 0 ? (
+                  day.empty ? (
+                    <span className="rounded-field border border-dashed border-line px-2 py-1.5 text-center text-[0.6875rem] text-ink-faint">
+                      {day.empty}
+                    </span>
+                  ) : null
+                ) : (
+                  chips.map((chip) => <Chip key={chip.id} chip={chip} busy={busy} />)
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      </div>
     </div>
   );
 }

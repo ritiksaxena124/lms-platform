@@ -52,6 +52,20 @@ export function wallClock(minutes: number): string {
   return `${String(hours).padStart(2, '0')}:${String(rest).padStart(2, '0')}`;
 }
 
+/**
+ * The way back: a clock face a person typed, or `null` for a face that is not one.
+ *
+ * Strict on purpose. A form field that read `9:00` as 0 minutes would open a window at the start
+ * of every day the teacher never chose, and the API would accept it — the columns only ask for a
+ * number. So two digits each side, `00`–`23` for the hours, and `24:00` alone at the top end,
+ * because that is the midnight a through-the-night window closes at.
+ */
+export function minutesFromWallClock(face: string): number | null {
+  const match = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(face);
+  if (match) return Number(match[1]) * 60 + Number(match[2]);
+  return face === '24:00' ? MAX_END_MINUTES : null;
+}
+
 export interface AvailabilityRule {
   id: string;
   weekday: number;
