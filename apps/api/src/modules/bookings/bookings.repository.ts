@@ -291,6 +291,25 @@ export class BookingsRepository {
     });
   }
 
+  /** Every class on this teacher's calendar, soonest first, whatever became of the request.
+   *
+   * The teacher half of `listOwned`, and the reason it is a separate read rather than a filter on
+   * that one: a booking row carries both ends of the class, so a query on `studentUserId` cannot
+   * answer "what am I teaching" without first being told who is asking, which is a rule about a
+   * session living in a place that has no session.
+   *
+   * It carries the name for the same reason the requests list does — a teacher's six o'clock is
+   * somebody's lesson — and it is the row's own state that decides whether that person is still
+   * standing in it, which is why nothing is filtered out here.
+   */
+  async listClasses(teacherUserId: string): Promise<BookingRequestRow[]> {
+    return this.prisma.booking.findMany({
+      where: { teacherUserId, isActive: true },
+      orderBy: { startsAt: 'asc' },
+      select: BOOKING_REQUEST_SELECT,
+    });
+  }
+
   /** Every class this student has ever asked for, soonest first.
    *
    * All of them, including the called-off and the taught: this is the record a student's own

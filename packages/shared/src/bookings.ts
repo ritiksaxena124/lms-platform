@@ -87,6 +87,10 @@ export interface Booking {
  * find out who. It comes from the account rather than from a student-profile table because that is
  * the name the platform already shows a teacher, and it is stored on the booking's student rather
  * than copied onto the row — a person who changes their name is not a class that changed.
+ *
+ * Both teacher reads carry it. The queue of requests is the obvious one, and the class list is
+ * the same fact a day later: six o'clock is somebody's lesson whether or not the answer to it is
+ * still unwritten.
  */
 export interface BookingRequest extends Booking {
   student: { id: string; displayName: string };

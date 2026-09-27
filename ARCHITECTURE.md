@@ -621,17 +621,21 @@ offered at, and everything else about the hour happens somewhere else.
   student asking for the same minute of the same course replays their existing row instead of
   adding one; cancelling a cancelled class and confirming a confirmed one both answer `200` with
   the row as it now reads.
-- **Four student routes and three teacher ones, on one table.** `GET slots`, `POST /bookings`, `GET
-/bookings`, `POST /bookings/:id/cancel` for the student; `GET /bookings/requests`, `POST
-/bookings/:id/confirm`, `POST /bookings/:id/reject` for the teacher — read from the teacher rather
-  than the course, because a teacher with four courses keeps one list of people wanting Thursday.
-  `GET /bookings` returns every active row soonest-first and lets the screen decide what "upcoming"
-  means; `requests` is pending-only, because answered ones are not a queue.
+- **Four student routes and four teacher ones, on one table.** `GET slots`, `POST /bookings`,
+  `GET /bookings` and `POST /bookings/:id/cancel` for the student; `GET /bookings/requests`,
+  `GET /bookings/classes`, `POST /bookings/:id/confirm` and `POST /bookings/:id/reject` for the
+  teacher — both teacher lists read from the teacher rather than the course, because a teacher with
+  four courses keeps one list of people wanting Thursday. Each list returns every active row
+  soonest-first and lets the screen decide what "upcoming" means; `requests` is pending-only,
+  because answered ones are not a queue, and `classes` keeps them all, because an answered Tuesday
+  is still a Tuesday. Both carry the student's name, which the student's own list does not: a
+  teacher's six o'clock is somebody's lesson.
 - **What holds it:** `apps/api/test/booking-schema.spec.ts` for the table,
   `booking-slots.spec.ts` for the grid and the entitlement that picks it, `booking-create.spec.ts`
   for the hold and the race, `booking-cancel.spec.ts`, `booking-answer.spec.ts` and
-  `booking-expiry.spec.ts` for the three ways a request stops being one, and
-  `packages/shared/src/schedule.test.ts` for the expansion all of them agree on.
+  `booking-expiry.spec.ts` for the three ways a request stops being one, `booking-classes.spec.ts`
+  for the teacher's own calendar, and `packages/shared/src/schedule.test.ts` for the expansion all
+  of them agree on.
 
 ## 15. Frontend
 

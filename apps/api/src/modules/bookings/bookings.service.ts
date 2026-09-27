@@ -356,6 +356,21 @@ export class BookingsService {
   }
 
   /**
+   * The teacher's own calendar: every class on their week, answered or not.
+   *
+   * The two teacher reads split on the question, not the shape — `requestsFor` is the queue and
+   * this is the schedule, and a row leaves the first the moment it is answered while it stays on
+   * this one, because a class that was called off was still on that Tuesday. Same rule as the
+   * student's list: no filter, no pagination, the screen decides what it calls upcoming.
+   *
+   * Names included, which is the one difference from the student's read of the same table: a
+   * student looking at their own calendar already knows who they are.
+   */
+  async classesFor(teacherUserId: string): Promise<BookingRequest[]> {
+    return (await this.bookings.listClasses(teacherUserId)).map(toRequest);
+  }
+
+  /**
    * Say yes or no to one of those requests.
    *
    * Only a pending row can be answered, and that is the load-bearing rule rather than a nicety:

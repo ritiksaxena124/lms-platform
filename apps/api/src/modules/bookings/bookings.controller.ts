@@ -78,18 +78,30 @@ export class BookingsController {
   }
 
   /**
-   * The teacher's door: what is waiting for them, and what they say to it.
+   * The teacher's door: what is waiting for them, what they are teaching, and what they say to it.
    *
-   * Three routes on one table read from the other side, all under `@Roles(TEACHER)` — which is
-   * why the student routes above carry their own `@Roles` rather than a controller-wide one. The
-   * requests are pending only, because the answered ones are not a queue; the teacher's own
-   * calendar is a different read, and it belongs to the screen that shows a week rather than the
-   * one that shows a decision.
+   * Four routes on one table read from the other side, all under `@Roles(TEACHER)` — which is why
+   * the student routes above carry their own `@Roles` rather than a controller-wide one. The
+   * requests are pending only, because the answered ones are not a queue; the class list keeps
+   * them all, because an answered Tuesday is still a Tuesday.
    */
   @Get('requests')
   @Roles(ROLE_CODES.TEACHER)
   async requests(@CurrentUser() user: AuthenticatedUser): Promise<{ requests: BookingRequest[] }> {
     return { requests: await this.bookings.requestsFor(user.id) };
+  }
+
+  /**
+   * The other teacher read of the same table: their own calendar, answered rows and all.
+   *
+   * `requests` is a queue and this is a schedule. A teacher asking "what have I not looked at yet"
+   * and a teacher asking "what am I teaching on Tuesday" are different questions, and one route
+   * carrying a `?pending=` flag would be the screen's tab structure written into the API.
+   */
+  @Get('classes')
+  @Roles(ROLE_CODES.TEACHER)
+  async classes(@CurrentUser() user: AuthenticatedUser): Promise<{ bookings: BookingRequest[] }> {
+    return { bookings: await this.bookings.classesFor(user.id) };
   }
 
   @Post(':id/confirm')
