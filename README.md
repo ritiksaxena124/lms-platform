@@ -206,14 +206,16 @@ decision was made, and what was deliberately left out.
 | 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell             | **Done**    |
 | 2     | Auth, accounts, roles, teacher profile                                   | **Done**    |
 | 3     | Courses, lessons, enrollment                                             | **Done**    |
-| 4     | Availability, bookings and scheduling across timezones — with a calendar | Not started |
+| 4     | Availability, bookings and scheduling across timezones — with a calendar | In progress |
 | 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons  | Not started |
 | 6     | Email notifications behind the SMTP port                                 | Not started |
 | 7     | Action log — who did what, to what, in which part of the app             | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above            | Not started |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment      | Not started |
 
-Phase 4 is next. Phases 5–9 are the ordered backlog: a live class needs a booked slot to
+Phase 4 is in progress: the availability rules, the slot grid and the booking lifecycle are
+shipped and tested (ARCHITECTURE.md §13 and §14); the calendar and the two portal screens are
+the remaining work. Phases 5–9 are the ordered backlog: a live class needs a booked slot to
 attach to, the action log wants every kind of write to exist before it fixes what a record
 looks like, and coupons land last because a discount only means something next to a price
 that is charged — which is the same reason they sit after the portals are complete.

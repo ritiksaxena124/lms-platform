@@ -529,9 +529,111 @@ what an invitation is for.
   say. The student portal reads the first set now — `lib/enrollments.ts`
   for the transport, `EnrollControl` for taking a place, `my-courses` for the roster and leaving
   one — the teacher portal reads the roster at `/courses/[id]/roster`, and the rules those screens
-  keep are §13's.
+  keep are §15's.
 
-## 13. Frontend
+## 13. Availability
+
+A teacher's week is four numbers per window — which weekday, when it opens, when it closes, how
+long a class is — and nothing in it is expanded into dates. An expansion is a snapshot, and a
+teacher edits their week.
+
+- **Wall clock, in the teacher's zone, nowhere near UTC.** `startMinutes` means "half past nine on
+  a Tuesday" and the zone it means is that teacher's `User.timezone`. Storing an instant instead
+  would ask every window the question §5 answers twice a year, and get it wrong on the day the zone
+  changes its mind. The instant only ever exists once a student books a minute out of the window.
+- **Three rules make a window a window, and all three live in the service.** It closes after it
+  opens; a class fits inside it; no two standing windows cover the same minute. The columns
+  deliberately accept anything numeric (`availability-schema.spec.ts` holds that line), because
+  each of those is a question about four numbers together or about a set of rows, which is not
+  something a field-level check on a DTO can answer. Overlap is reported against `startMinutes` —
+  the box the teacher was typing in — and two windows that merely touch, 09:00–10:00 and
+  10:00–11:00, are a Tuesday afternoon rather than a collision.
+- **Retirement is the only exit, and reopening finds the same row.** `POST :id/retire` closes a
+  window; a window later set at that same weekday and opening minute reopens the original row
+  instead of adding a second one competing with it, because `@@unique([teacherUserId, weekday,
+startMinutes])` is a business key that outlives `isActive` (§2). Two tabs saving the same window
+  at the same moment settle on the key, and the loser is told the same thing it would have been told
+  by the check it raced past.
+- **Four routes, one teacher's own week.** `GET/POST /api/v1/availability/rules`, `PATCH
+/api/v1/availability/rules/:id`, `POST /api/v1/availability/rules/:id/retire`, in
+  `modules/availability`. Ownership answers `404` — a colleague probing ids learns nothing about
+  whose schedule exists — and the list reads only active rows, since a retired window is the
+  teacher's history rather than something to offer.
+- **What holds it:** `apps/api/test/availability-schema.spec.ts` for what the table promises and
+  what it deliberately does not decide, and `apps/api/test/availability.spec.ts` for the routes,
+  the three rules, the reopen, and the silence about another teacher's week.
+
+## 14. Bookings
+
+A booking is a class a student asked for. It is not a calendar entry, a meeting link or an
+invoice: `startsAt` is the minute they chose, `durationMinutes` is the length that minute was
+offered at, and everything else about the hour happens somewhere else.
+
+- **The grid is derived, never stored.** `GET /api/v1/bookings/slots?course=` expands the
+  teacher's windows across a rolling 30-day horizon (`BOOKING_HORIZON_DAYS`) in their zone and
+  subtracts the minutes already held. There is no `slot` table to keep in step with a teacher's
+  edit, which is the whole reason a booking reads `AvailabilityModule` and `EnrollmentsModule`
+  through their own services rather than reaching for their tables.
+- **One function answers "what is on the calendar" and "may this minute be booked."**
+  `slotAt` in `packages/shared/src/schedule.ts` is the same expansion the grid came from, so an
+  offer and a booking cannot have different answers about the same minute — and a student who
+  sends a time that was never on any grid is refused for that reason, not by a length check.
+- **A day is a set of instants, so a DST change moves a class rather than mislabelling it.** The
+  window is wall clock; the row is UTC. A February class and a March class at the same clock face
+  in Kolkata are two hours apart in the table, which is exactly what the student agreed to.
+- **What a student is entitled to decides the grid before any window is expanded.** Enrolled in a
+  published course: its class times. Not enrolled, the course opts in to trials, and this student
+  has never had one: the same times, as a demo. Anything else: nothing. The read answers `200` with
+  `entitlement` and `denial` so a portal can render "Enroll to see class times" as a screen, while
+  the write answers `409` — a request that cannot exist is a state conflict, not a fact about a
+  field.
+- **A trial is per course, opted into by its own route.** `POST /api/v1/courses/:id/demo-bookings`
+  with `{ enabled: true }` is the course's yes (§8 keeps the route in `modules/course`), and it is a
+  route rather than an edit-form field because the form closes when a course publishes and offering
+  trials is what a teacher decides about a course already live. One demo ever per (student, course),
+  counted over surviving rows — a cancelled, refused or expired trial was still the trial a student
+  asked for.
+- **A request is not a class until the teacher says so.** Every booking starts `pending`, and the
+  minute is held from the moment it is asked for (`slotHeldAt`), because a teacher deciding about
+  Thursday should find Thursday still free on Friday. `pending` and `confirmed` are the two statuses
+  that block (`BLOCKING_BOOKING_STATUSES`); refused, called off, taught and expired all give the
+  minute back.
+- **The race is settled by the database.** Writing the hold goes: advisory transaction lock on
+  teacher + instant, a check that this student has not already asked for this minute, a check that
+  no standing row of this teacher's _overlaps_ the requested length, then the insert — with
+  `@@unique([teacherUserId, slotHeldAt])` underneath it all, so two students who both pass the
+  checks leave one row and a `P2002` that reads as "that time is gone". Overlap rather than
+  equal-start is deliberate: a teacher who shortens a window retiles a week, and a forty-five-minute
+  class can otherwise land in the second half of an hour already taken.
+- **Both status moves — the student's cancel and the teacher's answer — are one compare-and-swap.**
+  The status just read is part of the update's own `where`, so a student cancelling as the teacher
+  confirms gets one of the two, and the loser is told to look again rather than being shown a row
+  whose status says one thing and whose hold says another. Releasing the hold and writing the status
+  are the same statement, always.
+- **Unanswered requests expire on a clock, because nobody is coming to answer them.**
+  `booking-request-expiry` runs hourly (`@nestjs/schedule`, the only job registered) and ends rows
+  older than `PENDING_REQUEST_HOURS` or whose class minute has arrived, into `expired` with the hold
+  cleared. Two clocks because two questions: a day of silence is a teacher's answer in itself, and a
+  class whose minute passed without a yes was never going to happen. The `pending` status is in the
+  sweep's own `where`, which is what makes a second pass find nothing and two API instances on one
+  database harmless.
+- **Every door is idempotent, because a button on a slow connection gets pressed twice.** The same
+  student asking for the same minute of the same course replays their existing row instead of
+  adding one; cancelling a cancelled class and confirming a confirmed one both answer `200` with
+  the row as it now reads.
+- **Four student routes and three teacher ones, on one table.** `GET slots`, `POST /bookings`, `GET
+/bookings`, `POST /bookings/:id/cancel` for the student; `GET /bookings/requests`, `POST
+/bookings/:id/confirm`, `POST /bookings/:id/reject` for the teacher — read from the teacher rather
+  than the course, because a teacher with four courses keeps one list of people wanting Thursday.
+  `GET /bookings` returns every active row soonest-first and lets the screen decide what "upcoming"
+  means; `requests` is pending-only, because answered ones are not a queue.
+- **What holds it:** `apps/api/test/booking-schema.spec.ts` for the table,
+  `booking-slots.spec.ts` for the grid and the entitlement that picks it, `booking-create.spec.ts`
+  for the hold and the race, `booking-cancel.spec.ts`, `booking-answer.spec.ts` and
+  `booking-expiry.spec.ts` for the three ways a request stops being one, and
+  `packages/shared/src/schedule.test.ts` for the expansion all of them agree on.
+
+## 15. Frontend
 
 - **The signed-in portal is a viewport-height frame with one scrolling column.** The sidebar
   runs to the left edge of the window and holds still while `main` scrolls, so navigation never
@@ -702,7 +804,7 @@ what an invitation is for.
   the field it keys, so the rules stay on the server; a failure no field owns — a wrong
   password pair — appears once, as a form-level line, and never says which half was wrong.
 
-## 14. Development environment
+## 16. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
   `student:3001`, `ops:…` and `api:4000` share one registrable domain and therefore one
@@ -721,7 +823,7 @@ what an invitation is for.
   credentials in the error, because the cost of pointing a suite at the dev database is a
   Saturday morning.
 
-## 15. Verification
+## 17. Verification
 
 `bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
 
