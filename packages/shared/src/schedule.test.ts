@@ -3,11 +3,14 @@ import { describe, expect, it } from 'vitest';
 import { MIN_WEEKDAY } from './availability';
 import {
   BOOKING_HORIZON_DAYS,
+  LIVE_CLASS_DOOR_OPENS_MINUTES_BEFORE,
+  LIVE_CLASS_DOOR_STAYS_MINUTES_AFTER,
   PENDING_REQUEST_HOURS,
   SLOT_DAYS_PER_WEEK,
   addLocalDays,
   expandWindows,
   isoWeekdayOf,
+  liveClassWindow,
   slotAt,
   type SlotInstant,
   type WeeklyWindow,
@@ -297,3 +300,39 @@ describe('walking local dates', () => {
     expect(isoWeekdayOf(addLocalDays(monday, 7))).toBe(MIN_WEEKDAY);
   });
 });
+
+/**
+ * The window a live class can be joined in. It lives beside the expansion rather than in the
+ * booking endpoint for the same reason the horizon does: the API that decides whether the door is
+ * open and the screen that says when it will open are answering one question, and two numbers
+ * written twice is how a portal starts promising a room the server then refuses.
+ */
+describe('the live class door', () => {
+  const startsAt = new Date('2026-09-28T09:30:00.000Z');
+  const endsAt = new Date('2026-09-28T10:15:00.000Z');
+
+  it('opens a few minutes before the class minute, not at it', () => {
+    // Nobody arrives at the exact instant, and a door that opens at 09:30 teaches people to show
+    // up at 09:29 and find nothing.
+    expect(LIVE_CLASS_DOOR_OPENS_MINUTES_BEFORE).toBe(5);
+    expect(liveClassWindow(startsAt, endsAt)).toEqual({
+      opensAt: new Date('2026-09-28T09:25:00.000Z'),
+      closesAt: new Date('2026-09-28T10:30:00.000Z'),
+    });
+  });
+
+  it('stays open after the class is over, because a lesson does not stop at the minute', () => {
+    expect(LIVE_CLASS_DOOR_STAYS_MINUTES_AFTER).toBe(15);
+    const { closesAt } = liveClassWindow(startsAt, endsAt);
+    expect(closesAt.getTime()).toBe(endsAt.getTime() + 15 * 60_000);
+  });
+
+  it('is a window over instants, so a class either side of a clock change is still measured', () => {
+    // The arithmetic is on the two instants the booking already holds, not on a wall clock: a
+    // 45-minute class that crosses a DST shift is still 45 minutes long, and the door is measured
+    // from its ends rather than from a recomputed face.
+    const long = new Date(startsAt.getTime() + 120 * 60_000);
+    expect(liveClassWindow(startsAt, long).closesAt.getTime()).toBe(long.getTime() + 15 * 60_000);
+  });
+});
+

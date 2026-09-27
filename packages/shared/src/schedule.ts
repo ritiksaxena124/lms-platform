@@ -49,6 +49,27 @@ export const BOOKING_HORIZON_DAYS = 30;
  * here because the sweep that expires it and the screen that warns the student read one number. */
 export const PENDING_REQUEST_HOURS = 24;
 
+/** How early a live class can be joined, and how long after its stated end the door stays open.
+ * Both are here rather than in the booking endpoint because the API that refuses a too-early
+ * arrival and the portal that says "opens at 09:25" answer to one pair of numbers. */
+export const LIVE_CLASS_DOOR_OPENS_MINUTES_BEFORE = 5;
+export const LIVE_CLASS_DOOR_STAYS_MINUTES_AFTER = 15;
+
+/** The span a booked class may be entered: from just before its first minute to a grace period
+ * after its last. Measured on the two instants the row already holds, so a class that crosses a
+ * clock change is still timed by its own ends. */
+export interface LiveClassWindow {
+  opensAt: Date;
+  closesAt: Date;
+}
+
+export function liveClassWindow(startsAt: Date, endsAt: Date): LiveClassWindow {
+  return {
+    opensAt: new Date(startsAt.getTime() - LIVE_CLASS_DOOR_OPENS_MINUTES_BEFORE * MS_PER_MINUTE),
+    closesAt: new Date(endsAt.getTime() + LIVE_CLASS_DOOR_STAYS_MINUTES_AFTER * MS_PER_MINUTE),
+  };
+}
+
 const MS_PER_DAY = 24 * 60 * 60_000;
 const MS_PER_MINUTE = 60_000;
 
