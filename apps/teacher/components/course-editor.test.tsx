@@ -228,6 +228,23 @@ describe('CourseEditor', () => {
     await waitFor(() => expect(screen.getByLabelText('Level')).toBeInTheDocument());
   });
 
+  it('holds the skeleton until every part of the load has arrived, not one at a time', async () => {
+    // The catalogue and the course are one request whose answer is derived as a whole: an empty
+    // level select beside a filled-in title would be a half-loaded form, and loading is read off
+    // the key the reply carries rather than flipped by a flag mid-effect.
+    let releaseLevels: ((value: unknown) => void) | undefined;
+    api.courseLevels.mockReturnValue(new Promise((resolve) => void (releaseLevels = resolve)));
+    api.readCourse.mockResolvedValue(course());
+
+    render(<CourseEditor courseId="c1" />);
+
+    // The course has come back but the catalogue has not — nothing is painted yet.
+    expect(screen.queryByLabelText('Title')).not.toBeInTheDocument();
+
+    releaseLevels?.(LEVELS);
+    expect(await screen.findByLabelText('Title')).toHaveValue('Fractions, slowly');
+  });
+
   describe('the price', () => {
     it('offers the currencies the catalogue lists, not three strings of its own', async () => {
       api.readCourse.mockResolvedValue(course());

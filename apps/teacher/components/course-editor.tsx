@@ -77,6 +77,12 @@ function ofCourse(course: Course): FormValues {
   };
 }
 
+/** What the load asked the API for, and whether it is still owed an answer. `key` tags the
+ * bundle with the request that earned it, so loading is derived from whether the answer matches
+ * the current key rather than announced by a flag set inside the effect (§13). */
+type Loaded = { levels: CourseChoice[]; currencies: CourseChoice[]; course: Course | null };
+type Load = { key: string; value: Loaded } | { key: string; error: string };
+
 /**
  * The one place a course is written.
  *
@@ -90,21 +96,21 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
   const router = useRouter();
   const [values, setValues] = useState<FormValues>(BLANK);
   const [course, setCourse] = useState<Course | null>(null);
-  const [levels, setLevels] = useState<CourseChoice[]>([]);
-  const [currencies, setCurrencies] = useState<CourseChoice[]>([]);
   const [pending, setPending] = useState<'save' | 'publish' | 'archive' | null>(null);
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string | null>(null);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
+  const [load, setLoad] = useState<Load | null>(null);
+
+  // The request is keyed on which course this is and how many times it has been asked for, so
+  // an answer is only ever an answer to *that* request. A retry gets a new key; the old reply
+  // can no longer match it.
+  const key = `${courseId ?? 'new'}:${attempt}`;
 
   // Catalogue and course travel together: a select with no options and a form with no values
   // would be a page that half-loaded, and a teacher cannot tell the difference.
   useEffect(() => {
     let alive = true;
-    setLoading(true);
-    setLoadError(null);
 
     const catalogues = Promise.all([courseLevels(), courseCurrencies()]);
     const document = courseId ? readCourse(courseId) : Promise.resolve(null);
@@ -112,26 +118,32 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
     Promise.all([catalogues, document])
       .then(([[levelRows, currencyRows], loaded]) => {
         if (!alive) return;
-        setLevels(levelRows);
-        setCurrencies(currencyRows);
+        setLoad({ key, value: { levels: levelRows, currencies: currencyRows, course: loaded } });
         setCourse(loaded);
         if (loaded) setValues(ofCourse(loaded));
       })
       .catch((error: unknown) => {
-        if (alive) setLoadError(describeFailure(error));
-      })
-      .finally(() => {
-        if (alive) setLoading(false);
+        if (alive) setLoad({ key, error: describeFailure(error) });
       });
 
     return () => {
       alive = false;
     };
-  }, [courseId, attempt]);
+  }, [key, courseId]);
 
   const isNew = courseId === undefined;
   const locked = course?.status.code === 'published';
   const busy = pending !== null;
+
+  // Loading and failure are read off the answer's key, never set as flags: an answer tagged with
+  // some earlier key has not arrived for *this* request, so the skeleton stays up rather than a
+  // half-loaded form flashing under a course the teacher did not open.
+  const settled = load && load.key === key ? load : null;
+  const loading = settled === null;
+  const loadError = settled && 'error' in settled ? settled.error : null;
+  const loaded = settled && 'value' in settled ? settled.value : null;
+  const levels = loaded?.levels ?? [];
+  const currencies = loaded?.currencies ?? [];
 
   const set = (key: keyof FormValues, value: string) => {
     setValues((current) => ({ ...current, [key]: value }));
