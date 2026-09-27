@@ -313,7 +313,7 @@ domain module would only re-derive the same two hops.
 - **The content is one markdown `body`, capped at 20 000 characters.** No embedded video, no file
   attachments, no block editor: those are the shapes that need a provider, and a provider is a
   decision for later. That later is now Phase 5 (§6), which adds a lesson's video through the
-  storage and Jitsi ports — so the body stays a plain column and a page gains a *second* thing
+  storage and Jitsi ports — so the body stays a plain column and a page gains a _second_ thing
   rather than growing an editor that has to parse its own content.
 - **`estimatedMinutes` is shown, never enforced** (1–600, cleared with an explicit `null` rather
   than by leaving the field alone). A teacher's guess at how long a page takes is useful
