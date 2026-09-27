@@ -37,7 +37,8 @@ const EnvSchema = z.object({
 
   STORAGE_PROVIDER: z.enum(['local', 's3']).default('local'),
   STORAGE_LOCAL_DIR: z.string().min(1).default('./storage/uploads'),
-  STORAGE_PUBLIC_URL: z.string().min(1).default('http://api.localtest.me:4000/files'),
+  // There is deliberately no public URL for stored bytes: the read route carries the gate
+  // (§6), so a config key promising a link to them would be a door around it.
   MAX_UPLOAD_MB: z.coerce.number().int().positive().max(200).default(15),
 
   SMTP_URL: z.string().optional(),

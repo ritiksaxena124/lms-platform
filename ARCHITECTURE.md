@@ -141,6 +141,28 @@ Domain code depends on the port, never on a vendor SDK.
 change, not a refactor — and so nothing pretends to take a payment or start a call in the
 meantime. `STORAGE_PROVIDER=s3` throws at boot rather than silently doing nothing.
 
+Storage is the first of these to be real (Phase 5, step 5a). `apps/api/src/providers/storage`
+defines two operations — write a stream under a key, read a stream back for a key — and the
+`local` adapter is the only implementation. Three things follow from that shape, and they are
+the parts a caller cannot see from the signature:
+
+- **The caller mints the key.** The endpoint asks for a uuid and appends the extension it
+  recognised, because a filename is not unique across teachers and a lesson id is guessable.
+  An adapter refuses a key that is absolute, escaping or built from characters the store does
+  not name things with, so no path ever leaves the directory it was given.
+- **A stored file has no URL.** There is no `STORAGE_PUBLIC_URL` to configure and no public
+  directory to serve, because a link that works without a session would be a second door around
+  the read gates in §10 and §11. Every byte is streamed by a route that resolved the row, and
+  therefore the person, first.
+- **There is no delete.** `put` also refuses to overwrite a key that already holds bytes, and a
+  retired asset keeps its file, for the reason §2 gives for every other row: the bytes are the
+  record of what the teacher uploaded. When a purge is eventually designed it will be a policy
+  with a retention rule, not a method sitting here waiting to be called.
+
+`lesson_asset` (§10) is the row that names those bytes, and it is the only thing that does: a
+file on the disk belongs to a lesson because a row says so, which is what keeps a listing of
+the directory from being a list of what is watchable.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API
@@ -315,6 +337,14 @@ domain module would only re-derive the same two hops.
   decision for later. That later is now Phase 5 (§6), which adds a lesson's video through the
   storage and Jitsi ports — so the body stays a plain column and a page gains a _second_ thing
   rather than growing an editor that has to parse its own content.
+- **That second thing is a row of its own.** `LessonAsset` names the bytes a teacher uploaded and
+  the key the storage port keeps them under (§6), and a lesson stands one at a time: attaching a
+  replacement retires the previous row rather than deleting it, so the page keeps a history of
+  what was taught from it. `displayName` is what the teacher recognises and `storedKey` is the
+  store's business, which is why neither is the other — two teachers both uploading `intro.mp4`
+  must not collide on bytes. Which row stands, and whether an upload is a video of a sane size,
+  are the endpoint's rules; the table's are only that no two rows ever name the same file, and
+  that a lesson somebody attached something to cannot be deleted underneath it.
 - **`estimatedMinutes` is shown, never enforced** (1–600, cleared with an explicit `null` rather
   than by leaving the field alone). A teacher's guess at how long a page takes is useful
   information and a promise the platform should not hold anyone to; no timer sits behind it.

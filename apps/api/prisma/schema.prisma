@@ -327,9 +327,61 @@ model Lesson {
   module Module   @relation("module_lessons", fields: [moduleId], references: [id], onDelete: Restrict)
   status LkpValue @relation("lesson_status", fields: [statusValueId], references: [id], onDelete: Restrict)
 
+  /// The recordings and files a teacher has attached to this page, newest standing until a
+  /// replacement retires it.
+  assets LessonAsset[] @relation("lesson_assets")
+
   @@unique([moduleId, position], map: "uk_lesson_module_position")
   @@index([moduleId, isActive, position], map: "ix_lesson_module_order")
   @@map("lesson")
+}
+
+/// A file a teacher attached to a lesson — a recording of the class, uploaded through the
+/// storage port (ARCHITECTURE §6). This row is the only thing that names the bytes: the file
+/// itself sits in a directory nobody can guess a path into, and every read of it goes through
+/// a route that asks who is asking first.
+///
+/// One lesson stands one asset at a time, and that is the endpoint's rule rather than a
+/// constraint. A replacement retires the previous row instead of deleting it (§2), so the
+/// retired row has to keep its `lessonId` — a unique pair would refuse exactly the history
+/// that keeping it is for.
+///
+/// The asset has no status of its own, unlike its lesson. A lesson's status says whether a
+/// student may read the page, which is a lifecycle a teacher moves through; an asset is one
+/// yes-or-no about whether it is the standing file, and `isActive` already answers it. A
+/// second flag would need the rules for which one wins that §9 refused for a module.
+model LessonAsset {
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  lessonId String @map("lesson_id") @db.Uuid
+
+  /// What the teacher called the file, shown on their own page. Free text on purpose: two
+  /// lessons of a course may both hold `intro.mp4`, and a name a person recognises is not a
+  /// key.
+  displayName String @map("display_name")
+
+  /// The key the bytes were written under, minted by the endpoint rather than taken from the
+  /// upload. Unique across every row including retired ones, because a retired asset still
+  /// names bytes on disk — handing the same key to a second row would put two files' history
+  /// behind one path.
+  storedKey String @map("stored_key")
+
+  /// The mime type the upload declared, recorded as sent. It is not a verdict: what a teacher
+  /// may attach is the endpoint's decision, and a lookup row for every mime type would be a
+  /// list Ops cannot maintain any better than the client that sent it.
+  contentType String @map("content_type")
+  /// Size in bytes, frozen at upload. Recomputing it from the disk at display time would let
+  /// a lesson page's wording change under a student who was quoting it.
+  bytes       Int    @map("bytes")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  lesson Lesson @relation("lesson_assets", fields: [lessonId], references: [id], onDelete: Restrict)
+
+  @@unique([storedKey], map: "uk_lesson_asset_stored_key")
+  @@index([lessonId, isActive], map: "ix_lesson_asset_lesson_active")
+  @@map("lesson_asset")
 }
 
 /// A student's place in a course: the row that says they may read it.

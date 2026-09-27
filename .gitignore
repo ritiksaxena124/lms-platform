@@ -14,8 +14,10 @@ storybook-static/
 .env.*
 !.env.example
 
-# database / local storage
-storage/
+# uploaded files (the API writes them beside itself) + local database data. Anchored to where
+# the bytes actually land: an unanchored `storage/` also hides `src/providers/storage`, which is
+# code.
+apps/api/storage/
 pgdata/
 
 # test + tooling

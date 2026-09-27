@@ -10,7 +10,15 @@ import tseslint from 'typescript-eslint';
  */
 export default tseslint.config(
   {
-    ignores: ['**/dist/**', '**/.next/**', '**/node_modules/**', '**/coverage/**', 'storage/**'],
+    ignores: [
+      '**/dist/**',
+      '**/.next/**',
+      '**/node_modules/**',
+      '**/coverage/**',
+      // Where uploaded bytes land on a dev box. Anchored: `storage/**` also matched
+      // `apps/api/src/providers/storage`, which is the code that reads that directory.
+      'apps/api/storage/**',
+    ],
   },
   js.configs.recommended,
   ...tseslint.configs.recommended,

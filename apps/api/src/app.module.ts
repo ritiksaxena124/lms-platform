@@ -15,6 +15,7 @@ import { CatalogModule } from './modules/catalog/catalog.module';
 import { CourseModule } from './modules/course/course.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
 import { TeacherModule } from './modules/teacher/teacher.module';
+import { StorageModule } from './providers/storage/storage.module';
 import { ReferenceModule } from './reference/reference.module';
 
 @Module({
@@ -30,6 +31,10 @@ import { ReferenceModule } from './reference/reference.module';
     EnrollmentsModule,
     AvailabilityModule,
     BookingsModule,
+    // The port behind every uploaded byte, selected by `STORAGE_PROVIDER` (§6). Registered
+    // before any route uses it, so the provider string is checked at boot rather than on the
+    // first upload of a term.
+    StorageModule,
     // Coarse default for the POC; auth endpoints get a tighter limit in Phase 2.
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
     // The one clock the platform runs on its own. Currently only the sweep of class requests

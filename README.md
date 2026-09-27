@@ -232,7 +232,7 @@ decision was made, and what was deliberately left out.
 | 2     | Auth, accounts, roles, teacher profile                                    | **Done**    |
 | 3     | Courses, lessons, enrollment                                              | **Done**    |
 | 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
-| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | Not started |
+| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | In progress |
 | 6     | Email notifications behind the SMTP port                                  | Not started |
 | 7     | Action log — who did what, to what, in which part of the app              | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above             | Not started |
@@ -241,9 +241,12 @@ decision was made, and what was deliberately left out.
 
 Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
 and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
-request queue and class list, the student's booking page and own calendar. Phases 5–10 are the
-ordered backlog: a live class needs a booked slot to attach to, which is why booking came first,
-the action log wants every kind of write to exist before it fixes what a record looks like, and
+request queue and class list, the student's booking page and own calendar. Phase 5 has begun
+underneath that, one brick at a time: the storage port is real and a lesson can name the bytes of
+a recording somebody attached (ARCHITECTURE.md §6 and §10), with the upload route, the Jitsi rooms
+and both portals' players still to come. What is left of Phases 5–10 is the ordered backlog: a
+live class needs a booked slot to attach to, which is why booking came first, the action log
+wants every kind of write to exist before it fixes what a record looks like, and
 coupons land last among the things a student touches, because a discount only means something
 next to a price that is charged — the same reason they sit after the portals are complete. The
 calendar work is after all of it: a teacher marking a course's classes to repeat weekly, and
@@ -264,5 +267,7 @@ inside it and the portals around it are settled.
   is planned as Jitsi (a live class, plus a teacher's uploaded lesson through
   `STORAGE_PROVIDER`) in Phase 5, and money — with the coupon codes a teacher issues per
   course — is Phase 9. The ports exist so neither costs a refactor when it lands.
-- `STORAGE_PROVIDER=local` writes uploads to `storage/` (gitignored). `s3` is rejected at
-  boot until it is actually implemented.
+- `STORAGE_PROVIDER=local` writes uploads under `apps/api/storage/` (gitignored). They have no
+  URL of their own: a route that has already checked who is asking streams them back, so there is
+  no public directory to leak a paid lesson through. `s3` is rejected at boot until it is
+  actually implemented.
