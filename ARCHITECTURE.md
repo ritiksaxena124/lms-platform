@@ -163,6 +163,16 @@ the parts a caller cannot see from the signature:
 file on the disk belongs to a lesson because a row says so, which is what keeps a listing of
 the directory from being a list of what is watchable.
 
+The first route to use it is a teacher attaching a recording to a page of their own (step 5b),
+and the order it works in is the reason the port takes a stream rather than a buffer: the page is
+proved to belong to the caller, then the bytes stream into `put`, then the row is filed. Nothing
+in that sequence can be rearranged — a middleware that parsed the body on the way in would let
+anyone with a token spend disk on a lesson they cannot see, and a write that reported success
+after being cut short would file a row pointing at half a recording. So the size cap fails the
+write instead of truncating it (which is also why it is not multer's own `fileSize` limit), the
+local adapter erases a write that never finished, and `displayName` is stored as the text it is
+while the key is minted here from the lesson's id and a uuid.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API

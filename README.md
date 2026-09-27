@@ -242,9 +242,10 @@ decision was made, and what was deliberately left out.
 Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
 and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
 request queue and class list, the student's booking page and own calendar. Phase 5 has begun
-underneath that, one brick at a time: the storage port is real and a lesson can name the bytes of
-a recording somebody attached (ARCHITECTURE.md §6 and §10), with the upload route, the Jitsi rooms
-and both portals' players still to come. What is left of Phases 5–10 is the ordered backlog: a
+underneath that, one brick at a time: the storage port is real, a lesson can name the bytes of
+a recording, and a teacher can attach one to a page of their own — the route decides it is their
+page before it reads a byte of the body (ARCHITECTURE.md §6 and §10). The Jitsi rooms and both
+portals' players are still to come. What is left of Phases 5–10 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and
 coupons land last among the things a student touches, because a discount only means something

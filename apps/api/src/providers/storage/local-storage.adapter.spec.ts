@@ -86,6 +86,26 @@ describe('local storage adapter', () => {
     expect(await readFile(join(root, 'taken.mp4'), 'utf8')).toBe('the first recording');
   });
 
+  it('leaves nothing behind when the body it was writing dies midway', async () => {
+    function* interruptedUpload(): Generator<Buffer> {
+      yield Buffer.from('the beginning of a recording');
+      throw new Error('the upload was cut off');
+    }
+
+    const written = storage.put({
+      key: 'lessons/cut-off.mp4',
+      contentType: 'video/mp4',
+      body: Readable.from(interruptedUpload()),
+    });
+
+    await expect(written).rejects.toThrow('the upload was cut off');
+
+    // The hole the write left is the part that matters. A half-written file under a key nobody
+    // filed is invisible to the app and immortal on the disk, and if the key were reused the
+    // `wx` above would refuse a teacher's retry. An unfinished write is an unfinished write.
+    await expect(stat(join(root, 'lessons', 'cut-off.mp4'))).rejects.toThrow();
+  });
+
   it('refuses a key that names somewhere other than its own directory', async () => {
     const before = await readdir(root);
 

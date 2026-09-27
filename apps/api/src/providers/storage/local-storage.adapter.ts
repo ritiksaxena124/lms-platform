@@ -1,5 +1,5 @@
 import { createReadStream, createWriteStream } from 'node:fs';
-import { access, mkdir } from 'node:fs/promises';
+import { access, mkdir, unlink } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { pipeline } from 'node:stream/promises';
 import type { Readable } from 'node:stream';
@@ -63,10 +63,26 @@ export class LocalStorage implements Storage {
     const path = this.pathFor(key);
     await mkdir(dirname(path), { recursive: true });
 
-    // `wx`: fail if the bytes are already there. A half-arrived file stays a half-arrived
-    // file — the caller writes no row until this resolves, so nothing can read it, and the
-    // next attempt mints a fresh key rather than arguing with this one.
-    await pipeline(body, createWriteStream(path, { flags: 'wx' }));
+    // `wx`: fail if the bytes are already there.
+    const sink = createWriteStream(path, { flags: 'wx' });
+    // Whether *this* call is the one that made the file. `open` fires once the fd exists, so a
+    // collision with someone else's key never reaches the unlink below — deleting the recording
+    // that refused to be overwritten would be the worst possible answer to a failed write.
+    let opened = false;
+    sink.on('open', () => {
+      opened = true;
+    });
+
+    try {
+      await pipeline(body, sink);
+    } catch (thrown) {
+      // The write stopped early: the tab closed, the connection dropped, or the route cut the
+      // stream at the size cap. Those bytes are invisible to the app — no row names them — and
+      // would stay on the disk forever, so an unfinished upload is undone rather than left as
+      // a leak that nothing can clean up later.
+      if (opened) await unlink(path).catch(() => undefined);
+      throw thrown;
+    }
   }
 
   async open(key: string): Promise<Readable> {

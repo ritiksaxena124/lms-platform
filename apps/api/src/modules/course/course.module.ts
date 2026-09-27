@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { StorageModule } from '../../providers/storage/storage.module';
 import { AuthModule } from '../auth/auth.module';
 import { CourseModulesController } from './course-modules.controller';
 import { CourseModulesRepository } from './course-modules.repository';
@@ -7,6 +8,9 @@ import { CourseModulesService } from './course-modules.service';
 import { CoursesController } from './course.controller';
 import { CoursesRepository } from './courses.repository';
 import { CoursesService } from './courses.service';
+import { LessonAssetsController } from './lesson-assets.controller';
+import { LessonAssetsRepository } from './lesson-assets.repository';
+import { LessonAssetsService } from './lesson-assets.service';
 import { LessonsController } from './lessons.controller';
 import { LessonsRepository } from './lessons.repository';
 import { LessonsService } from './lessons.service';
@@ -19,11 +23,18 @@ import { LessonsService } from './lessons.service';
  * A module is part of the course it sits in rather than its own domain: every route reaches
  * it through a course the session owns. A lesson shares this module for the same reason even
  * though it has a lifecycle of its own — the path to a lesson still runs through a course,
- * and ownership is answered once, in `CoursesRepository`, rather than three times.
+ * and ownership is answered once, in `CoursesRepository`, rather than three times. A recording
+ * on a lesson shares it for the same reason a third time over, and borrows the same two
+ * ownership reads rather than inventing a third answer to "is this page yours".
  */
 @Module({
-  imports: [AuthModule],
-  controllers: [CoursesController, CourseModulesController, LessonsController],
+  imports: [AuthModule, StorageModule],
+  controllers: [
+    CoursesController,
+    CourseModulesController,
+    LessonsController,
+    LessonAssetsController,
+  ],
   providers: [
     CoursesService,
     CoursesRepository,
@@ -31,6 +42,8 @@ import { LessonsService } from './lessons.service';
     CourseModulesRepository,
     LessonsService,
     LessonsRepository,
+    LessonAssetsService,
+    LessonAssetsRepository,
   ],
 })
 export class CourseModule {}

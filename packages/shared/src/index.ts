@@ -7,6 +7,7 @@ export * from './courses';
 export * from './enrollments';
 export * from './error-codes';
 export * from './lookup-codes';
+export * from './lesson-assets';
 export * from './lessons';
 export * from './money';
 export * from './schedule';
