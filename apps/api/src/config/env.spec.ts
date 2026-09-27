@@ -18,6 +18,23 @@ describe('parseEnv', () => {
     expect(env.MAX_UPLOAD_MB).toBe(15);
     expect(env.PAYMENT_PROVIDER).toBe('none');
     expect(env.VIDEO_PROVIDER).toBe('none');
+    expect(env.JITSI_DOMAIN).toBe('meet.jit.si');
+  });
+
+  it('takes jitsi as the video provider, and the bridge it should point classes at', () => {
+    const env = parseEnv({
+      ...BASE,
+      VIDEO_PROVIDER: 'jitsi',
+      JITSI_DOMAIN: 'calls.example-school.org',
+    });
+    expect(env.VIDEO_PROVIDER).toBe('jitsi');
+    expect(env.JITSI_DOMAIN).toBe('calls.example-school.org');
+  });
+
+  it('has no video provider beyond the adapters that exist', () => {
+    // `mock` was a placeholder written before Phase 5 chose Jitsi. Accepting a value nothing
+    // implements is how a deployment boots with video it only thinks it has.
+    expect(() => parseEnv({ ...BASE, VIDEO_PROVIDER: 'mock' })).toThrow(/VIDEO_PROVIDER/);
   });
 
   it('rejects an empty CORS list instead of silently allowing every origin', () => {

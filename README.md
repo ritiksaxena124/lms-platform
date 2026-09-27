@@ -244,8 +244,10 @@ and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the t
 request queue and class list, the student's booking page and own calendar. Phase 5 has begun
 underneath that, one brick at a time: the storage port is real, a lesson can name the bytes of
 a recording, and a teacher can attach one to a page of their own — the route decides it is their
-page before it reads a byte of the body (ARCHITECTURE.md §6 and §10). The Jitsi rooms and both
-portals' players are still to come. What is left of Phases 5–10 is the ordered backlog: a
+page before it reads a byte of the body (ARCHITECTURE.md §6 and §10). The video port is real as
+of the same phase: a Jitsi room address built from a name the API mints, with `none` still an
+adapter rather than an `if` in every route. The room on a booking, the gate that hands it out and
+both portals' players are still to come. What is left of Phases 5–10 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and
 coupons land last among the things a student touches, because a discount only means something
@@ -264,10 +266,13 @@ inside it and the portals around it are settled.
   Generate with `openssl rand -hex 32`.
 - `COOKIE_DOMAIN=localtest.me` is what lets one login cover all three portals. Left unset
   the session cookie belongs to the API host alone.
-- `PAYMENT_PROVIDER` and `VIDEO_PROVIDER` default to `none` and are still unset work: video
-  is planned as Jitsi (a live class, plus a teacher's uploaded lesson through
-  `STORAGE_PROVIDER`) in Phase 5, and money — with the coupon codes a teacher issues per
-  course — is Phase 9. The ports exist so neither costs a refactor when it lands.
+- `PAYMENT_PROVIDER` defaults to `none` and is still unset work: money — with the coupon codes a
+  teacher issues per course — is Phase 9, and the port exists so it costs no refactor when it
+  lands. `VIDEO_PROVIDER` defaults to `none` too, and is a real configuration rather than a
+  placeholder: with `jitsi` and a `JITSI_DOMAIN` (a bare host, `meet.jit.si` unless you name
+  another) a class gets a room address; on `none` the same screens say there is no room. A Jitsi
+  room carries no password, so the name the API mints is what keeps a class private — see
+  ARCHITECTURE.md §6 before putting a room URL anywhere a stranger can read it.
 - `STORAGE_PROVIDER=local` writes uploads under `apps/api/storage/` (gitignored). They have no
   URL of their own: a route that has already checked who is asking streams them back, so there is
   no public directory to leak a paid lesson through. `s3` is rejected at boot until it is

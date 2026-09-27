@@ -136,10 +136,10 @@ Video, storage, payments and email sit behind ports in `apps/api/src/providers`,
 by environment (`STORAGE_PROVIDER`, `PAYMENT_PROVIDER`, `VIDEO_PROVIDER`, `SMTP_URL`).
 Domain code depends on the port, never on a vendor SDK.
 
-`PAYMENT_PROVIDER` and `VIDEO_PROVIDER` currently default to `none`: those integrations are
-**not built yet**. The ports exist so that choosing a vendor later is an adapter plus an env
-change, not a refactor — and so nothing pretends to take a payment or start a call in the
-meantime. `STORAGE_PROVIDER=s3` throws at boot rather than silently doing nothing.
+`PAYMENT_PROVIDER` defaults to `none`: that integration is **not built yet** (Phase 9). The
+ports exist so that choosing a vendor later is an adapter plus an env change, not a refactor —
+and so nothing pretends to take a payment in the meantime. `STORAGE_PROVIDER=s3` throws at boot
+rather than silently doing nothing.
 
 Storage is the first of these to be real (Phase 5, step 5a). `apps/api/src/providers/storage`
 defines two operations — write a stream under a key, read a stream back for a key — and the
@@ -172,6 +172,34 @@ after being cut short would file a row pointing at half a recording. So the size
 write instead of truncating it (which is also why it is not multer's own `fileSize` limit), the
 local adapter erases a write that never finished, and `displayName` is stored as the text it is
 while the key is minted here from the lesson's id and a uuid.
+
+Video is the second port to be real (step 5c). `apps/api/src/providers/video` answers exactly
+one question — _where would a class named this be held_ — and its `jitsi` adapter builds
+`https://<JITSI_DOMAIN>/<name>` without asking the bridge anything, because a Jitsi room exists
+the moment someone types its name. That absence of a handshake is what the no-JWT choice bought
+(no vendor account, no key to rotate, no SDK), and the port's shape is the three consequences of
+paying for it:
+
+- **The room name is the only secret.** On a public bridge, knowing the name is being invited, so
+  the name is minted by the caller from a uuid — never from a course title, a date or a lesson id,
+  every one of which someone could work out. The adapter refuses a name that carries a path, a
+  query, a fragment or whitespace, and refuses a `JITSI_DOMAIN` that is not a bare host at the
+  moment the port is built, so a configuration that would send a class somewhere unintended stops
+  the boot rather than surprising a teacher mid-class.
+- **An address is not a permission.** Nothing in this port decides whether the caller may join,
+  and no route gets to ask it for a URL it has not earned: the gate is the booking endpoint that
+  owns the class (§14). A portal that went to the port directly would be a door with nobody
+  standing in it — which is also why a room URL is a secret with a URL's shape and never belongs
+  in a log line or on a public course page.
+- **`none` is an adapter, not an `if`.** `NoVideo` answers `null`, so the one question a caller
+  can ask has one shape on every deployment, and no screen can forget a branch and offer a Join
+  button for a room that never was. `none` remains the shipped default for a config that has not
+  decided yet; a `JITSI_DOMAIN` the operator did not name is `meet.jit.si`.
+
+It is synchronous on purpose. A port whose only provider needs no network call would be theatre
+wrapped in a `Promise`, and the provider that does need one — signed URLs, a JWT to mint them —
+changes the shape of the answer, not merely its asynchrony. That is a phase-5-and-later decision,
+not a reason to write the signature twice now.
 
 The choice has now been made, which is why these are phases rather than open questions:
 

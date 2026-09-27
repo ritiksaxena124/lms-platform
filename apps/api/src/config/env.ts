@@ -44,10 +44,17 @@ const EnvSchema = z.object({
   SMTP_URL: z.string().optional(),
   MAIL_FROM: z.string().optional(),
 
-  // Payments and video are on hold: no vendor SDK may be wired until a free provider is
-  // approved, so `none` is a first-class value rather than a TODO comment.
+  // Payments are on hold: no vendor SDK may be wired until a free provider is approved, so
+  // `none` is a first-class value rather than a TODO comment.
   PAYMENT_PROVIDER: z.enum(['none', 'mock']).default('none'),
-  VIDEO_PROVIDER: z.enum(['none', 'mock']).default('none'),
+  // Video chose Jitsi in Phase 5 (§10). `none` stays a value a deployment can run on — an
+  // unconfigured box has live classes switched off, not broken.
+  VIDEO_PROVIDER: z.enum(['none', 'jitsi']).default('none'),
+  /** The bridge a class is held on: a bare host, no scheme and no path. The public meet.jit.si
+   * is the default because it needs no account; a self-hosted bridge is the same adapter with
+   * this pointed at it. Judged when the provider is built, so a value that is not a host stops
+   * the boot rather than sending a class somewhere unexpected. */
+  JITSI_DOMAIN: z.string().min(1).default('meet.jit.si'),
 });
 
 export type AppEnv = z.infer<typeof EnvSchema> & {
