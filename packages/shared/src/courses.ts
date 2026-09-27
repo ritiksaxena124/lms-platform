@@ -48,6 +48,11 @@ export interface Course {
   /** A quote, not a charge: nothing in this platform takes money yet, and an enrollment
    * buys a place rather than a receipt. */
   price: CoursePrice | null;
+  /** Whether a student without a place may ask this teacher for a trial hour of this course.
+   * The course's own yes, because one teacher's conversation club and one teacher's exam prep
+   * do not want the same trial policy — and a route of its own rather than an edit-form field,
+   * because a teacher decides this about a course that is already live. */
+  demoBookingsEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }

@@ -58,6 +58,7 @@ function course(overrides: Partial<Course> = {}): Course {
     level: { code: 'beginner', label: 'Beginner' },
     status: { code: 'draft', label: 'Draft' },
     price: null,
+    demoBookingsEnabled: false,
     createdAt: '2026-09-25T00:00:00.000Z',
     updatedAt: '2026-09-25T00:00:00.000Z',
     ...overrides,

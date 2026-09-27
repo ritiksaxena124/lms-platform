@@ -17,7 +17,7 @@ import { Roles } from '../auth/roles.decorator';
 import { CoursesService } from './courses.service';
 // Value imports: the validation pipe finds a DTO through emitted parameter metadata, and
 // an erased class would leave every body unchecked.
-import { CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
+import { CreateCourseDto, DemoBookingsDto, UpdateCourseDto } from './dto/course.dto';
 import { ListCoursesQueryDto } from './dto/list-courses-query.dto';
 
 /**
@@ -93,5 +93,23 @@ export class CoursesController {
     @Param('id') id: string,
   ): Promise<{ course: Course }> {
     return { course: await this.courses.archive(user.id, id) };
+  }
+
+  /**
+   * Open or close the course to a trial call from a student who has not taken a place.
+   *
+   * A route rather than a field on `PATCH :id`, because the edit form is closed once a course is
+   * published and this is the one decision a teacher most often makes about a course that is
+   * already live. `POST` on an address that reads as a switch, with the word in the body, so
+   * opening and closing are the same call with the same answer shape.
+   */
+  @Post(':id/demo-bookings')
+  @HttpCode(HttpStatus.OK)
+  async setDemoBookings(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: DemoBookingsDto,
+  ): Promise<{ course: Course }> {
+    return { course: await this.courses.setDemoBookings(user.id, id, dto.enabled) };
   }
 }

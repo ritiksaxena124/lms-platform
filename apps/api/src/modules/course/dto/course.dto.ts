@@ -1,5 +1,6 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  IsBoolean,
   IsInt,
   IsOptional,
   IsString,
@@ -134,4 +135,16 @@ export class UpdateCourseDto {
   @ValidateNested()
   @Type(() => CoursePriceDto)
   price?: CoursePriceDto | null;
+}
+
+/**
+ * The one switch a course keeps apart from its edit form, on a route that carries nothing else.
+ *
+ * `enabled` is required rather than read as absent-means-on: a body that meant to close a course to
+ * trial calls and dropped the word would have opened it instead. The route says one of two
+ * sentences — trials, or not trials — and never "whatever the last caller left out".
+ */
+export class DemoBookingsDto {
+  @IsBoolean({ message: 'Say true to open this course to a trial call, false to close it.' })
+  enabled!: boolean;
 }

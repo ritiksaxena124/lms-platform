@@ -83,4 +83,20 @@ export class CoursesRepository {
       include: WITH_VOCABULARY,
     });
   }
+
+  /**
+   * Open or close this course to a trial call.
+   *
+   * Its own write rather than another key on `updateColumns`, because `updateColumns` is the edit
+   * form's door and the service keeps that door shut once a course is published — which is exactly
+   * when a teacher is most likely to decide to offer trials. Two doors, two writes, so neither one
+   * inherits the other's rule by accident.
+   */
+  async setDemoBookings(id: string, demoBookingsEnabled: boolean) {
+    return this.prisma.course.update({
+      where: { id },
+      data: { demoBookingsEnabled },
+      include: WITH_VOCABULARY,
+    });
+  }
 }

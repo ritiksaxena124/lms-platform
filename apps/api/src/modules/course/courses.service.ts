@@ -60,6 +60,7 @@ function toDocument(course: CourseWithVocabulary): Course {
       course.priceMinorUnits === null || course.priceCurrency === null
         ? null
         : { minorUnits: course.priceMinorUnits, currency: course.priceCurrency },
+    demoBookingsEnabled: course.demoBookingsEnabled,
     createdAt: course.createdAt.toISOString(),
     updatedAt: course.updatedAt.toISOString(),
   };
@@ -212,6 +213,28 @@ export class CoursesService {
 
     const archived = await this.status(COURSE_STATUS_CODES.ARCHIVED);
     return toDocument(await this.courses.updateStatus(course.id, archived.id));
+  }
+
+  /**
+   * Open or close this course to a trial call from a student who has not taken a place.
+   *
+   * No status check, which is the one transition-shaped thing here that does not have one: the
+   * booking gate already refuses a demo on a course that is not published, so a flag set on a
+   * draft is not a hole but a decision waiting for its course to go live. Refusing it would ask a
+   * teacher to publish first and only then be allowed to say what they want the published thing to
+   * offer.
+   *
+   * Setting it to what it already is succeeds and writes nothing new, for the reason every other
+   * switch here works that way: a portal's response can be lost on the way home, and the second
+   * press of the same switch should say the same thing as the first.
+   */
+  async setDemoBookings(
+    teacherUserId: string,
+    id: string,
+    demoBookingsEnabled: boolean,
+  ): Promise<Course> {
+    const course = await this.owned(teacherUserId, id);
+    return toDocument(await this.courses.setDemoBookings(course.id, demoBookingsEnabled));
   }
 
   /** A code the catalogue does not carry is the teacher's mistake, not the API's, so it
