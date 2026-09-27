@@ -2,11 +2,13 @@ import { PrismaClient } from '@prisma/client';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import {
+  BOOKING_TYPE_CODES,
   COURSE_LEVEL_CODES,
   COURSE_STATUS_CODES,
   CURRENCY_CODES,
   LKP_TYPE_CODES,
   ROLE_CODES,
+  SCHEDULABLE_BOOKING_STATUSES,
 } from '@lms/shared';
 
 import { LOOKUP_SEEDS, REQUIRED_LKP_TYPES } from '../src/reference/reference-data';
@@ -92,6 +94,28 @@ describe('reference data seeding', () => {
     expect(values.map((value) => [value.code, value.label])).toEqual([
       [CURRENCY_CODES.INR, 'Indian rupee'],
       [CURRENCY_CODES.USD, 'US dollar'],
+    ]);
+  });
+
+  it('seeds the kinds and stages a booking moves through', async () => {
+    // A booking's kind decides who may take the slot (a place in the course, or a one-time
+    // trial); its status decides whether the slot is still held. Phase 4 reads both, so both
+    // have to be rows — and only the stages this phase's code actually transitions through
+    // are seeded, not the whole reserved set.
+    const codesFor = async (typeCode: string) =>
+      (
+        await prisma.lkpValue.findMany({
+          where: { type: { code: typeCode } },
+          orderBy: { position: 'asc' },
+        })
+      ).map((value) => value.code);
+
+    expect(await codesFor(LKP_TYPE_CODES.BOOKING_TYPE)).toEqual([
+      BOOKING_TYPE_CODES.ENROLLED,
+      BOOKING_TYPE_CODES.DEMO,
+    ]);
+    expect(await codesFor(LKP_TYPE_CODES.BOOKING_STATUS)).toEqual([
+      ...SCHEDULABLE_BOOKING_STATUSES,
     ]);
   });
 

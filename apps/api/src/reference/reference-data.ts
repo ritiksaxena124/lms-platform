@@ -1,5 +1,7 @@
 import {
   ACCOUNT_STATUS_CODES,
+  BOOKING_STATUS_CODES,
+  BOOKING_TYPE_CODES,
   COURSE_LEVEL_CODES,
   COURSE_STATUS_CODES,
   CURRENCY_CODES,
@@ -114,6 +116,26 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
     values: [
       at(LESSON_STATUS_CODES.DRAFT, 'Draft'),
       at(LESSON_STATUS_CODES.PUBLISHED, 'Published'),
+    ],
+  },
+  /**
+   * The booking vocabulary Phase 4 schedules against. Kind decides who may take a slot and
+   * status decides whether it is still held. Only the statuses a Phase 4 transition can reach
+   * are seeded — `rejected` is reserved for a moderation flow (§6) and seeding an unreachable
+   * row is exactly the drift a lookup table is meant to prevent (§3).
+   */
+  [LKP_TYPE_CODES.BOOKING_TYPE]: {
+    description: 'What entitlement holds a booked slot',
+    values: [at(BOOKING_TYPE_CODES.ENROLLED, 'Enrolled'), at(BOOKING_TYPE_CODES.DEMO, 'Demo')],
+  },
+  [LKP_TYPE_CODES.BOOKING_STATUS]: {
+    description: 'Where a booked slot is in its own life',
+    values: [
+      at(BOOKING_STATUS_CODES.PENDING, 'Pending'),
+      at(BOOKING_STATUS_CODES.CONFIRMED, 'Confirmed'),
+      at(BOOKING_STATUS_CODES.CANCELLED, 'Cancelled'),
+      at(BOOKING_STATUS_CODES.COMPLETED, 'Completed'),
+      at(BOOKING_STATUS_CODES.NO_SHOW, 'No show'),
     ],
   },
 };

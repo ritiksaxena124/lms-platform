@@ -55,6 +55,34 @@ export const BOOKING_STATUS_CODES = {
   NO_SHOW: 'no_show',
 } as const;
 
+/**
+ * What kind of entitlement holds a slot. `enrolled` is a student who already holds a place in
+ * the course; `demo` is a one-time trial a signed-in student takes on a course whose teacher
+ * has opened demo bookings, without enrolling. A lookup rather than a boolean because the two
+ * answer to different rules, and a marketplace may add a third kind (a paid trial, a
+ * placement interview) as a row rather than a migration.
+ */
+export const BOOKING_TYPE_CODES = {
+  ENROLLED: 'enrolled',
+  DEMO: 'demo',
+} as const;
+
+export type BookingTypeCode = (typeof BOOKING_TYPE_CODES)[keyof typeof BOOKING_TYPE_CODES];
+
+/**
+ * The booking statuses Phase 4's code actually transitions through. The full
+ * `BOOKING_STATUS_CODES` set is reserved for later phases — `rejected` belongs to a
+ * moderation flow that does not exist yet, so seeding it now would put a row in the database
+ * that no code can move a booking into, which is the drift lookups exist to prevent (§3).
+ */
+export const SCHEDULABLE_BOOKING_STATUSES = [
+  BOOKING_STATUS_CODES.PENDING,
+  BOOKING_STATUS_CODES.CONFIRMED,
+  BOOKING_STATUS_CODES.CANCELLED,
+  BOOKING_STATUS_CODES.COMPLETED,
+  BOOKING_STATUS_CODES.NO_SHOW,
+] as const;
+
 /** Bookings in these statuses still occupy the teacher's slot. */
 export const BLOCKING_BOOKING_STATUSES: readonly string[] = [
   BOOKING_STATUS_CODES.PENDING,
