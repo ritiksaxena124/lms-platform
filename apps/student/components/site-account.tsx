@@ -26,6 +26,12 @@ export function SiteAccount() {
         >
           My courses
         </Link>
+        <Link
+          href="/my-classes"
+          className={cn(buttonClass({ variant: 'secondary', size: 'sm' }))}
+        >
+          My classes
+        </Link>
         <span className="hidden text-[0.8125rem] text-ink-muted sm:inline">{user.fullName}</span>
         <button
           type="button"

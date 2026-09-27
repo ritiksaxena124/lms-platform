@@ -5,7 +5,7 @@ import { apiGet, apiJson } from './api';
 /**
  * The student's side of a teacher's calendar: what is free, what is asked for, what is booked.
  *
- * Three reads and one write, and none of them carries a student id. The session is the identity
+ * Two reads and two writes, and none of them carries a student id. The session is the identity
  * on every route here, which is the only way a list of "my classes" cannot be widened into
  * somebody else's by a changed query string.
  *
@@ -52,4 +52,20 @@ export async function myBookings(): Promise<Booking[]> {
     withSession: true,
   });
   return bookings;
+}
+
+/**
+ * Let go of a class, and hand its minute back to the teacher's calendar.
+ *
+ * Nothing is sent but the id: there is no field here a student could get wrong, and pressing it
+ * twice answers `200` both times, because the second press is asking for a state the class is
+ * already in. A class that has been taught, missed, refused or left to expire is the one thing
+ * this cannot undo, and that comes back as a conflict.
+ */
+export async function leaveClass(id: string): Promise<Booking> {
+  const { booking } = await apiJson<{ booking: Booking }>(
+    `/bookings/${encodeURIComponent(id)}/cancel`,
+    { method: 'POST', withSession: true },
+  );
+  return booking;
 }

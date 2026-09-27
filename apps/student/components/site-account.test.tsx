@@ -34,8 +34,9 @@ function linkedRoutes(href: string): HTMLAnchorElement[] {
 
 /**
  * The header's account corner, and the reason it owns one decision rather than two: where a
- * signed-out person belongs is the `Sign in` link's answer, and what a member can reach is
- * `My courses`. No screen redirects from here — `RequireSession` does that where it gates.
+ * signed-out person belongs is the `Sign in` link's answer, and what a member can reach is their
+ * two lists — the courses they hold a place in and the classes on their calendar. No screen
+ * redirects from here — `RequireSession` does that where it gates.
  */
 describe('SiteAccount', () => {
   it('offers a stranger the door that opens the rest', () => {
@@ -58,6 +59,9 @@ describe('SiteAccount', () => {
       'href',
       '/my-courses',
     );
+    // A place in a course and a class on a calendar are two different things to catch up on, and
+    // a member should not have to reach one through the other.
+    expect(screen.getByRole('link', { name: /my classes/i })).toHaveAttribute('href', '/my-classes');
     // The way out is a button, not a link: it ends a session rather than opening a page.
     expect(linkedRoutes('/login')).toHaveLength(0);
 

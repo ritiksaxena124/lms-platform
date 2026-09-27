@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_ERROR_CODES, SLOT_DENIAL_CODES, SLOT_ENTITLEMENT_CODES } from '@lms/shared';
 
 import { setAccessToken } from './api';
-import { bookSlot, myBookings, openSlotsFor } from './bookings';
+import { bookSlot, leaveClass, myBookings, openSlotsFor } from './bookings';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -158,5 +158,43 @@ describe('myBookings', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ bookings: [BOOKING, later] }));
 
     await expect(myBookings()).resolves.toEqual([BOOKING, later]);
+  });
+});
+
+describe('leaveClass', () => {
+  it('names the class in the path and sends nothing to get wrong', async () => {
+    setAccessToken('at-9');
+    const stood = { ...BOOKING, status: 'cancelled' };
+    fetchMock.mockResolvedValueOnce(jsonResponse({ booking: stood }));
+
+    await expect(leaveClass('6a27')).resolves.toEqual(stood);
+
+    expect(callAt(0).url).toBe(`${BASE_URL}/api/v1/bookings/6a27/cancel`);
+    expect(callAt(0).init.method).toBe('POST');
+    expect(bodyAt(0)).toBeUndefined();
+    expect((callAt(0).init.headers as Record<string, string>).authorization).toBe('Bearer at-9');
+  });
+
+  it('keeps an id from the URL inside the path it belongs to', async () => {
+    await leaveClass('../../admin');
+
+    expect(callAt(0).url).toBe(`${BASE_URL}/api/v1/bookings/..%2F..%2Fadmin/cancel`);
+  });
+
+  it('carries back a class that is no longer standing as a conflict', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          statusCode: 409,
+          code: API_ERROR_CODES.CONFLICT,
+          message: 'This class is not standing, so there is nothing to cancel.',
+        },
+        409,
+      ),
+    );
+
+    await expect(leaveClass('6a27')).rejects.toMatchObject({
+      code: API_ERROR_CODES.CONFLICT,
+    });
   });
 });
