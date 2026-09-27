@@ -23,6 +23,8 @@ export type IconName =
   | 'unlock'
   | 'layers'
   | 'arrow-right'
+  | 'chevron-left'
+  | 'chevron-right'
   | 'user';
 
 /** Ordered, not a `keyof`: the story gallery and the test that guards it walk
@@ -34,6 +36,8 @@ export const ICON_NAMES = [
   'unlock',
   'layers',
   'arrow-right',
+  'chevron-left',
+  'chevron-right',
   'user',
 ] as const satisfies readonly IconName[];
 
@@ -78,6 +82,10 @@ const ARTWORK: Record<IconName, ReactNode> = {
       <path d="m11.6 6.2 4.6 3.8-4.6 3.8" />
     </>
   ),
+  // The pair that walks a calendar one week at a time. No shaft: an arrow says "go on", a chevron
+  // says "the next one of these", which is what a week navigator is.
+  'chevron-left': <path d="m11.8 5.4-4.6 4.6 4.6 4.6" />,
+  'chevron-right': <path d="m8.2 5.4 4.6 4.6-4.6 4.6" />,
   user: (
     <>
       <circle cx="10" cy="7.4" r="3.3" />
