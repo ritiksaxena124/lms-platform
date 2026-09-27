@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
 
 import { AllExceptionsFilter } from './common/filters/all-exceptions.filter';
@@ -31,6 +32,10 @@ import { ReferenceModule } from './reference/reference.module';
     BookingsModule,
     // Coarse default for the POC; auth endpoints get a tighter limit in Phase 2.
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
+    // The one clock the platform runs on its own. Currently only the sweep of class requests
+    // nobody answered (`BookingExpiryService`); anything else that has to happen whether or not
+    // someone is asking registers here, and each job decides its own schedule.
+    ScheduleModule.forRoot(),
   ],
   providers: [
     AppLogger,

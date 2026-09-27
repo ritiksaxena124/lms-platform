@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AvailabilityModule } from '../availability/availability.module';
 import { EnrollmentsModule } from '../enrollments/enrollments.module';
+import { BookingExpiryService } from './booking-expiry.service';
 import { BookingsController } from './bookings.controller';
 import { BookingsRepository } from './bookings.repository';
 import { BookingsService } from './bookings.service';
@@ -17,10 +18,13 @@ import { BookingsService } from './bookings.service';
  *
  * The slots route derives its grid instead of storing one, which is the reason the two reads
  * above are live rather than a snapshot a teacher's edit would have to keep in step with.
+ *
+ * `BookingExpiryService` is the third thing that stops a request from being pending, and the only
+ * one with no person behind it — a teacher who never replies still has to give the minute back.
  */
 @Module({
   imports: [AvailabilityModule, EnrollmentsModule],
   controllers: [BookingsController],
-  providers: [BookingsService, BookingsRepository],
+  providers: [BookingsService, BookingsRepository, BookingExpiryService],
 })
 export class BookingsModule {}

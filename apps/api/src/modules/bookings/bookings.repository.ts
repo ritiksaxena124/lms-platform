@@ -307,6 +307,38 @@ export class BookingsRepository {
   }
 
   /**
+   * End every request that has run out, and hand back the minutes it was holding. Returns how
+   * many rows the sweep changed.
+   *
+   * Two clocks, because they ask different questions. `olderThan` is a teacher's silence read as
+   * the answer it is, whatever the class time; `at` is a class minute that arrived without a yes,
+   * however recently the student asked. Either one on its own is enough to end the request, and a
+   * week of nightly classes swept on age alone would hold seven minutes nobody is standing in.
+   *
+   * One `updateMany` rather than a read-and-swap per row, because there is no caller here to give
+   * an outcome to: whoever wanted the decision has already gone. The pending status in the `where`
+   * is what makes the sweep safe to run twice and safe to run in two places at once — an expired
+   * row is no longer pending, so a second pass finds nothing, and a row that some newer request
+   * has just been given the hold to cannot be taken back by an older sweep arriving late.
+   */
+  async expirePending(args: {
+    pendingStatusValueId: string;
+    expiredStatusValueId: string;
+    olderThan: Date;
+    at: Date;
+  }): Promise<number> {
+    const { count } = await this.prisma.booking.updateMany({
+      where: {
+        isActive: true,
+        statusValueId: args.pendingStatusValueId,
+        OR: [{ createdAt: { lte: args.olderThan } }, { startsAt: { lte: args.at } }],
+      },
+      data: { statusValueId: args.expiredStatusValueId, slotHeldAt: null },
+    });
+    return count;
+  }
+
+  /**
    * Stand a student down from one of their classes, and hand the minute back.
    *
    * One write, because the two halves have to happen together: a row that says cancelled while
