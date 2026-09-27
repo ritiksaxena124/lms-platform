@@ -1,4 +1,4 @@
-import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Inject, Injectable, NotFoundException } from '@nestjs/common';
 import {
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
@@ -14,6 +14,10 @@ import {
   type CoursePrice,
 } from '@lms/shared';
 
+import type { Request, Response } from 'express';
+
+import { missingRecording, streamLessonVideo } from '../../common/http/lesson-video';
+import { STORAGE, type Storage } from '../../providers/storage/storage.port';
 import { ReferenceService } from '../../reference/reference.service';
 import type {
   CatalogCourseRef,
@@ -173,6 +177,7 @@ export class CatalogService {
   constructor(
     private readonly catalog: CatalogRepository,
     private readonly reference: ReferenceService,
+    @Inject(STORAGE) private readonly storage: Storage,
   ) {}
 
   async list(input: CatalogListInput): Promise<{
@@ -228,6 +233,53 @@ export class CatalogService {
    * and says nothing about whether the page exists.
    */
   async lesson(address: string, lessonId: string, viewerId?: string): Promise<CatalogLessonPage> {
+    return toLessonPage(await this.readableLesson(address, lessonId, viewerId));
+  }
+
+  /**
+   * The recording on a page, streamed to whoever that page opens for.
+   *
+   * This asks the same question the page route asks, in the same words and the same query, and
+   * then does something different with the answer: instead of text it carries bytes. That is the
+   * whole design of the read side — one gate with two readers behind it, so that "may I see this
+   * page" and "may I watch this page" cannot drift apart the way two copies of a rule do. A
+   * recording is the part a student paid for, and the door on it is the door on the lesson.
+   *
+   * Nothing here re-checks the course's published status or the enrollment: `readableLesson` is
+   * the only place those are compared, and a second copy would be a second chance to get one
+   * wrong. What is added is only the recording's own absence — a page may well have no video —
+   * and the range, which is the shared reader's business (§6).
+   */
+  async play(
+    address: string,
+    lessonId: string,
+    viewerId: string | undefined,
+    source: { req: Request; res: Response },
+  ): Promise<void> {
+    const lesson = await this.readableLesson(address, lessonId, viewerId);
+    const video = await this.catalog.standingVideo(lesson.id);
+    if (!video) throw missingRecording();
+
+    await streamLessonVideo(
+      {
+        contentType: video.contentType,
+        bytes: video.bytes,
+        // The key goes into the store and nowhere else, not even into this method's caller: the
+        // route that reads these bytes is the only address they have.
+        open: (window) => this.storage.open(video.storedKey, window),
+      },
+      source.req,
+      source.res,
+    );
+  }
+
+  /** The page, if this reader may have it — the one door every catalog read of a lesson goes
+   * through, whatever it is they want from the page afterwards. */
+  private async readableLesson(
+    address: string,
+    lessonId: string,
+    viewerId?: string,
+  ): Promise<ReadableLessonRow> {
     const lesson = UUID.test(lessonId)
       ? await this.catalog.findReadable(
           courseRef(address),
@@ -244,7 +296,7 @@ export class CatalogService {
       });
     }
 
-    return toLessonPage(lesson);
+    return lesson;
   }
 
   /** The two published statuses, plus the level and phrase a caller filtered on. Codes are

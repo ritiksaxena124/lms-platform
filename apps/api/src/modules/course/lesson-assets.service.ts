@@ -5,6 +5,7 @@ import type { Request, Response } from 'express';
 
 import { ENV } from '../../config/env.module';
 import type { AppEnv } from '../../config/env';
+import { missingRecording, streamLessonVideo } from '../../common/http/lesson-video';
 import { STORAGE, type Storage } from '../../providers/storage/storage.port';
 import { CourseModulesRepository } from './course-modules.repository';
 import { readLessonVideo } from './lesson-asset-upload';
@@ -100,6 +101,37 @@ export class LessonAssetsService {
     const lesson = await this.writableLesson(teacherUserId, moduleId, lessonId);
     const row = await this.assets.findStanding(lesson.id);
     return row ? toAsset(row) : null;
+  }
+
+  /**
+   * Play the page's recording back to the teacher who uploaded it.
+   *
+   * The gate is the one the rest of this service uses — the module resolved against the courses
+   * this session owns, and "not yours" answered as "not there" — and everything after it is the
+   * shared ranged reader: the same window arithmetic, the same headers, the same door a student
+   * goes through. That is the point of it being one function rather than a second implementation
+   * here. Two routes, one way to the bytes, because a second reader is a second place for the
+   * gate to be wrong.
+   */
+  async play(
+    teacherUserId: string,
+    moduleId: string,
+    lessonId: string,
+    source: { req: Request; res: Response },
+  ): Promise<void> {
+    const lesson = await this.writableLesson(teacherUserId, moduleId, lessonId);
+    const asset = await this.assets.findStanding(lesson.id);
+    if (!asset) throw missingRecording();
+
+    await streamLessonVideo(
+      {
+        contentType: asset.contentType,
+        bytes: asset.bytes,
+        open: (window) => this.storage.open(asset.storedKey, window),
+      },
+      source.req,
+      source.res,
+    );
   }
 
   /** The page, proved reachable by this session and still in the syllabus. A page taken out of

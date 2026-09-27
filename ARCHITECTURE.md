@@ -173,6 +173,20 @@ write instead of truncating it (which is also why it is not multer's own `fileSi
 local adapter erases a write that never finished, and `displayName` is stored as the text it is
 while the key is minted here from the lesson's id and a uuid.
 
+Step 5e is the other direction, and it is where `open` grew a window. A `<video>` element does not
+download a recording, it seeks — the head of the file to find its metadata, then whatever range is
+under the scrubber — so the window is decided in `common/http/byte-range.ts` against the length the
+`LessonAsset` row already carries, never against a `stat` of the file: bytes behind a key are
+written once, and the row is the record of how long they were. A header the server cannot make
+sense of is ignored and the whole file goes out; a well-formed one beginning past the end is a real
+question answered `416` with the real length, which is how a player learns it has outgrown the
+recording. Both audiences share one writer of those answers, `streamLessonVideo`, so the teacher's
+own page and a student's gated page cannot drift into two range contracts — and each of them opens
+the file *before* the first header leaves, so a refusal is still the JSON envelope rather than a
+`200` that goes quiet halfway. `apps/api/test/lesson-asset-stream.spec.ts` holds the teacher's
+side of that contract and `apps/api/test/lesson-video-stream.spec.ts` the student's, including the
+case a player creates on its own: a tab closed mid-seek, after which the next request has to work.
+
 Video is the second port to be real (step 5c). `apps/api/src/providers/video` answers exactly
 one question — _where would a class named this be held_ — and its `jitsi` adapter builds
 `https://<JITSI_DOMAIN>/<name>` without asking the bridge anything, because a Jitsi room exists
@@ -437,9 +451,10 @@ domain module would only re-derive the same two hops.
 ## 11. The catalog: what a stranger may read
 
 The catalog is the same course seen by somebody who cannot edit it — `GET
-/api/v1/catalog/courses`, `/catalog/courses/levels`, `/catalog/courses/:id` and `/catalog/courses/:id/lessons/:lessonId`, in their own Nest
-module (`modules/catalog`) because the question they answer is different in kind: no ownership,
-no writes, and — but for the one route below — no session either.
+/api/v1/catalog/courses`, `/catalog/courses/levels`, `/catalog/courses/:id`,
+`/catalog/courses/:id/lessons/:lessonId` and that page's `…/video`, in their own Nest module
+(`modules/catalog`) because the question they answer is different in kind: no ownership,
+no writes, and — but for the routes below — no session either.
 
 - **It is the only public surface in the API, deliberately.** A shop window has to be readable
   before anybody is asked to sign in, and what it can reach is decided by the rows' own statuses
@@ -468,6 +483,13 @@ no writes, and — but for the one route below — no session either.
   returns a body for a page its caller may open: one the teacher marked `isFreePreview`, or any
   published page of a course they hold a place in. It is one route, not a syllabus row with text
   slipped in, so the outline keeps one shape whether or not any room on it happens to be open.
+- **A page's recording is that same door, answered in bytes.** `GET
+  /catalog/courses/:id/lessons/:lessonId/video` asks the readable-page question above and nothing
+  subtler — a locked page, a page of a course nobody published and a page that never was all
+  answer the one `404` — and then streams the standing `LessonAsset` with its range honoured (§6).
+  It is a route rather than a link on the page because a guessable URL for these bytes would be a
+  second door around every gate on this shelf, which is also why no response here carries the
+  store's key.
 - **Each outline row carries two flags, because they answer two questions.** `isFreePreview` is
   the teacher's statement about the page — true whether or not anybody is signed in, and worth a
   badge. `isReadable` is about the reader: it says the page route will hand _this_ caller the

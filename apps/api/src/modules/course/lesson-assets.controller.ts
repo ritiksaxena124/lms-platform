@@ -42,4 +42,24 @@ export class LessonAssetsController {
   ): Promise<LessonAssetResponse> {
     return { asset: await this.assets.standing(user.id, moduleId, lessonId) };
   }
+
+  /**
+   * The recording itself, played back to the teacher whose page carries it.
+   *
+   * A route that answers with a file takes the response over: the status, the headers and the
+   * end of the stream are decided inside the shared ranged reader rather than by a serialiser
+   * with no idea what a seek is. It lives on this address and not a public one because the key
+   * these bytes live under is the store's business — a URL for a paid recording is exactly what
+   * this module was built not to have.
+   */
+  @Get('video')
+  async play(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('moduleId') moduleId: string,
+    @Param('lessonId') lessonId: string,
+    @Req() req: Request,
+    @Res() res: Response,
+  ): Promise<void> {
+    await this.assets.play(user.id, moduleId, lessonId, { req, res });
+  }
 }

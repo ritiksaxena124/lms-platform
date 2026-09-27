@@ -56,6 +56,26 @@ describe('local storage adapter', () => {
     expect((await collect(opened)).toString('utf8')).toBe('\u0000FTYPisom\u0000\u0000free');
   });
 
+  it('hands back one window of a file, both ends of it included', async () => {
+    await storage.put({
+      key: 'seekable.mp4',
+      contentType: 'video/mp4',
+      body: chunks('0123456789', 'abcdefghij'),
+    });
+
+    // A player seeking asks for bytes 4 to 7 of a recording, and the answer has to be exactly
+    // four bytes long: `end` inclusive is what the `Content-Range` header a browser is being
+    // shown promises, and a store that read four bytes starting at the fifth would put the
+    // whole stream out of position by one.
+    const slice = await storage.open('seekable.mp4', { start: 4, end: 7 });
+    expect((await collect(slice)).toString('utf8')).toBe('4567');
+
+    // The read left nothing behind. A ranged read that could truncate or append would make a
+    // client's abandoned seek — a tab closed mid-stream, which is the ordinary case — a way to
+    // damage a recording, so this is the sentence the no-cleanup-on-read decision rests on.
+    expect(await readFile(join(root, 'seekable.mp4'), 'utf8')).toBe('0123456789abcdefghij');
+  });
+
   it('makes room for a key whose directories nobody created', async () => {
     await storage.put({
       key: 'lessons/2026/09/pie.mp4',
@@ -147,6 +167,11 @@ describe('local storage adapter', () => {
 
   it('refuses to open a key it would refuse to write', async () => {
     await expect(storage.open('../../etc/passwd')).rejects.toThrow(UnsafeStorageKeyError);
+    // Including on the way a seek comes in: a window is an argument to the same read, not a
+    // second door with its own rules about what a key may name.
+    await expect(storage.open('../../etc/passwd', { start: 0, end: 8 })).rejects.toThrow(
+      UnsafeStorageKeyError,
+    );
   });
 
   it('does not touch the disk until something is written', async () => {

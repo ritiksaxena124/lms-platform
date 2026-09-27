@@ -97,6 +97,18 @@ export type ReadableLessonRow = Prisma.LessonGetPayload<{
   select: typeof READABLE_LESSON_SELECT;
 }>;
 
+/** What the route that plays a recording needs from it: what the bytes are, how long they are,
+ * and the key that stays behind the door. */
+const STANDING_VIDEO_SELECT = {
+  contentType: true,
+  bytes: true,
+  storedKey: true,
+} as const satisfies Prisma.LessonAssetSelect;
+
+export type StandingVideoRow = Prisma.LessonAssetGetPayload<{
+  select: typeof STANDING_VIDEO_SELECT;
+}>;
+
 /** A course as a browser addressed it: the id the API issued, or the slug its author chose.
  * Both name one row, so the two must never answer differently. */
 export type CatalogCourseRef = { id: string } | { slug: string };
@@ -229,5 +241,25 @@ export class CatalogRepository {
       select: READABLE_LESSON_SELECT,
     });
     return lesson;
+  }
+
+  /**
+   * The recording a page carries, asked for after the page was proved readable.
+   *
+   * A second query rather than an include on the gate above, because the two answer different
+   * questions and only one of them is a door: `findReadable` decides whether this caller may see
+   * the page at all, and nothing about a recording can change that answer. It also keeps the key
+   * out of the read that a browser can reach without a session — a page's text and a page's file
+   * are the same permission, but they do not have to be the same query.
+   *
+   * The newest standing row, which is the rule the teacher's own asset read uses too: a lesson
+   * keeps the takes it retired and plays exactly one of them.
+   */
+  async standingVideo(lessonId: string) {
+    return this.prisma.lessonAsset.findFirst({
+      where: { lessonId, isActive: true },
+      orderBy: { createdAt: 'desc' },
+      select: STANDING_VIDEO_SELECT,
+    });
   }
 }

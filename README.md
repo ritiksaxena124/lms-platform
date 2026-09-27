@@ -251,7 +251,11 @@ name — minted from a uuid, written beside the status, stored and never sent �
 list carries the window its door opens in, so a screen can draw a Join button and say when it
 works. The endpoint that hands the address out is now the other half of that: one POST, answered
 only for the two accounts a standing class is about and only while its window is open
-(ARCHITECTURE.md §14). The gate on a recorded lesson and both portals' players are still to come.
+(ARCHITECTURE.md §14). A recording is watched through the same kind of door: a page's bytes go out
+only to a caller its own gate admits — a free preview, or a place in the course — and they go out
+as the piece the player asked for, because a `<video>` element seeks rather than downloads. What
+is left of the phase is both portals: a teacher attaching and playing a recording, a student's
+player, and the Join button that opens the room.
 What is left of Phases 5–10 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and

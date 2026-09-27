@@ -9,6 +9,7 @@ import { Injectable } from '@nestjs/common';
 import type { AppEnv } from '../../config/env';
 import {
   MissingStoredObjectError,
+  type ByteWindow,
   type Storage,
   type StoredObject,
   UnsafeStorageKeyError,
@@ -45,7 +46,9 @@ function keySegments(key: string): string[] {
  * own, and a name nobody can guess is not the same thing as a permission.
  *
  * Writes stream (`put`) and reads stream (`open`), so the box never holds a whole recording in
- * memory; the size a teacher may upload is the boundary's decision, not this one.
+ * memory; the size a teacher may upload is the boundary's decision, not this one. A `range` on the
+ * read is the same argument one layer down — the filesystem seeks rather than copying, so the four
+ * seconds under a student's scrubber cost four seconds of disk instead of an hour of it.
  */
 @Injectable()
 export class LocalStorage implements Storage {
@@ -85,13 +88,15 @@ export class LocalStorage implements Storage {
     }
   }
 
-  async open(key: string): Promise<Readable> {
+  async open(key: string, range?: ByteWindow): Promise<Readable> {
     const path = this.pathFor(key);
     try {
       await access(path);
     } catch {
       throw new MissingStoredObjectError(key);
     }
-    return createReadStream(path);
+    // The default flag is `r`, and that is the whole of what makes a seek that never finished
+    // need no cleanup: a read never has the file open in a state where it could damage it.
+    return createReadStream(path, range);
   }
 }
