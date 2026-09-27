@@ -21,5 +21,9 @@ import { AvailabilityService } from './availability.service';
 @Module({
   controllers: [AvailabilityController],
   providers: [AvailabilityService, AvailabilityRepository],
+  // A slot is a window expanded into instants, so the booking calendar reads these rows through
+  // the repository that owns them rather than reaching for the table and re-deciding what
+  // "standing" means.
+  exports: [AvailabilityRepository],
 })
 export class AvailabilityModule {}

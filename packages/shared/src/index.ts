@@ -1,5 +1,6 @@
 export * from './availability';
 export * from './auth';
+export * from './bookings';
 export * from './catalog';
 export * from './course-modules';
 export * from './courses';

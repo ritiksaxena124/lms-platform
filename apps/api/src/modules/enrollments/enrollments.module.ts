@@ -25,5 +25,8 @@ import { EnrollmentsService } from './enrollments.service';
 @Module({
   controllers: [EnrollmentsController, CourseRosterController],
   providers: [EnrollmentsService, EnrollmentsRepository],
+  // "Does this student hold a place" is the first question a booking calendar asks, and the row it
+  // asks about belongs here.
+  exports: [EnrollmentsRepository],
 })
 export class EnrollmentsModule {}
