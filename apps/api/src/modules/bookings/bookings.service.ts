@@ -1,14 +1,24 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import {
   API_ERROR_CODES,
   BLOCKING_BOOKING_STATUSES,
   BOOKING_HORIZON_DAYS,
+  BOOKING_STATUS_CODES,
   BOOKING_TYPE_CODES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
   SLOT_DENIAL_CODES,
   SLOT_ENTITLEMENT_CODES,
   expandWindows,
+  slotAt,
+  type Booking,
+  type BookingStatusCode,
+  type BookingTypeCode,
   type OpenSlot,
   type OpenSlotsResponse,
   type SlotDenialCode,
@@ -18,14 +28,74 @@ import {
 import { AvailabilityRepository } from '../availability/availability.repository';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
 import { ReferenceService } from '../../reference/reference.service';
+import type { BookingRow } from './bookings.repository';
 import type { BookableCourseRow } from './bookings.repository';
 import { BookingsRepository } from './bookings.repository';
+import type { CreateBookingDto } from './dto/create-booking.dto';
 
 /** A course is addressed by the id the API issued or the slug a link carries; a shape that
  * cannot be an id is read as a slug, which is the rule the catalog already runs on. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
+
+const MS_PER_MINUTE = 60 * 1000;
+
+/** A row out of the booking table, in the shape every portal reads it.
+ *
+ * The lookup ids become the codes the shared vocabulary uses, and the end is worked out from the
+ * length the table froze rather than stored: a class that was booked as an hour is an hour, even
+ * after the teacher's window around it changes, which is the whole reason the length lives on the
+ * row instead of being re-derived from the rules at display time. */
+function toBooking(row: BookingRow): Booking {
+  return {
+    id: row.id,
+    course: { id: row.courseId },
+    type: row.type.code as BookingTypeCode,
+    status: row.status.code as BookingStatusCode,
+    startsAt: row.startsAt.toISOString(),
+    endsAt: new Date(row.startsAt.getTime() + row.durationMinutes * MS_PER_MINUTE).toISOString(),
+    durationMinutes: row.durationMinutes,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** Reported against `startsAt`, the box the student was choosing in, for the same reason the
+ * availability service reports an overlap against `startMinutes`: a person reading "this minute is
+ * taken" needs to know which minute the API means. */
+function takenMinute(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'Check the highlighted fields.',
+    details: {
+      validation: {
+        startsAt: ['That class time is no longer free. Pick another one from the calendar.'],
+      },
+    },
+  });
+}
+
+/** The two reasons a student who is entitled to nothing were told so on the calendar already,
+ * said again here because a write needs its own answer: `200` with an empty list is a screen, but
+ * a request that cannot exist is a conflict with the state of the course. */
+function notEntitled(denial: SlotDenialCode | null): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message:
+      denial === SLOT_DENIAL_CODES.DEMO_ALREADY_TAKEN
+        ? 'You have already used the one demo call this course offers. Enroll to book its classes.'
+        : 'Enroll in this course to book its classes.',
+  });
+}
+
+function fieldError(field: string, message: string): BadRequestException {
+  return new BadRequestException({
+    code: API_ERROR_CODES.VALIDATION_FAILED,
+    message: 'Check the highlighted fields.',
+    details: { validation: { [field]: [message] } },
+  });
+}
 
 /**
  * Who this student is to this course, or the reason they are nobody to it.
@@ -67,21 +137,7 @@ export class BookingsService {
   ) {}
 
   async openSlots(studentUserId: string, address: string): Promise<OpenSlotsResponse> {
-    const published = await this.reference.valueId(
-      LKP_TYPE_CODES.COURSE_STATUS,
-      COURSE_STATUS_CODES.PUBLISHED,
-    );
-    const course = await this.bookings.findBookableCourse(
-      UUID.test(address) ? { id: address } : { slug: address },
-      published,
-    );
-
-    if (!course) {
-      throw new NotFoundException({
-        code: API_ERROR_CODES.NOT_FOUND,
-        message: 'We cannot find that course.',
-      });
-    }
+    const course = await this.resolveCourse(address);
 
     const from = new Date();
     const to = new Date(from.getTime() + BOOKING_HORIZON_DAYS * MS_PER_DAY);
@@ -118,6 +174,98 @@ export class BookingsService {
       }));
 
     return { ...described, entitlement: access.code, denial: access.denial, slots };
+  }
+
+  /**
+   * Take a class: ask for one minute of a teacher's week, and hold it until they answer.
+   *
+   * The order is the price of each question, cheapest refusal first. A course the shelf does not
+   * carry is a `NOT_FOUND` before anything else is looked at, because a booking cannot be about a
+   * course that does not exist. Whether this student may book at all is answered next, from the
+   * enrollment and the course's own trial setting — before a week of windows is expanded for
+   * somebody who was never going to be offered one. Only then does the minute itself get judged,
+   * and only then is a row written.
+   *
+   * The instant must be one this teacher's grid opens *and* one inside the horizon the calendar
+   * searched. Both are needed and neither covers the other: the windows repeat weekly, so a minute
+   * two months out is a genuine class start that nobody has been shown, and holding a class the
+   * platform never offered is exactly what the horizon exists to stop.
+   *
+   * What the student sent is deliberately small. The kind of booking is the entitlement the read
+   * already derived — a place makes it an enrolled class, otherwise the trial door makes it a demo
+   * — and the length is the window's, taken from the tile the minute matched. A status is not
+   * accepted at all: a request is pending until the teacher says otherwise, and a student who
+   * could send `confirmed` would be confirming their own class.
+   *
+   * The insert is the only part that races, and it is the repository's problem to lock; a second
+   * press by the same student for the same minute replays their own row rather than answering a
+   * conflict, because the portal would otherwise have to remember whether it had been clicked.
+   */
+  async create(studentUserId: string, dto: CreateBookingDto): Promise<Booking> {
+    const course = await this.resolveCourse(dto.course);
+    const access = await this.entitlementFor(course, studentUserId);
+
+    if (access.code === SLOT_ENTITLEMENT_CODES.NONE) throw notEntitled(access.denial);
+
+    const from = new Date();
+    const to = new Date(from.getTime() + BOOKING_HORIZON_DAYS * MS_PER_DAY);
+    const startsAt = new Date(dto.startsAt);
+
+    if (startsAt < from || startsAt >= to) {
+      throw fieldError('startsAt', 'Pick a class from the coming month shown on the calendar.');
+    }
+
+    const windows = await this.rules.listActive(course.teacherUserId);
+    const tile = slotAt(windows, course.teacher.timezone, startsAt);
+    if (!tile) {
+      throw fieldError('startsAt', 'This teacher does not keep a class open at that minute.');
+    }
+
+    const result = await this.bookings.request({
+      studentUserId,
+      teacherUserId: course.teacherUserId,
+      courseId: course.id,
+      startsAt: tile.startsAt,
+      durationMinutes: Math.round(
+        (tile.endsAt.getTime() - tile.startsAt.getTime()) / MS_PER_MINUTE,
+      ),
+      typeValueId: await this.reference.valueId(
+        LKP_TYPE_CODES.BOOKING_TYPE,
+        access.code === SLOT_ENTITLEMENT_CODES.DEMO
+          ? BOOKING_TYPE_CODES.DEMO
+          : BOOKING_TYPE_CODES.ENROLLED,
+      ),
+      pendingStatusValueId: await this.reference.valueId(
+        LKP_TYPE_CODES.BOOKING_STATUS,
+        BOOKING_STATUS_CODES.PENDING,
+      ),
+      blockingStatusValueIds: await this.blockingStatusIds(),
+    });
+
+    if (result.outcome === 'held') throw takenMinute();
+
+    return toBooking(result.booking);
+  }
+
+  /** A course this platform can take a booking for: published, live, and addressed either way. */
+  private async resolveCourse(address: string): Promise<BookableCourseRow> {
+    const published = await this.reference.valueId(
+      LKP_TYPE_CODES.COURSE_STATUS,
+      COURSE_STATUS_CODES.PUBLISHED,
+    );
+    const course = await this.bookings.findBookableCourse(
+      UUID.test(address) ? { id: address } : { slug: address },
+      published,
+    );
+
+    if (!course) {
+      throw new NotFoundException({
+        code: API_ERROR_CODES.NOT_FOUND,
+        message: 'We cannot find that course.',
+      });
+    }
+
+    return course;
   }
 
   /** A place in the course, then the course's own invitation, then the student's history with it. */

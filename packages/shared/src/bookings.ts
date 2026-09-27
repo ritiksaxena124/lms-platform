@@ -7,6 +7,7 @@
  * teacher to confirm it. The instants themselves are cut from availability rules by
  * `schedule.ts`; nothing in this file stores or recomputes them.
  */
+import type { BookingStatusCode, BookingTypeCode } from './lookup-codes';
 
 /**
  * How the caller relates to the course whose calendar they opened.
@@ -50,4 +51,27 @@ export interface OpenSlotsResponse {
   from: string;
   to: string;
   slots: OpenSlot[];
+}
+
+/**
+ * A class a student has asked for.
+ *
+ * `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a
+ * calendar square has to say when the class is over, and making three portals add sixty minutes
+ * in three slightly different ways is how a lesson ends up finishing at two times.
+ *
+ * There is no student on it and no teacher either. A request is read from the door that owns it:
+ * a student's own list needs no names on its rows, and the teacher's list of requests is a
+ * separate shape that adds the student back, because that is the fact they are asking about.
+ */
+export interface Booking {
+  id: string;
+  course: { id: string };
+  type: BookingTypeCode;
+  status: BookingStatusCode;
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  createdAt: string;
+  updatedAt: string;
 }

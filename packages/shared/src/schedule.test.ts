@@ -5,7 +5,7 @@ import {
   PENDING_REQUEST_HOURS,
   SLOT_DAYS_PER_WEEK,
   expandWindows,
-  isWindowStart,
+  slotAt,
   type SlotInstant,
   type WeeklyWindow,
 } from './schedule';
@@ -39,7 +39,7 @@ const startsOf = (windows: WeeklyWindow[], timeZone: string, horizon: { from: Da
 
 /** An index read in a spec is a claim that the grid has that row in it, so let it say so rather
  * than quieting the compiler with `!` at every call site. */
-function slotAt(slots: SlotInstant[], index: number): SlotInstant {
+function rowAt(slots: SlotInstant[], index: number): SlotInstant {
   const slot = slots[index];
   if (!slot) throw new Error(`No slot at ${index}; the grid came back shorter than expected.`);
   return slot;
@@ -172,7 +172,7 @@ describe('availability window expansion', () => {
     // And the day the horizon opens is not a free half-day: the range starts at 00:00 UTC, which
     // is 05:30 in Kolkata, so that local date's 01:00–02:00 window had already closed and the
     // first offer is the next local day's class.
-    expect(slotAt(slots, 0).startsAt.toISOString()).toBe('2026-10-05T19:30:00.000Z');
+    expect(rowAt(slots, 0).startsAt.toISOString()).toBe('2026-10-05T19:30:00.000Z');
   });
 
   it('refuses to invent a class a window cannot hold', () => {
@@ -199,21 +199,24 @@ describe('availability window expansion', () => {
   it('asks the same arithmetic whether an instant was ever on the grid', () => {
     // A booking endpoint cannot accept an instant just because a student typed it: the minute has
     // to be one the teacher's windows open. Going through the expansion rather than a second copy
-    // of the tiling is what keeps "offered" and "bookable" from ever disagreeing.
+    // of the tiling is what keeps "offered" and "bookable" from ever disagreeing — and it hands
+    // back the class the window described, length included, rather than a bare yes.
     const windows = [window()];
     const monday = expandWindows(windows, 'Asia/Kolkata', WEEK);
-    const firstClass = slotAt(monday, 0);
+    const firstClass = rowAt(monday, 0);
 
-    expect(isWindowStart(windows, 'Asia/Kolkata', firstClass.startsAt)).toBe(true);
+    expect(slotAt(windows, 'Asia/Kolkata', firstClass.startsAt)).toEqual(firstClass);
     // Mid-class is not a start.
     expect(
-      isWindowStart(windows, 'Asia/Kolkata', new Date(firstClass.startsAt.getTime() + 15 * 60_000)),
-    ).toBe(false);
+      slotAt(windows, 'Asia/Kolkata', new Date(firstClass.startsAt.getTime() + 15 * 60_000)),
+    ).toBeNull();
     // Tuesday 10:00 in the same shape is a start of a *Tuesday* window, and there is none.
-    expect(isWindowStart(windows, 'Asia/Kolkata', new Date('2026-10-06T04:00:00.000Z'))).toBe(
-      false,
-    );
-    expect(isWindowStart([], 'Asia/Kolkata', firstClass.startsAt)).toBe(false);
+    expect(slotAt(windows, 'Asia/Kolkata', new Date('2026-10-06T04:00:00.000Z'))).toBeNull();
+    expect(slotAt([], 'Asia/Kolkata', firstClass.startsAt)).toBeNull();
+    // A minute with seconds on it is on no grid, whatever the tiles around it say.
+    expect(
+      slotAt(windows, 'Asia/Kolkata', new Date(firstClass.startsAt.getTime() + 1_000)),
+    ).toBeNull();
   });
 
   it('sorts two windows of one day into one calendar', () => {

@@ -11,7 +11,7 @@ import { getZoneParts, instantAtLocalMinutes, type LocalDate } from './timezone'
  * and nothing has to be repaired in a table afterwards.
  *
  * The same function answers "what is on the calendar" and "may this instant be booked" (see
- * `isWindowStart`), because those two questions must never have different answers.
+ * `slotAt`), because those two questions must never have different answers.
  */
 
 /** A window exactly as the rule stores it: a weekday and a stretch of local minutes. */
@@ -148,20 +148,29 @@ export function expandWindows(
 }
 
 /**
- * Whether this instant is one the windows open — asked of the expansion itself rather than a
- * second copy of the tiling, so "offered" and "bookable" cannot drift apart.
+ * The class a teacher's windows open at exactly this instant, or nothing.
+ *
+ * Asked of the expansion itself rather than a second copy of the tiling, so "offered" and
+ * "bookable" cannot drift apart: a booking endpoint gets back the same `SlotInstant` the calendar
+ * showed, including the length the window said the class was.
  *
  * The horizon is deliberately two days wide on each side: every tile belongs to the local date
  * the instant itself is read in, and a zone's day is at most twenty-five real hours long, so a
  * range that wide cannot miss the minute being asked about. Seconds are not on any grid.
  */
-export function isWindowStart(windows: WeeklyWindow[], timeZone: string, instant: Date): boolean {
-  if (getZoneParts(instant, timeZone).second !== 0) return false;
+export function slotAt(
+  windows: WeeklyWindow[],
+  timeZone: string,
+  instant: Date,
+): SlotInstant | null {
+  if (getZoneParts(instant, timeZone).second !== 0) return null;
   const around = {
     from: new Date(instant.getTime() - 2 * MS_PER_DAY),
     to: new Date(instant.getTime() + 2 * MS_PER_DAY),
   };
-  return expandWindows(windows, timeZone, around).some(
-    (slot) => slot.startsAt.getTime() === instant.getTime(),
+  return (
+    expandWindows(windows, timeZone, around).find(
+      (slot) => slot.startsAt.getTime() === instant.getTime(),
+    ) ?? null
   );
 }
