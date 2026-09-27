@@ -46,14 +46,23 @@ export type RoleCode = (typeof ROLE_CODES)[keyof typeof ROLE_CODES];
  */
 export const SELF_REGISTERABLE_ROLES = [ROLE_CODES.STUDENT, ROLE_CODES.TEACHER] as const;
 
+/**
+ * Where a booked class stands. A student's write opens a request, so `pending` is where every
+ * row starts and `confirmed` is a teacher's answer to it — the class is not on anyone's calendar
+ * until they give one. `expired` is nobody's answer: the request held a minute for as long as a
+ * teacher could reasonably be asked to reply and was then released by the sweep.
+ */
 export const BOOKING_STATUS_CODES = {
   PENDING: 'pending',
   CONFIRMED: 'confirmed',
   COMPLETED: 'completed',
   CANCELLED: 'cancelled',
   REJECTED: 'rejected',
+  EXPIRED: 'expired',
   NO_SHOW: 'no_show',
 } as const;
+
+export type BookingStatusCode = (typeof BOOKING_STATUS_CODES)[keyof typeof BOOKING_STATUS_CODES];
 
 /**
  * What kind of entitlement holds a slot. `enrolled` is a student who already holds a place in
@@ -70,10 +79,10 @@ export const BOOKING_TYPE_CODES = {
 export type BookingTypeCode = (typeof BOOKING_TYPE_CODES)[keyof typeof BOOKING_TYPE_CODES];
 
 /**
- * The booking statuses Phase 4's code actually transitions through. The full
- * `BOOKING_STATUS_CODES` set is reserved for later phases — `rejected` belongs to a
- * moderation flow that does not exist yet, so seeding it now would put a row in the database
- * that no code can move a booking into, which is the drift lookups exist to prevent (§3).
+ * The booking statuses Phase 4's code actually moves a row through. The two the teacher's answer
+ * needs sit at the end rather than beside the transitions they belong to, because the seed is
+ * insert-only and writes a row's `position` from its index: renumbering the earlier codes would
+ * leave every existing database holding one order and every fresh one reading another.
  */
 export const SCHEDULABLE_BOOKING_STATUSES = [
   BOOKING_STATUS_CODES.PENDING,
@@ -81,9 +90,15 @@ export const SCHEDULABLE_BOOKING_STATUSES = [
   BOOKING_STATUS_CODES.CANCELLED,
   BOOKING_STATUS_CODES.COMPLETED,
   BOOKING_STATUS_CODES.NO_SHOW,
+  BOOKING_STATUS_CODES.REJECTED,
+  BOOKING_STATUS_CODES.EXPIRED,
 ] as const;
 
-/** Bookings in these statuses still occupy the teacher's slot. */
+/**
+ * Bookings in these statuses still occupy the teacher's slot. A request holds the minute while
+ * the teacher decides, which is the price of asking them; everything after an answer — refused,
+ * called off, left unanswered until it expired, taught — gives it back.
+ */
 export const BLOCKING_BOOKING_STATUSES: readonly string[] = [
   BOOKING_STATUS_CODES.PENDING,
   BOOKING_STATUS_CODES.CONFIRMED,

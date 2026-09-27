@@ -8,4 +8,5 @@ export * from './error-codes';
 export * from './lookup-codes';
 export * from './lessons';
 export * from './money';
+export * from './schedule';
 export * from './timezone';

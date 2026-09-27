@@ -120,9 +120,11 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
   },
   /**
    * The booking vocabulary Phase 4 schedules against. Kind decides who may take a slot and
-   * status decides whether it is still held. Only the statuses a Phase 4 transition can reach
-   * are seeded — `rejected` is reserved for a moderation flow (§6) and seeding an unreachable
-   * row is exactly the drift a lookup table is meant to prevent (§3).
+   * status decides whether it is still held. Only the statuses a Phase 4 transition can reach are
+   * seeded: `rejected` was reserved for a moderation flow (§6) until a teacher's answer to a
+   * request needed one, and `expired` is the sweep giving a minute back that nobody answered.
+   * Seeding an unreachable row is the drift a lookup table exists to prevent (§3), which is why
+   * these two arrived with the code that writes them and not with the table.
    */
   [LKP_TYPE_CODES.BOOKING_TYPE]: {
     description: 'What entitlement holds a booked slot',
@@ -136,6 +138,8 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at(BOOKING_STATUS_CODES.CANCELLED, 'Cancelled'),
       at(BOOKING_STATUS_CODES.COMPLETED, 'Completed'),
       at(BOOKING_STATUS_CODES.NO_SHOW, 'No show'),
+      at(BOOKING_STATUS_CODES.REJECTED, 'Rejected'),
+      at(BOOKING_STATUS_CODES.EXPIRED, 'Expired'),
     ],
   },
 };

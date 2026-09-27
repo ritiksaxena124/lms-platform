@@ -5,6 +5,7 @@ import {
   BOOKING_STATUS_CODES,
   BOOKING_TYPE_CODES,
   ROLE_CODES,
+  SCHEDULABLE_BOOKING_STATUSES,
   SELF_REGISTERABLE_ROLES,
   validateLookupSeeds,
 } from './lookup-codes';
@@ -47,8 +48,24 @@ describe('lookup reference codes', () => {
       'completed',
       'cancelled',
       'rejected',
+      'expired',
       'no_show',
     ]);
+  });
+
+  it('releases a minute the teacher refused or never answered', () => {
+    // A request that was said no to, or left unanswered until the sweep released it, has to give
+    // the instant back — otherwise a teacher's silence would keep blocking a calendar forever.
+    expect(BLOCKING_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.REJECTED);
+    expect(BLOCKING_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.EXPIRED);
+  });
+
+  it('seeds every status Phase 4 can move a booking into', () => {
+    // The sweep writes `expired`, and a teacher's refusal writes `rejected`. A status no code can
+    // reach is the drift lookups exist to prevent, and a status some code does reach had no row
+    // until the confirm flow existed.
+    expect(SCHEDULABLE_BOOKING_STATUSES).toContain(BOOKING_STATUS_CODES.REJECTED);
+    expect(SCHEDULABLE_BOOKING_STATUSES).toContain(BOOKING_STATUS_CODES.EXPIRED);
   });
 
   it('fails loudly when a reference type the application reads has no seeded values', () => {

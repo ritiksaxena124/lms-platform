@@ -123,6 +123,36 @@ export function shortZoneLabel(instant: Date | string | number, timeZone: string
   return `GMT${sign}${Math.floor(abs / 60)}${abs % 60 ? `:${String(abs % 60).padStart(2, '0')}` : ''}`;
 }
 
+export interface LocalDate {
+  year: number;
+  month: number;
+  day: number;
+}
+
+/**
+ * The instant a zone's wall clock reads `minutes` past midnight on `localDate`.
+ *
+ * Two passes, because the offset is only knowable from an instant and the instant is what we
+ * are looking for: the first guess uses the offset on the far side of the transition, the
+ * second corrects it against the offset the guess actually lands in.
+ *
+ * The zone's own clock has the final word — a caller that needs certainty re-reads the result
+ * with `getZoneParts` and compares. A skipped clock face (spring forward) resolves to an instant
+ * that reads a *different* face, which is how the caller learns the minute never arrived; a
+ * repeated one (fall back) resolves to whichever of the two passes the offset leads to, so the
+ * same request always names the same instant.
+ */
+export function instantAtLocalMinutes(
+  timeZone: string,
+  localDate: LocalDate,
+  minutes: number,
+): Date {
+  const wallClockAsUtc =
+    Date.UTC(localDate.year, localDate.month - 1, localDate.day, 0, 0, 0) + minutes * 60_000;
+  const guessed = wallClockAsUtc - zoneOffsetMinutes(new Date(wallClockAsUtc), timeZone) * 60_000;
+  return new Date(wallClockAsUtc - zoneOffsetMinutes(new Date(guessed), timeZone) * 60_000);
+}
+
 export function zoneOffsetMinutes(instant: Date | string | number, timeZone: string): number {
   const date = toUtcInstant(instant);
   const parts = getZoneParts(date, timeZone);
