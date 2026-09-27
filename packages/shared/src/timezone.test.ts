@@ -3,8 +3,12 @@ import { describe, expect, it } from 'vitest';
 import {
   formatInZone,
   getZoneParts,
+  instantAtLocalMinutes,
   isValidIanaTimeZone,
+  localDateKey,
   shortZoneLabel,
+  zoneDateKey,
+  zoneDateOf,
   zoneOffsetMinutes,
 } from './timezone';
 
@@ -63,5 +67,43 @@ describe('timezone display', () => {
 
   it('refuses to guess at a non-instant', () => {
     expect(() => formatInZone('not-a-date', 'Asia/Kolkata')).toThrow();
+  });
+});
+
+/**
+ * A calendar column is a date in somebody's zone before it is an instant, and the two ways a
+ * screen asks about one — "which date is this slot" and "which date is this column" — must give
+ * the same string or the slot lands on the wrong Tuesday.
+ */
+describe('local dates', () => {
+  it('names the zone calendar date an instant falls on', () => {
+    expect(zoneDateOf('2026-09-28T04:00:00Z', 'Asia/Kolkata')).toEqual({
+      year: 2026,
+      month: 9,
+      day: 28,
+    });
+    // Twenty:00 UTC is already the next morning in Kolkata: the day belongs to the zone, not to
+    // the UTC midnight that a naive `toISOString().slice(0, 10)` would have used.
+    expect(zoneDateOf('2026-09-28T20:00:00Z', 'Asia/Kolkata')).toEqual({
+      year: 2026,
+      month: 9,
+      day: 29,
+    });
+  });
+
+  it('writes a zone date as a padded key', () => {
+    expect(zoneDateKey('2026-09-05T20:00:00Z', 'Asia/Kolkata')).toBe('2026-09-06');
+    expect(zoneDateKey('2027-01-01T00:00:00Z', 'Pacific/Kiritimati')).toBe('2027-01-01');
+    expect(localDateKey({ year: 2026, month: 12, day: 1 })).toBe('2026-12-01');
+  });
+
+  it('agrees with itself whichever way the question was asked', () => {
+    const zone = 'America/New_York';
+    const date = { year: 2026, month: 3, day: 14 };
+    // A whole day of instants, read back, all land on the same key the column would carry.
+    for (const minutes of [0, 8 * 60 + 30, 23 * 60 + 59]) {
+      const instant = instantAtLocalMinutes(zone, date, minutes);
+      expect(zoneDateKey(instant, zone)).toBe(localDateKey(date));
+    }
   });
 });

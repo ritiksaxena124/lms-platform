@@ -130,6 +130,30 @@ export interface LocalDate {
 }
 
 /**
+ * The day an instant is on, as the zone sees it.
+ *
+ * Not the UTC date: a class booked for "Monday evening" in Kolkata is a Wednesday morning in
+ * the database, and a calendar that grouped its columns by the stored date would put it two days
+ * from where the teacher's clock says it is.
+ */
+export function zoneDateOf(instant: Date | string | number, timeZone: string): LocalDate {
+  const { year, month, day } = getZoneParts(instant, timeZone);
+  return { year, month, day };
+}
+
+/** `2026-09-28`. Padded so that sorting two keys sorts the two days the same way. */
+export function localDateKey(date: LocalDate): string {
+  const month = String(date.month).padStart(2, '0');
+  const day = String(date.day).padStart(2, '0');
+  return `${date.year}-${month}-${day}`;
+}
+
+/** The same key, asked from an instant instead of from a date. */
+export function zoneDateKey(instant: Date | string | number, timeZone: string): string {
+  return localDateKey(zoneDateOf(instant, timeZone));
+}
+
+/**
  * The instant a zone's wall clock reads `minutes` past midnight on `localDate`.
  *
  * Two passes, because the offset is only knowable from an instant and the instant is what we

@@ -1,5 +1,10 @@
 import { MAX_END_MINUTES, MAX_START_MINUTES, MINUTES_IN_DAY, MIN_WEEKDAY } from './availability';
-import { getZoneParts, instantAtLocalMinutes, type LocalDate } from './timezone';
+import {
+  getZoneParts,
+  instantAtLocalMinutes,
+  zoneDateOf,
+  type LocalDate,
+} from './timezone';
 
 /**
  * The one place a teacher's weekly windows become the instants a student is offered.
@@ -47,13 +52,13 @@ export const PENDING_REQUEST_HOURS = 24;
 const MS_PER_DAY = 24 * 60 * 60_000;
 const MS_PER_MINUTE = 60_000;
 
-function localDateOf(instant: Date, timeZone: string): LocalDate {
-  const { year, month, day } = getZoneParts(instant, timeZone);
-  return { year, month, day };
-}
-
-/** A calendar date stepped by days, so a DST shift can never shorten or lengthen the walk. */
-function addDays(date: LocalDate, days: number): LocalDate {
+/**
+ * A calendar date stepped by days, so a DST shift can never shorten or lengthen the walk.
+ *
+ * Exported because a screen that pages a week needs the same walk the generator does: seven
+ * twenty-four-hour slices across the spring-forward weekend land on six columns and skip one.
+ */
+export function addLocalDays(date: LocalDate, days: number): LocalDate {
   const moved = new Date(Date.UTC(date.year, date.month - 1, date.day) + days * MS_PER_DAY);
   return { year: moved.getUTCFullYear(), month: moved.getUTCMonth() + 1, day: moved.getUTCDate() };
 }
@@ -63,7 +68,7 @@ function serialOf(date: LocalDate): number {
 }
 
 /** Monday is 1, the way the availability table stores it. */
-function isoWeekdayOf(date: LocalDate): number {
+export function isoWeekdayOf(date: LocalDate): number {
   const sundayFirst = new Date(serialOf(date)).getUTCDay();
   return ((sundayFirst + 6) % SLOT_DAYS_PER_WEEK) + MIN_WEEKDAY;
 }
@@ -129,8 +134,8 @@ export function expandWindows(
   }
 
   const slots = new Map<number, SlotInstant>();
-  const lastDate = localDateOf(horizon.to, timeZone);
-  for (let date = localDateOf(horizon.from, timeZone); serialOf(date) <= serialOf(lastDate);) {
+  const lastDate = zoneDateOf(horizon.to, timeZone);
+  for (let date = zoneDateOf(horizon.from, timeZone); serialOf(date) <= serialOf(lastDate);) {
     for (const window of byWeekday.get(isoWeekdayOf(date)) ?? []) {
       for (const minutes of tileMinutes(window)) {
         const startsAt = resolveTile(timeZone, date, minutes);
@@ -141,7 +146,7 @@ export function expandWindows(
         });
       }
     }
-    date = addDays(date, 1);
+    date = addLocalDays(date, 1);
   }
 
   return [...slots.values()].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());

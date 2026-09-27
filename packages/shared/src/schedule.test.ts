@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
+import { MIN_WEEKDAY } from './availability';
 import {
   BOOKING_HORIZON_DAYS,
   PENDING_REQUEST_HOURS,
   SLOT_DAYS_PER_WEEK,
+  addLocalDays,
   expandWindows,
+  isoWeekdayOf,
   slotAt,
   type SlotInstant,
   type WeeklyWindow,
@@ -242,5 +245,55 @@ describe('availability window expansion', () => {
     // named rather than written inline.
     expect(PENDING_REQUEST_HOURS).toBe(24);
     expect(BOOKING_HORIZON_DAYS).toBe(30);
+  });
+});
+
+/**
+ * A calendar that pages by week walks dates, not instants: `expandWindows` already depends on
+ * that, and the same arithmetic is what a student's screen needs to show the next seven columns
+ * without losing a day to a clock that shifts by an hour.
+ */
+describe('walking local dates', () => {
+  it('steps the calendar rather than twenty-four hours at a time', () => {
+    // The UK spring-forward falls on 29 March 2026: that weekend is 167 real hours long.
+    expect(addLocalDays({ year: 2026, month: 3, day: 28 }, 1)).toEqual({
+      year: 2026,
+      month: 3,
+      day: 29,
+    });
+    expect(addLocalDays({ year: 2026, month: 3, day: 29 }, 1)).toEqual({
+      year: 2026,
+      month: 3,
+      day: 30,
+    });
+  });
+
+  it('carries a date over a month, a year and a leap day', () => {
+    expect(addLocalDays({ year: 2026, month: 2, day: 28 }, 1)).toEqual({
+      year: 2026,
+      month: 3,
+      day: 1,
+    });
+    expect(addLocalDays({ year: 2028, month: 2, day: 28 }, 1)).toEqual({
+      year: 2028,
+      month: 2,
+      day: 29,
+    });
+    expect(addLocalDays({ year: 2026, month: 1, day: 1 }, -1)).toEqual({
+      year: 2025,
+      month: 12,
+      day: 31,
+    });
+  });
+
+  it('lands a week of columns on seven different weekdays', () => {
+    // 28 September 2026 is a Monday, the way the availability table numbers it.
+    const monday = { year: 2026, month: 9, day: 28 };
+    expect(isoWeekdayOf(monday)).toBe(MIN_WEEKDAY);
+    const week = Array.from({ length: SLOT_DAYS_PER_WEEK }, (_, index) =>
+      addLocalDays(monday, index),
+    );
+    expect(week.map(isoWeekdayOf)).toEqual([1, 2, 3, 4, 5, 6, 7]);
+    expect(isoWeekdayOf(addLocalDays(monday, 7))).toBe(MIN_WEEKDAY);
   });
 });

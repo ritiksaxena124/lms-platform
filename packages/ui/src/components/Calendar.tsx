@@ -71,7 +71,7 @@ export interface CalendarProps {
 
 const CHIP: Record<CalendarChipTone, string> = {
   available: 'border-line bg-surface text-ink hover:border-brand-line hover:bg-brand-soft',
-  selected: 'border-brand-line bg-brand-soft text-brand-deep',
+  selected: 'border-brand bg-brand-soft text-brand-deep',
   pending: 'border-warning-soft bg-warning-soft text-warning',
   confirmed: 'border-success-soft bg-success-soft text-success',
   closed: 'border-line bg-paper-sunk text-ink-faint',

@@ -215,6 +215,27 @@ export function CourseOutline({ courseId }: { courseId: string }) {
           The control below owns that; this paragraph only describes the list. */}
       <EnrollControl courseId={course.id} onPlaceTaken={() => setAttempt((c) => c + 1)} />
 
+      {/* Reading a syllabus and sitting in a class are two different buys of time, and the
+          second has a calendar of its own. The door is open to a visitor as much as to a member:
+          whether a teacher teaches at hours you can keep is a fact somebody weighs *before*
+          enrolling, and the booking screen itself sends a stranger to sign in. */}
+      <Link
+        href={`/courses/${course.id}/book`}
+        data-icon-zone
+        className={cn(
+          'mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line',
+          'bg-surface px-5 py-4 text-[0.9375rem] text-ink',
+          'transition-[background-color,border-color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
+          'hover:border-brand-line hover:bg-brand-soft',
+        )}
+      >
+        <span>Live classes — see the times this teacher keeps open</span>
+        <span className="flex items-center gap-1.5 text-[0.8125rem] text-brand">
+          Book a class
+          <Icon name="arrow-right" size="sm" />
+        </span>
+      </Link>
+
       <div className="mt-8 flex flex-col gap-4">
         <h2 className="text-h2 text-ink-strong">Syllabus</h2>
         <ol className="flex flex-col gap-3">
