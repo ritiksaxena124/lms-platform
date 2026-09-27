@@ -4,7 +4,7 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 3 done** — accounts sign in, hold a session and a teacher can save a
+**Status: Phase 4 done** — accounts sign in, hold a session and a teacher can save a
 profile and write, publish and archive courses in the teacher portal (`/courses`, backed by
 `/api/v1/courses`), order a course's syllabus of modules (`/courses/[id]/modules`, backed by
 `/api/v1/courses/:id/modules`), and write the lessons inside a module — the page, its rough
@@ -30,8 +30,15 @@ took it, and the portal shows it at `/courses/[id]/roster` — a headcount, a na
 row, and no button that removes somebody. A course can now carry a price the teacher sets in the
 editor and the shelf prints — a quote rather than a checkout (`PAYMENT_PROVIDER` is still `none`),
 stored as minor units plus a `Currency` lookup value, `null` when nobody has quoted it and `0` when
-the teacher says free, and enrollment still grants a place for nothing. Bookings, live video,
-the action log, the ops portal and coupons are still ahead.
+the teacher says free, and enrollment still grants a place for nothing. A calendar sits on top of
+all that now. A teacher keeps weekly windows open (`/availability`, `/api/v1/availability/rules`)
+and can give a live course a trial-call switch (`/api/v1/courses/:id/demo-bookings`); a student
+inside that course — or a stranger taking the one trial the teacher allows — sees the teacher's
+next 30 days as minutes to ask for (`/courses/[id]/book`, `/api/v1/bookings/slots`). The ask waits
+in the teacher's `/requests` queue as `pending` until it is confirmed or refused, and nothing is a
+class until that answer. Both sides then read the same rows in their own clock: `/classes` for the
+teacher, `/my-classes` for the student, who can also leave. Live video, the action log, the ops
+portal and coupons are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -129,7 +136,25 @@ window) so the teacher and the student are signed in as different people at the 
 
 That is the whole loop Phase 3 closes: a teacher writes and prices a course, a stranger reads
 enough of it to want it, enrolling turns that want into a place, and both sides see the same
-decision. Bookings, live video, the action log, the ops portal and coupons are Phase 4 and later.
+decision.
+
+**Then the same course, as a class to book** — Phase 4's loop, still in the teacher's course page
+and the student's:
+
+1. As the teacher, `/availability`: a window is four numbers — weekday, opens, closes, how long a
+   class runs — and the week is kept in the teacher's own timezone. Save one and the grid below it
+   fills with the minutes that window offers over the next thirty days.
+2. Still as the teacher, open the course row: _Offer trial calls_ is the switch that lets a
+   not-yet-enrolled reader book one class from this course, once, ever. Leave it off if the loop
+   you want to see is the enrolled one.
+3. As the student, `/courses/[id]/book` is now a real page: the teacher's open minutes, each one
+   labelled with the caption "Times are the teacher's clock". Pick one and ask. It is not booked —
+   the minute is held, and the words say so.
+4. As the teacher, `/requests` has the ask: one row, one student, one minute. Confirm it and the
+   row leaves the queue; refuse it and the minute goes back on the calendar for whoever asks next.
+   `/classes` holds the answer either way, soonest first.
+5. As the student, `/my-classes` shows the same class in your own timezone — and _Leave this
+   class_ gives the minute back while it still stands.
 
 ## Commands
 
@@ -149,8 +174,8 @@ decision. Bookings, live video, the action log, the ops portal and coupons are P
 ```
 apps/
   api/        NestJS modular monolith — the only writer to the database
-  teacher/    Next.js App Router portal for teachers (built first)
-  student/    Next.js App Router portal for learners — shelf, outline, one free page
+  teacher/    Next.js App Router portal for teachers — courses, syllabus, the week, the queue
+  student/    Next.js App Router portal for learners — shelf, outline, places and classes
 packages/
   shared/     Framework-free TypeScript: error codes, lookup codes, money, timezones
   ui/         Design tokens, primitives and motion shared by all three portals
@@ -206,19 +231,20 @@ decision was made, and what was deliberately left out.
 | 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell             | **Done**    |
 | 2     | Auth, accounts, roles, teacher profile                                   | **Done**    |
 | 3     | Courses, lessons, enrollment                                             | **Done**    |
-| 4     | Availability, bookings and scheduling across timezones — with a calendar | In progress |
+| 4     | Availability, bookings and scheduling across timezones — with a calendar | **Done**    |
 | 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons  | Not started |
 | 6     | Email notifications behind the SMTP port                                 | Not started |
 | 7     | Action log — who did what, to what, in which part of the app             | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above            | Not started |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment      | Not started |
 
-Phase 4 is in progress: the availability rules, the slot grid and the booking lifecycle are
-shipped and tested (ARCHITECTURE.md §13 and §14); the calendar and the two portal screens are
-the remaining work. Phases 5–9 are the ordered backlog: a live class needs a booked slot to
-attach to, the action log wants every kind of write to exist before it fixes what a record
-looks like, and coupons land last because a discount only means something next to a price
-that is charged — which is the same reason they sit after the portals are complete.
+Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
+and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
+request queue and class list, the student's booking page and own calendar. Phases 5–9 are the
+ordered backlog: a live class needs a booked slot to attach to, which is why booking came first,
+the action log wants every kind of write to exist before it fixes what a record looks like, and
+coupons land last because a discount only means something next to a price that is charged — the
+same reason they sit after the portals are complete.
 
 ## Environment variables
 

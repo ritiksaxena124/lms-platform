@@ -16,6 +16,10 @@ export default defineConfig({
     css: false,
     // Every form and button test here types into a real input through `userEvent`, and a whole
     // portal's suites run at once — the default 5s is a timeout on the machine, not on the code.
+    // Two threads is the cap this box needs while all five packages test together: uncapped, one
+    // portal asks for eleven workers and every `userEvent` wait on the machine slows down, so a
+    // suite that passes in three seconds alone starts failing at fifteen.
+    poolOptions: { threads: { maxThreads: 2 } },
     testTimeout: 15_000,
   },
 });

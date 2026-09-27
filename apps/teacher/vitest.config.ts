@@ -14,5 +14,11 @@ export default defineConfig({
     include: ['{lib,components,app}/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
     css: false,
+    // The student portal carries the same two lines: `bun run test` runs every package at once,
+    // and an uncapped portal suite asks for eleven workers on a twelve-core box. A `userEvent`
+    // test then starves rather than fails, and the timeout it hits says nothing about the
+    // component under it.
+    poolOptions: { threads: { maxThreads: 2 } },
+    testTimeout: 15_000,
   },
 });

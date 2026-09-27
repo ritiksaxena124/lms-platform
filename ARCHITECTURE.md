@@ -691,6 +691,18 @@ offered at, and everything else about the hour happens somewhere else.
   the signed-in user's IANA zone, falling back to the browser's when the profile has none or the
   stored name no longer validates. A relative "2 days ago" beside an absolute date would put two
   calendars on one shelf.
+- **A week is drawn once, and a portal decides what a chip means.** `Calendar` in `@lms/ui` is
+  given a tone and an optional handler per cell: a chip with no handler is a static `<span>`, so
+  the minutes a student cannot take never enter the tab order. Which of this student's bookings
+  sits on which of the teacher's open minutes is decided in `apps/student/lib/slot-week.ts`, not
+  in the screen, and a held minute wins the cell over the open slot it covers — the grid the
+  teacher keeps and the grid this student is looking at are the same week read twice.
+- **A class is read in the clock of whoever is looking at it.** The booking screen captions its
+  grid as the teacher's zone, because the window is theirs, and the student's own `/my-classes`
+  prints every row in the student's, because the class is something this person has to be awake
+  for. Both lists split Coming up / Earlier on the start date alone: on status alone a confirmed
+  class keeps claiming to be upcoming after its hour has passed, and on whether the minute is
+  still held a called-off class vanishes from the week it happened in.
 - **A session change re-reads what the session decided.** The outline keys its request on the
   course, a retry counter and the session's state, so signing in re-fetches the same address and
   the locked rows become links without a reload; keyed on the address alone, the screen would go
@@ -821,6 +833,13 @@ offered at, and everything else about the hour happens somewhere else.
   other portal's memory until something needs the cookie. Verifying two roles at once is two
   profiles (or one normal plus one private window), not two tabs, and a screen that shows the
   wrong name after a reload is that fact rather than a bug in the portal.
+- **In development a role can also be shadowed by its own earlier login, not just followed by
+  one.** Before `COOKIE_DOMAIN` was set, the API wrote a host-only refresh cookie for
+  `api.localtest.me`; the browser sends that one first and `readRefreshToken` takes the first
+  match, so a session revive can land on an account that was signed out of sight and a reload
+  brings it back. Signing out revokes the shadowed session and clears it. The artifact lives in the
+  local cookie jar, not in the code path — a deployment that always had `COOKIE_DOMAIN` set never
+  writes the host-only twin.
 - Two databases: `lms` for development, `lms_test` for tests, owned by a least-privilege
   `lms` role with `CREATEDB` (Prisma needs it for migration shadow databases). The test
   global setup **refuses to run** unless `DATABASE_URL` names `lms_test`, and redacts
@@ -836,6 +855,15 @@ suite boots the real `AppModule` through supertest, so guards, filters, prefix, 
 validation are exercised as shipped rather than as mocked; data isolation is a transaction
 rolled back per test. Migrations are applied to `lms_test` automatically, and the Prisma CLI
 is only spawned when a migration is genuinely missing.
+
+**Every package's tests run at once, so a suite cannot also ask for every core.** The API holds
+at four forks (§16's Prisma pool) and each portal at two threads, and a portal's tests wait
+fifteen seconds rather than vitest's five. Those caps are the same decision written down twice:
+`bun run --filter '*' test` runs the packages concurrently, so an uncapped portal suite asking for
+eleven workers on a twelve-core box slows every `userEvent` wait on the machine, and a form test
+that finishes in three seconds alone starts failing at fifteen. A timeout in the gate then says
+nothing about the component under it. The numbers were set by running the gate until it stopped
+being wrong, not by a theory about core counts.
 
 A phase is not "done" when the code compiles. It is done when the tests pass, the browser
 behaviour has been checked by hand, and the next phase has been approved.
