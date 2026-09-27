@@ -8,6 +8,7 @@ import {
   listCourses,
   publishCourse,
   readCourse,
+  setDemoBookings,
   updateCourse,
 } from './courses';
 
@@ -22,6 +23,7 @@ const COURSE = {
   level: { code: 'intermediate', label: 'Intermediate' },
   status: { code: 'draft', label: 'Draft' },
   price: null,
+  demoBookingsEnabled: false,
   createdAt: '2026-09-25T00:00:00.000Z',
   updatedAt: '2026-09-25T00:00:00.000Z',
 };
@@ -64,6 +66,22 @@ describe('courses client', () => {
       url: `${BASE_URL}/api/v1/courses`,
       method: 'GET',
     });
+  });
+
+  it('writes the trial-call switch as its own call, with the word in the body', async () => {
+    await setDemoBookings('c1', true);
+
+    expect(requestAt(0)).toMatchObject({
+      url: `${BASE_URL}/api/v1/courses/c1/demo-bookings`,
+      method: 'POST',
+    });
+    expect(JSON.parse(requestAt(0).body ?? '')).toEqual({ enabled: true });
+  });
+
+  it('closes it through the same route, because a switch has two positions and one address', async () => {
+    await setDemoBookings('c1', false);
+
+    expect(JSON.parse(requestAt(0).body ?? '')).toEqual({ enabled: false });
   });
 
   it('asks the API for the levels instead of keeping its own list', async () => {

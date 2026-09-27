@@ -77,3 +77,18 @@ export async function archiveCourse(id: string): Promise<Course> {
   });
   return course;
 }
+
+/**
+ * The trial-call switch, on a route of its own rather than as a field of the edit form.
+ *
+ * The form closes when a course is published, and this is the one decision a teacher keeps
+ * revisiting about a course that is already live — so the API takes it as its own write, with the
+ * word in the body and the whole course back in the answer. Opening and closing are the same call.
+ */
+export async function setDemoBookings(id: string, enabled: boolean): Promise<Course> {
+  const { course } = await apiJson<{ course: Course }>(`/courses/${id}/demo-bookings`, {
+    method: 'POST',
+    body: { enabled },
+  });
+  return course;
+}

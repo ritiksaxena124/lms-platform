@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Button,
+  Checkbox,
   EmptyState,
   ErrorState,
   Illo,
@@ -17,7 +18,7 @@ import {
 import type { Course } from '@lms/shared';
 
 import { describeFailure } from '@/lib/api';
-import { archiveCourse, listCourses, publishCourse } from '@/lib/courses';
+import { archiveCourse, listCourses, publishCourse, setDemoBookings } from '@/lib/courses';
 
 const TABS = [
   { code: 'all', label: 'All' },
@@ -88,6 +89,26 @@ export function CourseList() {
     } catch (error) {
       // The row keeps the status it has. A transition the API refused has not happened,
       // and a list that painted the answer anyway teaches a teacher not to trust it.
+      notify.error(describeFailure(error));
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  /**
+   * The trial-call switch, written the moment it is moved.
+   *
+   * It has no Save because it is not part of the edit form: the form closes when a course is
+   * published, and whether to take a student who has not bought a place is the one decision a
+   * teacher keeps revisiting about a course that is already live. The box is painted from the
+   * row's own value, so a refused write puts it back where it was by itself.
+   */
+  async function setTrials(course: Course, enabled: boolean) {
+    setPendingId(course.id);
+    try {
+      const next = await setDemoBookings(course.id, enabled);
+      setCourses((current) => current.map((item) => (item.id === next.id ? next : item)));
+    } catch (error) {
       notify.error(describeFailure(error));
     } finally {
       setPendingId(null);
@@ -194,6 +215,17 @@ export function CourseList() {
                     {course.status.label}
                   </StatusPill>
                 </div>
+
+                {course.status.code === 'archived' ? null : (
+                  <Checkbox
+                    id={`demo-bookings-${course.id}`}
+                    label="Trial calls"
+                    hint="A student without a place can book one class."
+                    checked={course.demoBookingsEnabled}
+                    disabled={pendingId === course.id}
+                    onChange={(event) => void setTrials(course, event.target.checked)}
+                  />
+                )}
 
                 {course.status.code === 'draft' ? (
                   <Button

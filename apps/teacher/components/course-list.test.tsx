@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
   listCourses: vi.fn(),
   publishCourse: vi.fn(),
   archiveCourse: vi.fn(),
+  setDemoBookings: vi.fn(),
 }));
 
 vi.mock('@/lib/courses', () => api);
@@ -73,6 +74,12 @@ function rowOf(title: string): HTMLElement {
   const match = [...list.querySelectorAll('li')].find((node) => node.textContent?.includes(title));
   if (!match) throw new Error(`No row for ${title}`);
   return match as HTMLElement;
+}
+
+/** The trial-call box on one row, which is the only switch a course row carries. */
+async function switchOn(title: string): Promise<HTMLElement> {
+  await screen.findAllByRole('listitem');
+  return within(rowOf(title)).findByRole('checkbox', { name: 'Trial calls' });
 }
 
 beforeEach(() => {
@@ -187,5 +194,51 @@ describe('CourseList', () => {
     await userEvent.click(await screen.findByRole('button', { name: /try again/i }));
 
     expect(await screen.findByRole('link', { name: 'Fractions, slowly' })).toBeInTheDocument();
+  });
+
+  it('shows the trial-call switch in the state the course is actually in', async () => {
+    render(<CourseList />);
+    await screen.findAllByRole('listitem');
+
+    expect(await switchOn('Verbs in passing')).not.toBeChecked();
+    expect(await switchOn('Fractions, slowly')).not.toBeChecked();
+  });
+
+  it('writes the switch the moment it is moved, because there is no form to save it in', async () => {
+    api.setDemoBookings.mockResolvedValue({ ...PUBLISHED, demoBookingsEnabled: true });
+
+    render(<CourseList />);
+    const box = await switchOn('Verbs in passing');
+    await userEvent.click(box);
+
+    await waitFor(() => expect(api.setDemoBookings).toHaveBeenCalledWith('c2', true));
+    await waitFor(() => expect(box).toBeChecked());
+  });
+
+  it('puts the switch back when the API refuses to move it', async () => {
+    api.setDemoBookings.mockRejectedValue(new Error('The API is unreachable.'));
+
+    render(<CourseList />);
+    const box = await switchOn('Verbs in passing');
+    await userEvent.click(box);
+
+    expect(notify.error).toHaveBeenCalledWith('The API is unreachable.');
+    await waitFor(() => expect(box).not.toBeChecked());
+  });
+
+  it('keeps the switch off a retired course, where nothing can be booked anyway', async () => {
+    api.listCourses.mockResolvedValue([
+      course({
+        id: 'c3',
+        title: 'Old arithmetic',
+        slug: 'old-arithmetic',
+        status: { code: 'archived', label: 'Archived' },
+      }),
+    ]);
+
+    render(<CourseList />);
+    await screen.findByText('Old arithmetic');
+
+    expect(within(rowOf('Old arithmetic')).queryByRole('checkbox')).toBeNull();
   });
 });
