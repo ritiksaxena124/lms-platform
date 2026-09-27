@@ -245,6 +245,7 @@ describe('answering a request', () => {
       'durationMinutes',
       'endsAt',
       'id',
+      'live',
       'startsAt',
       'status',
       'student',

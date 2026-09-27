@@ -340,6 +340,7 @@ describe('leaving a class', () => {
       'durationMinutes',
       'endsAt',
       'id',
+      'live',
       'startsAt',
       'status',
       'type',

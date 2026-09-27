@@ -498,6 +498,20 @@ model Booking {
   durationMinutes Int       @map("duration_minutes")
   slotHeldAt      DateTime? @map("slot_held_at") @db.Timestamptz(6)
 
+  /// The room this class is held in, as the video port names it (§6). Written when the teacher
+  /// confirms — a request that is refused or left to expire never had a class — and never
+  /// rewritten afterwards, because a booking row does not forget what happened to it.
+  ///
+  /// The name, not the address: where the bridge lives is configuration, and rows that stored a
+  /// URL would have to be migrated the day a school moves to its own domain. Nothing here is
+  /// encrypted, because it does not need to be and the difference is not subtle — this value is
+  /// the only thing keeping a Jitsi room private, so it is a secret that happens to live in a
+  /// column: read by the two accounts a gate has already accepted, and sent nowhere else.
+  ///
+  /// Unique, and nullable, because both halves are the promise: many classes have no room, and
+  /// no two classes share one.
+  roomName String? @unique @map("room_name")
+
   /// The row-level flag the convention requires. A cancelled class is not an archived row — it
   /// is a standing row in a cancelled status — and releasing a minute is `slotHeldAt` going null,
   /// which is why retirement clears the hold in the same write instead of leaving a row that

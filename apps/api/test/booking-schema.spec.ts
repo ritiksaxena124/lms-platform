@@ -380,4 +380,45 @@ describe('booking table', () => {
     });
     expect(shifted.startsAt.getTime()).toBe(INSTANT.getTime() + 3_600_000);
   });
+
+  /**
+   * `room_name`, which is a Jitsi room's only lock (ARCHITECTURE §6). The table's job is small
+   * and it is the whole reason the endpoint above can trust what it writes: many rows may have no
+   * room, and no two rows may point a class at the same one.
+   */
+  it('holds no room for a request, and never the same room twice', async () => {
+    const owner = await createTeacher(emailFor('room-owner'));
+    const student = await createStudent(emailFor('room-a'));
+    const other = await createStudent(emailFor('room-b'));
+    const course = await createCourse(owner.id, `room-${RUN}`);
+
+    const pending = await book(student.id, owner.id, course.id);
+    expect(pending.roomName).toBeNull();
+
+    // Three minutes on one teacher's calendar, so the only thing two rows can collide on here is
+    // the room. A test that reused the held minute would prove the schedule's index instead and
+    // read as green either way.
+    const name = randomUUID();
+    await book(other.id, owner.id, course.id, {
+      startsAt: later(60),
+      slotHeldAt: later(60),
+      roomName: name,
+      statusValueId: pendingStatusId,
+    });
+    await expect(
+      book(student.id, owner.id, course.id, {
+        startsAt: later(120),
+        slotHeldAt: later(120),
+        roomName: name,
+      }),
+    ).rejects.toThrow(/room_name/);
+
+    // The second half of the same promise: a school with a hundred requests has a hundred rows
+    // with no room, so the unique index cannot be the plain kind that treats nulls as equal.
+    const second = await book(student.id, owner.id, course.id, {
+      startsAt: later(180),
+      slotHeldAt: later(180),
+    });
+    expect(second.roomName).toBeNull();
+  });
 });

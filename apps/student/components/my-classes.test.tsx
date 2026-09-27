@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AuthUser, Booking, BookingStatusCode } from '@lms/shared';
+import type { AuthUser, Booking } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { MyClasses } from './my-classes';
@@ -43,19 +43,29 @@ const MONDAY_END = '2026-09-28T04:45:00.000Z';
 const LAST_MONDAY = '2026-09-21T04:00:00.000Z';
 const LAST_MONDAY_END = '2026-09-21T04:45:00.000Z';
 
+/** A class the API has confirmed, so it carries its door: the window the room opens in, from five
+ * minutes before the first minute to a quarter of an hour after the last. */
+const BOOKING_ONE: Booking = {
+  id: '6a27',
+  course: { id: 'b2a1', slug: 'fractions', title: 'Fractions, the slow way' },
+  type: 'enrolled',
+  status: 'confirmed',
+  live: {
+    opensAt: '2026-09-28T03:55:00.000Z',
+    closesAt: '2026-09-28T05:00:00.000Z',
+  },
+  startsAt: MONDAY,
+  endsAt: MONDAY_END,
+  durationMinutes: 45,
+  createdAt: '2026-09-27T10:00:00.000Z',
+  updatedAt: '2026-09-27T10:00:00.000Z',
+};
+
+/** A class that is not standing has no door, and the statuses below move off `confirmed`, so the
+ * fixture closes it rather than sending a shape no response has. */
 function booking(overrides: Partial<Booking> = {}): Booking {
-  return {
-    id: '6a27',
-    course: { id: 'b2a1', slug: 'fractions', title: 'Fractions, the slow way' },
-    type: 'enrolled',
-    status: 'confirmed' as BookingStatusCode,
-    startsAt: MONDAY,
-    endsAt: MONDAY_END,
-    durationMinutes: 45,
-    createdAt: '2026-09-27T10:00:00.000Z',
-    updatedAt: '2026-09-27T10:00:00.000Z',
-    ...overrides,
-  };
+  const row = { ...BOOKING_ONE, ...overrides };
+  return row.status === 'confirmed' ? row : { ...row, live: null };
 }
 
 function refused(code: string, message: string) {

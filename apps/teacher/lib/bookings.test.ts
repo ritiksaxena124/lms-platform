@@ -11,6 +11,7 @@ const REQUEST: BookingRequest = {
   course: { id: 'c1', slug: 'veena-basics', title: 'Veena Basics' },
   type: 'enrolled',
   status: 'pending',
+  live: null,
   startsAt: '2026-10-01T09:00:00.000Z',
   endsAt: '2026-10-01T09:45:00.000Z',
   durationMinutes: 45,
@@ -19,7 +20,13 @@ const REQUEST: BookingRequest = {
   student: { id: 's1', displayName: 'Rohan Mehta' },
 };
 
-const ANSWERED: BookingRequest = { ...REQUEST, status: 'confirmed' };
+/** A request the teacher said yes to: the minute stays held and the class now has a door, which
+ * opens five minutes before the first minute and stays open a quarter of an hour after the last. */
+const ANSWERED: BookingRequest = {
+  ...REQUEST,
+  status: 'confirmed',
+  live: { opensAt: '2026-10-01T08:55:00.000Z', closesAt: '2026-10-01T10:00:00.000Z' },
+};
 
 function jsonResponse(body: unknown, status = 200) {
   const text = JSON.stringify(body);

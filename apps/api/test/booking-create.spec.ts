@@ -268,6 +268,7 @@ describe('booking a class', () => {
       'durationMinutes',
       'endsAt',
       'id',
+      'live',
       'startsAt',
       'status',
       'type',

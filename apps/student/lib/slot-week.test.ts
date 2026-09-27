@@ -45,6 +45,7 @@ function booking(overrides: Partial<Booking> = {}): Booking {
     course: { id: 'b2a1', slug: 'fractions', title: 'Fractions' },
     type: 'enrolled',
     status: 'pending',
+    live: null,
     startsAt: '2026-09-28T04:00:00.000Z',
     endsAt: '2026-09-28T04:45:00.000Z',
     durationMinutes: 45,

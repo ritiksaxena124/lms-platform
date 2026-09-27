@@ -25,6 +25,7 @@ function request(overrides: Partial<BookingRequest> = {}): BookingRequest {
     course: { id: 'c1', slug: 'veena-basics', title: 'Veena Basics' },
     type: 'enrolled',
     status: 'pending',
+    live: null,
     startsAt: '2026-10-01T03:30:00.000Z',
     endsAt: '2026-10-01T04:15:00.000Z',
     durationMinutes: 45,

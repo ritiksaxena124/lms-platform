@@ -248,6 +248,7 @@ describe('the teacher’s own class list', () => {
       'durationMinutes',
       'endsAt',
       'id',
+      'live',
       'startsAt',
       'status',
       'student',

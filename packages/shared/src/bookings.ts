@@ -7,11 +7,7 @@
  * teacher to confirm it. The instants themselves are cut from availability rules by
  * `schedule.ts`; nothing in this file stores or recomputes them.
  */
-import {
-  BOOKING_STATUS_CODES,
-  type BookingStatusCode,
-  type BookingTypeCode,
-} from './lookup-codes';
+import { BOOKING_STATUS_CODES, type BookingStatusCode, type BookingTypeCode } from './lookup-codes';
 
 /**
  * How the caller relates to the course whose calendar they opened.
@@ -81,6 +77,21 @@ export interface OpenSlotsResponse {
 }
 
 /**
+ * The span a live class can be entered: the door a few minutes before the first minute, and a
+ * grace after the last.
+ *
+ * Only the window travels. A Jitsi room has no password — its name is the lock — so the address
+ * is handed out by the join endpoint, to one person who has just been checked, rather than
+ * riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads
+ * this to decide whether to draw a door at all and when to say "it opens at 09:25"; it gets the
+ * key by asking.
+ */
+export interface LiveClassDoor {
+  opensAt: string;
+  closesAt: string;
+}
+
+/**
  * A class a student has asked for.
  *
  * `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a
@@ -98,6 +109,9 @@ export interface Booking {
   course: { id: string; slug: string; title: string };
   type: BookingTypeCode;
   status: BookingStatusCode;
+  /** The hours this class can be entered, or null when there is no door to open: an unconfirmed
+   * request has no room, and a cancelled or expired one has no class. Not a URL, on purpose. */
+  live: LiveClassDoor | null;
   startsAt: string;
   endsAt: string;
   durationMinutes: number;

@@ -21,20 +21,31 @@ import { listClasses } from '@/lib/bookings';
 /** The teacher's own schedule, read at a moment when nothing booked below has gone by yet. */
 const NOW = new Date('2026-10-03T06:00:00.000Z');
 
+/** A class as the API sends it. The door is the window the room opens in — five minutes before
+ * the first minute, a quarter of an hour after the last — and a row carries it because it is
+ * confirmed and for no other reason. */
+const CLASS_ONE: BookingRequest = {
+  id: 'class-1',
+  course: { id: 'course-1', slug: 'veena-basics', title: 'Veena Basics' },
+  type: 'enrolled',
+  status: BOOKING_STATUS_CODES.CONFIRMED,
+  live: {
+    opensAt: '2026-10-05T09:25:00.000Z',
+    closesAt: '2026-10-05T10:30:00.000Z',
+  },
+  startsAt: '2026-10-05T09:30:00.000Z',
+  endsAt: '2026-10-05T10:15:00.000Z',
+  durationMinutes: 45,
+  createdAt: '2026-09-30T00:00:00.000Z',
+  updatedAt: '2026-09-30T00:00:00.000Z',
+  student: { id: 'student-1', displayName: 'Aria Kapoor' },
+};
+
+/** The tests below move a class off `confirmed`, and a fixture that kept the door then would be a
+ * shape no response has ever sent. */
 function booked(overrides: Partial<BookingRequest> = {}): BookingRequest {
-  return {
-    id: 'class-1',
-    course: { id: 'course-1', slug: 'veena-basics', title: 'Veena Basics' },
-    type: 'enrolled',
-    status: BOOKING_STATUS_CODES.CONFIRMED,
-    startsAt: '2026-10-05T09:30:00.000Z',
-    endsAt: '2026-10-05T10:15:00.000Z',
-    durationMinutes: 45,
-    createdAt: '2026-09-30T00:00:00.000Z',
-    updatedAt: '2026-09-30T00:00:00.000Z',
-    student: { id: 'student-1', displayName: 'Aria Kapoor' },
-    ...overrides,
-  };
+  const row = { ...CLASS_ONE, ...overrides };
+  return row.status === BOOKING_STATUS_CODES.CONFIRMED ? row : { ...row, live: null };
 }
 
 /** A class that was taught two days before the teacher opened this screen. */

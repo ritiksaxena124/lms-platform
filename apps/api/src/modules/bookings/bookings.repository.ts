@@ -37,6 +37,9 @@ const BOOKING_SELECT = {
   status: { select: { code: true } },
   startsAt: true,
   durationMinutes: true,
+  /** Carried so a read can say whether this class has a room at all. The name itself never goes
+   * on the wire — `toBooking` answers with the door's two instants and nothing else (§6). */
+  roomName: true,
   createdAt: true,
   updatedAt: true,
 } as const satisfies Prisma.BookingSelect;
@@ -398,6 +401,10 @@ export class BookingsRepository {
     pendingStatusValueId: string;
     answerStatusValueId: string;
     releaseHold: boolean;
+    /** The room the class the teacher just agreed to happens in, from the video port. Written in
+     * the same statement as the status, because a confirmed class whose room arrived in a second
+     * write is a class with a missing half whenever that second write fails. */
+    mintRoomName?: string;
   }): Promise<AnswerOutcome> {
     return this.swapOwnedStatus({
       bookingId: args.bookingId,
@@ -405,6 +412,7 @@ export class BookingsRepository {
       fromStatusValueIds: [args.pendingStatusValueId],
       toStatusValueId: args.answerStatusValueId,
       releaseHold: args.releaseHold,
+      mintRoomName: args.mintRoomName,
     });
   }
 
@@ -426,6 +434,7 @@ export class BookingsRepository {
     fromStatusValueIds: string[];
     toStatusValueId: string;
     releaseHold: boolean;
+    mintRoomName?: string;
   }): Promise<AnswerOutcome> {
     const row = await this.prisma.booking.findFirst({
       where: { id: args.bookingId, ...args.owner, isActive: true },
@@ -445,6 +454,7 @@ export class BookingsRepository {
       data: {
         statusValueId: args.toStatusValueId,
         ...(args.releaseHold ? { slotHeldAt: null } : {}),
+        ...(args.mintRoomName ? { roomName: args.mintRoomName } : {}),
       },
       select: BOOKING_SELECT,
     });

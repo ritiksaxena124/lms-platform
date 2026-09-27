@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AvailabilityModule } from '../availability/availability.module';
 import { EnrollmentsModule } from '../enrollments/enrollments.module';
+import { VideoModule } from '../../providers/video/video.module';
 import { BookingExpiryService } from './booking-expiry.service';
 import { BookingsController } from './bookings.controller';
 import { BookingsRepository } from './bookings.repository';
@@ -21,9 +22,13 @@ import { BookingsService } from './bookings.service';
  *
  * `BookingExpiryService` is the third thing that stops a request from being pending, and the only
  * one with no person behind it — a teacher who never replies still has to give the minute back.
+ *
+ * `VideoModule` is where a confirmed class gets its room. The booking module asks the port for a
+ * name and never learns where the bridge lives, which is the difference between a booking table
+ * that stores a URL and one that stores what a booking actually owns (§6).
  */
 @Module({
-  imports: [AvailabilityModule, EnrollmentsModule],
+  imports: [AvailabilityModule, EnrollmentsModule, VideoModule],
   controllers: [BookingsController],
   providers: [BookingsService, BookingsRepository, BookingExpiryService],
 })

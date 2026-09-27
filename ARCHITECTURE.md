@@ -190,7 +190,9 @@ paying for it:
   and no route gets to ask it for a URL it has not earned: the gate is the booking endpoint that
   owns the class (§14). A portal that went to the port directly would be a door with nobody
   standing in it — which is also why a room URL is a secret with a URL's shape and never belongs
-  in a log line or on a public course page.
+  in a log line or on a public course page. The first caller asks for a _name_ at the moment a
+  teacher confirms, and keeps the answer in a column rather than a response (§14); the address is
+  what the join endpoint turns that name into, for one person who has just been checked.
 - **`none` is an adapter, not an `if`.** `NoVideo` answers `null`, so the one question a caller
   can ask has one shape on every deployment, and no screen can forget a branch and offer a Join
   button for a room that never was. `none` remains the shipped default for a config that has not
@@ -687,6 +689,16 @@ offered at, and everything else about the hour happens somewhere else.
   confirms gets one of the two, and the loser is told to look again rather than being shown a row
   whose status says one thing and whose hold says another. Releasing the hold and writing the status
   are the same statement, always.
+- **A confirmed class gets a room, and a list gets only the window it opens in** (step 5d).
+  `roomName` is written by the same statement that writes `confirmed` — a uuid through the video
+  port, so a `VIDEO_PROVIDER=none` deployment mints nothing and has no branch to forget — and is
+  never rewritten afterwards: a second confirm replays the row with its original room, a rebooked
+  minute gets a new one, and unique-but-nullable is both halves of the promise (two classes never
+  share a room; a hundred waiting requests share nothing). Reads carry `live: {opensAt, closesAt}`
+  from `liveClassWindow` on the confirmed rows and `null` everywhere else — a pending request has
+  no room yet and a cancelled one has no class — while the address stays server-side, because a
+  room's name is its only lock and a list is something a browser keeps, caches and logs. Giving
+  the address out is the join endpoint's job, one checked person at a time (§6).
 - **Unanswered requests expire on a clock, because nobody is coming to answer them.**
   `booking-request-expiry` runs hourly (`@nestjs/schedule`, the only job registered) and ends rows
   older than `PENDING_REQUEST_HOURS` or whose class minute has arrived, into `expired` with the hold
@@ -711,7 +723,8 @@ offered at, and everything else about the hour happens somewhere else.
   `booking-slots.spec.ts` for the grid and the entitlement that picks it, `booking-create.spec.ts`
   for the hold and the race, `booking-cancel.spec.ts`, `booking-answer.spec.ts` and
   `booking-expiry.spec.ts` for the three ways a request stops being one, `booking-classes.spec.ts`
-  for the teacher's own calendar, and `packages/shared/src/schedule.test.ts` for the expansion all
+  for the teacher's own calendar, `booking-room.spec.ts` for the room a confirmation brings and the
+  window that list carries, and `packages/shared/src/schedule.test.ts` for the expansion all
   of them agree on.
 
 ## 15. Frontend

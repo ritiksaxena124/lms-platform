@@ -1,9 +1,11 @@
 import {
   BadRequestException,
   ConflictException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
+import { randomUUID } from 'node:crypto';
 import {
   API_ERROR_CODES,
   BLOCKING_BOOKING_STATUSES,
@@ -16,6 +18,7 @@ import {
   SLOT_DENIAL_CODES,
   SLOT_ENTITLEMENT_CODES,
   expandWindows,
+  liveClassWindow,
   slotAt,
   type Booking,
   type BookingRequest,
@@ -30,6 +33,7 @@ import {
 import { AvailabilityRepository } from '../availability/availability.repository';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
 import { ReferenceService } from '../../reference/reference.service';
+import { VIDEO, type Video } from '../../providers/video/video.port';
 import type { BookableCourseRow, BookingRequestRow, BookingRow } from './bookings.repository';
 import { BookingsRepository } from './bookings.repository';
 import type { CreateBookingDto } from './dto/create-booking.dto';
@@ -47,15 +51,33 @@ const MS_PER_MINUTE = 60 * 1000;
  * The lookup ids become the codes the shared vocabulary uses, and the end is worked out from the
  * length the table froze rather than stored: a class that was booked as an hour is an hour, even
  * after the teacher's window around it changes, which is the whole reason the length lives on the
- * row instead of being re-derived from the rules at display time. */
+ * row instead of being re-derived from the rules at display time.
+ *
+ * `live` is the one field the table does not carry directly. It is the door's two instants, cut
+ * from the class's own start and end, and it appears on exactly the rows that can be entered — a
+ * confirmed class with a room. A pending request has neither yet, and a class the student walked
+ * out of still remembers its room for the history while having no door to open. The name itself
+ * stays here: what goes on the wire is the window, and the address is the join endpoint's to hand
+ * out one person at a time (§6). */
 function toBooking(row: BookingRow): Booking {
+  const endsAt = new Date(row.startsAt.getTime() + row.durationMinutes * MS_PER_MINUTE);
+  const status = row.status.code as BookingStatusCode;
+  const enterable =
+    row.roomName !== null && status === BOOKING_STATUS_CODES.CONFIRMED
+      ? liveClassWindow(row.startsAt, endsAt)
+      : null;
+
   return {
     id: row.id,
     course: { id: row.course.id, slug: row.course.slug, title: row.course.title },
     type: row.type.code as BookingTypeCode,
-    status: row.status.code as BookingStatusCode,
+    status,
+    live: enterable && {
+      opensAt: enterable.opensAt.toISOString(),
+      closesAt: enterable.closesAt.toISOString(),
+    },
     startsAt: row.startsAt.toISOString(),
-    endsAt: new Date(row.startsAt.getTime() + row.durationMinutes * MS_PER_MINUTE).toISOString(),
+    endsAt: endsAt.toISOString(),
     durationMinutes: row.durationMinutes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
@@ -177,6 +199,7 @@ export class BookingsService {
     private readonly rules: AvailabilityRepository,
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
+    @Inject(VIDEO) private readonly video: Video,
   ) {}
 
   async openSlots(studentUserId: string, address: string): Promise<OpenSlotsResponse> {
@@ -382,6 +405,14 @@ export class BookingsService {
    * Yes keeps the minute held and no gives it back, which is the only difference between the two
    * beyond the word on the row. Neither deletes anything: a refused class is still a class the
    * student asked for, and the reason they did not get it.
+   *
+   * Yes also gives the class somewhere to happen. The room's name is minted here, from a uuid and
+   * nothing else, and written in the same statement as the status — so a request left to expire or
+   * refused never held an address, and a confirmed class cannot exist without its room on a box
+   * where video is configured. A deployment with `VIDEO_PROVIDER=none` is answered by the port
+   * with null rather than by an `if` here, and the class simply has no door. The name travels no
+   * further than this method: the list carries the window it opens in, and the address is the join
+   * endpoint's to give (§6).
    */
   async answer(
     teacherUserId: string,
@@ -404,6 +435,7 @@ export class BookingsService {
           pendingStatusValueId,
           answerStatusValueId,
           releaseHold: answer === 'reject',
+          mintRoomName: answer === 'confirm' ? this.video.room(randomUUID())?.name : undefined,
         })
       : ({ outcome: 'missing' } as const);
 
