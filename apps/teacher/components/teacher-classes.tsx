@@ -14,7 +14,6 @@ import {
   type StatusTone,
 } from '@lms/ui';
 import {
-  BLOCKING_BOOKING_STATUSES,
   BOOKING_STATUS_CODES,
   BOOKING_STATUS_LABELS,
   type BookingRequest,
@@ -43,9 +42,7 @@ const TONES: Record<BookingStatusCode, StatusTone> = {
 };
 
 function isComingUp(booking: BookingRequest, now: number): boolean {
-  return (
-    BLOCKING_BOOKING_STATUSES.includes(booking.status) && Date.parse(booking.startsAt) > now
-  );
+  return Date.parse(booking.startsAt) > now;
 }
 
 /**
@@ -53,10 +50,19 @@ function isComingUp(booking: BookingRequest, now: number): boolean {
  *
  * The API hands back every booking that ever held this teacher's minute — waiting, confirmed,
  * cancelled, refused, expired — because the list *is* the schedule and a schedule keeps what
- * happened on it. Only two of those statuses still mean "a class is coming", and even those stop
- * meaning it once the hour goes by: Phase 4 has nothing that marks a class taught, so reading the
- * status alone would leave a Monday lesson in "Coming up" on Wednesday. The split is therefore
- * made on the time, and the status stays what each row says about itself.
+ * happened on it. The screen groups those by date and lets the pill say what each one is, so a
+ * class refuses to be in two places at once: the lesson you said no to on Monday still sits where
+ * Monday is, next to the word that explains why you are not teaching it.
+ *
+ * Splitting on anything else breaks in both directions. On the status alone, a confirmed class
+ * stays "coming up" after its hour has gone, because Phase 4 has nothing that marks a class
+ * taught; on whether the minute is still held, a refused request that was never going to happen
+ * moves out of the week it belongs to. The date is the one fact here that does not change when
+ * somebody answers.
+ *
+ * The instant the split is made against arrives with the read rather than being taken while
+ * rendering: a clock in the render body gives the server one schedule and the browser another,
+ * and a lesson that is upcoming on only one of those two is a hydration mismatch.
  *
  * The words come from `BOOKING_STATUS_LABELS` rather than from this screen, so the same class
  * reads the same way here and on the student's own list.

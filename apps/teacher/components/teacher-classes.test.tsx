@@ -88,9 +88,9 @@ describe('TeacherClasses', () => {
   });
 
   it('does not keep a class that has gone by under Coming up', async () => {
-    // A confirmed class whose hour has passed is history whatever its status says — nothing in
-    // Phase 4 marks it taught, so the status would still read `confirmed` beside a date behind
-    // the teacher. The split is made on the time for that reason, not on the answer.
+    // A confirmed class whose hour has passed is history whatever its status says, because
+    // nothing in Phase 4 marks a class taught. The date decides which half a row is in; the pill
+    // only says what the row is.
     queue().mockResolvedValue([booked(WAS)]);
     render(<TeacherClasses />);
 
@@ -99,20 +99,34 @@ describe('TeacherClasses', () => {
     expect(within(section('Earlier')).getByText('Aria Kapoor')).toBeInTheDocument();
   });
 
+  it('leaves a class you said no to in the week it was booked for', async () => {
+    // The alternative is a refused request vanishing into "Earlier" while its date is still ahead
+    // — which is where a teacher goes looking for it, because that minute is the reason they
+    // declined it. The date holds the row in place and the word says what happened.
+    queue().mockResolvedValue([booked({ status: BOOKING_STATUS_CODES.REJECTED })]);
+    render(<TeacherClasses />);
+
+    await screen.findByText('Aria Kapoor');
+    expect(within(section('Coming up')).getByText('Declined')).toBeInTheDocument();
+    expect(screen.queryByText('Earlier')).toBeNull();
+  });
+
   it('keeps the words the API gave a class that is over', async () => {
     queue().mockResolvedValue([
-      booked({ status: BOOKING_STATUS_CODES.EXPIRED }),
+      booked({ ...WAS, status: BOOKING_STATUS_CODES.EXPIRED }),
       booked({
         id: 'class-2',
         status: BOOKING_STATUS_CODES.REJECTED,
+        startsAt: '2026-10-01T11:00:00.000Z',
+        endsAt: '2026-10-01T11:45:00.000Z',
         student: { id: 'student-2', displayName: 'Chen Yu' },
       }),
     ]);
     render(<TeacherClasses />);
 
     expect(await screen.findByText('Chen Yu')).toBeInTheDocument();
-    expect(within(rowOf('Aria Kapoor')).getByText('Expired')).toBeInTheDocument();
-    expect(within(rowOf('Chen Yu')).getByText('Declined')).toBeInTheDocument();
+    expect(within(section('Earlier')).getByText('Expired')).toBeInTheDocument();
+    expect(within(section('Earlier')).getByText('Declined')).toBeInTheDocument();
   });
 
   it('names a trial class as one, in the schedule as much as in the queue', async () => {
