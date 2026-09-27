@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -284,5 +284,35 @@ describe('CatalogShelf', () => {
 
     await waitFor(() => expect(api.browseCatalog).toHaveBeenLastCalledWith({ level: 'advanced' }));
     expect(screen.queryByText(/page 2 of/i)).not.toBeInTheDocument();
+  });
+
+  it('drops a shelf reply that arrives after the visitor has already moved on', async () => {
+    // The race the per-effect guard exists for. The first request (unfiltered) is held open,
+    // the visitor changes the level, and the *new* request answers first. Then the abandoned
+    // one finally comes back — and it is somebody the shelf stopped waiting on, so it must not
+    // overwrite the answer that did land. Without the guard this would either repaint the old
+    // shelf under the new filter, or knock the current one back to a skeleton.
+    let releaseStale: ((value: unknown) => void) | undefined;
+    api.browseCatalog.mockImplementationOnce(
+      () => new Promise((resolve) => void (releaseStale = resolve)),
+    );
+    api.browseCatalog.mockImplementation((input: { level?: string } = {}) =>
+      Promise.resolve(input.level === 'advanced' ? page([VERBS], 1, 20) : page([ALGEBRA], 1, 20)),
+    );
+
+    render(<CatalogShelf />);
+    const chips = await screen.findByRole('group', { name: /level/i });
+    await userEvent.click(within(chips).getByRole('button', { name: 'Advanced' }));
+
+    // The current filter's shelf arrives and is shown.
+    await screen.findByRole('heading', { name: /Verbs/ });
+
+    // Now the abandoned request answers with the other shelf.
+    await act(async () => {
+      releaseStale?.(page([ALGEBRA], 1, 20));
+    });
+
+    expect(screen.queryByRole('heading', { name: /Algebra/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /Verbs/ })).toBeInTheDocument();
   });
 });
