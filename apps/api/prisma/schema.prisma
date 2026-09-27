@@ -101,6 +101,11 @@ model User {
   /// because a teacher's own list is already `courses`, and the two must not rhyme.
   enrollments   Enrollment[]    @relation("enrollment_student")
 
+  /// The weekly windows a teacher keeps open for booking. Owned by the account the way a
+  /// course is: a teacher is archived, never deleted, so a past booking still names the
+  /// window that made it possible.
+  availabilityRules AvailabilityRule[] @relation("teacher_availability")
+
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
 }
@@ -195,7 +200,7 @@ model Course {
   ///
   /// This is a quote on a shelf, not a charge: nothing collects a payment in this phase, and
   /// an enrollment stays a place rather than a purchase.
-  priceMinorUnits      Int?   @map("price_minor_units")
+  priceMinorUnits      Int?    @map("price_minor_units")
   priceCurrencyValueId String? @map("price_currency_value_id") @db.Uuid
 
   isActive  Boolean   @default(true) @map("is_active")
@@ -318,7 +323,7 @@ model Enrollment {
   studentUserId String @map("student_user_id") @db.Uuid
   courseId      String @map("course_id") @db.Uuid
 
-  isActive  Boolean @default(true) @map("is_active")
+  isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
@@ -331,6 +336,49 @@ model Enrollment {
   @@index([studentUserId, isActive, createdAt], map: "ix_enrollment_student_list")
   @@index([courseId, isActive], map: "ix_enrollment_course_roster")
   @@map("enrollment")
+}
+
+/// One weekly open window a teacher keeps for bookings, stored as a wall-clock range in
+/// their declared IANA zone (ARCHITECTURE §5). A rule is a recurring plan, not an instant:
+/// `startMinutes`/`endMinutes` are minutes from local midnight on `weekday`, and it is the
+/// slot generator that walks them forward across the horizon and turns each occurrence into
+/// a UTC instant. Storing a fixed UTC range instead would drift every class by an hour
+/// twice a year, which is not what "I teach Monday mornings" means to a teacher.
+///
+/// Which weekday, whether the range is well-formed and whether two rules overlap are the
+/// availability endpoint's decisions, not column constraints — the table only records that a
+/// teacher asked for this slice of their week to exist, so the same reason `price` has no DB
+/// CHECK applies here.
+model AvailabilityRule {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacherUserId String @map("teacher_user_id") @db.Uuid
+
+  /// 1–7, Monday first, mirroring `Date#getUTCDay` shifted so Sunday is the last day a
+  /// teacher would reasonably choose. An integer rather than a lookup because the seven days
+  /// are not a business constant Ops can add an eighth to.
+  weekday      Int @map("weekday")
+  /// Wall-clock minutes from local midnight. Kept as `start < end`, in whole minutes, by the
+  /// endpoint — see the model note on why no database CHECK.
+  startMinutes Int @map("start_minutes")
+  endMinutes   Int @map("end_minutes")
+  /// The length of one bookable class inside this window, so the generator knows how to tile
+  /// 09:00–12:00 into three 45-minute slots. Shown and scheduled by, never a suggestion.
+  slotMinutes  Int @map("slot_minutes")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teacher User @relation("teacher_availability", fields: [teacherUserId], references: [id], onDelete: Restrict)
+
+  /// One window may open at a given minute on a given day. A second rule starting at the same
+  /// minute would hand a student the same 09:00 class twice; a different start time is a
+  /// different slice of the week and stands. Like every other business key here it is unique
+  /// among all rows, so retiring a window and re-adding the same one reopens the row rather
+  /// than creating a competing twin (§2).
+  @@unique([teacherUserId, weekday, startMinutes], map: "uk_availability_rule_start")
+  @@index([teacherUserId, isActive, weekday], map: "ix_availability_rule_teacher_week")
+  @@map("availability_rule")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its
