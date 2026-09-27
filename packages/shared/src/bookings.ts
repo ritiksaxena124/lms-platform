@@ -66,7 +66,9 @@ export interface OpenSlotsResponse {
  */
 export interface Booking {
   id: string;
-  course: { id: string };
+  /** Named rather than id-only, because the list a student reads is one row per course and a
+   * screen that had to look the title up per row would be doing the join the query already has. */
+  course: { id: string; slug: string; title: string };
   type: BookingTypeCode;
   status: BookingStatusCode;
   startsAt: string;

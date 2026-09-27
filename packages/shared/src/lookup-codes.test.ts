@@ -4,6 +4,7 @@ import {
   BLOCKING_BOOKING_STATUSES,
   BOOKING_STATUS_CODES,
   BOOKING_TYPE_CODES,
+  CANCELLABLE_BOOKING_STATUSES,
   ROLE_CODES,
   SCHEDULABLE_BOOKING_STATUSES,
   SELF_REGISTERABLE_ROLES,
@@ -58,6 +59,17 @@ describe('lookup reference codes', () => {
     // the instant back — otherwise a teacher's silence would keep blocking a calendar forever.
     expect(BLOCKING_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.REJECTED);
     expect(BLOCKING_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.EXPIRED);
+  });
+
+  it('lets a student out of a request or a class, and out of nothing else', () => {
+    // The set is the answer to "is leaving still an action", which is a different question from
+    // "is this minute occupied" — a class that has been taught holds no minute and cannot be
+    // cancelled either.
+    expect([...CANCELLABLE_BOOKING_STATUSES].sort()).toEqual(['confirmed', 'pending']);
+    expect(CANCELLABLE_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.COMPLETED);
+    expect(CANCELLABLE_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.NO_SHOW);
+    expect(CANCELLABLE_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.REJECTED);
+    expect(CANCELLABLE_BOOKING_STATUSES).not.toContain(BOOKING_STATUS_CODES.EXPIRED);
   });
 
   it('seeds every status Phase 4 can move a booking into', () => {

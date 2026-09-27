@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ROLE_CODES, type Booking, type OpenSlotsResponse } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
@@ -50,5 +50,30 @@ export class BookingsController {
     @Body() dto: CreateBookingDto,
   ): Promise<{ booking: Booking }> {
     return { booking: await this.bookings.create(user.id, dto) };
+  }
+
+  /**
+   * The student's own classes, in one list.
+   *
+   * No course parameter, unlike the slots route: this is read from the person, not from the
+   * thing they are looking at. A student with three teachers has one calendar to keep, and the
+   * alternative — a screen calling this per course it happens to have open — is the same list
+   * assembled twice in two places.
+   */
+  @Get()
+  @Roles(ROLE_CODES.STUDENT)
+  async mine(@CurrentUser() user: AuthenticatedUser): Promise<{ bookings: Booking[] }> {
+    return { bookings: await this.bookings.listOwned(user.id) };
+  }
+
+  /** Let go of a class, and hand its minute back to the teacher's calendar. */
+  @Post(':id/cancel')
+  @HttpCode(HttpStatus.OK)
+  @Roles(ROLE_CODES.STUDENT)
+  async cancel(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<{ booking: Booking }> {
+    return { booking: await this.bookings.cancel(user.id, id) };
   }
 }

@@ -24,10 +24,15 @@ const BOOKABLE_COURSE_SELECT = {
 export type BookableCourseRow = Prisma.CourseGetPayload<{ select: typeof BOOKABLE_COURSE_SELECT }>;
 
 /** A booking with the two vocabulary codes read out of the lookup rows behind it, which is the
- * shape every response from this module wears: the table stores ids and the client reads codes. */
+ * shape every response from this module wears: the table stores ids and the client reads codes.
+ *
+ * `statusValueId` travels along for the same reason the hold column does — the cancel path needs
+ * to know which row it is standing down in order to say so in one write rather than two — and it
+ * is never copied into a response, because a client reads the code. */
 const BOOKING_SELECT = {
   id: true,
-  courseId: true,
+  statusValueId: true,
+  course: { select: { id: true, slug: true, title: true } },
   type: { select: { code: true } },
   status: { select: { code: true } },
   startsAt: true,
@@ -47,6 +52,24 @@ export type BookingRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_SELEC
  * student's other course, and the caller turns it into a conflict on the field they typed.
  */
 export type SlotRequestResult = { outcome: 'requested'; booking: BookingRow } | { outcome: 'held' };
+
+/**
+ * What leaving a class came down to.
+ *
+ * `done` is written for two roads that arrive at the same place: the row this write just stood
+ * down, and the row that was already stood down when the student pressed again. Both answer with
+ * the class as it now reads, which is the whole difference between a cancel and an error.
+ *
+ * `not-standing` is a class that has been taught, missed, refused or left to expire; `changed` is
+ * the rarer one, where the status read a moment ago was answered by somebody else — the teacher —
+ * before this write landed, so no row matched and the caller must not claim a release it did not
+ * make.
+ */
+export type CancelOutcome =
+  | { outcome: 'done'; booking: BookingRow }
+  | { outcome: 'not-standing' }
+  | { outcome: 'changed' }
+  | { outcome: 'missing' };
 
 /**
  * The table behind a booked class, and the course a booking is made against.
@@ -183,7 +206,7 @@ export class BookingsRepository {
         if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
           throw error;
         }
-        return (await this.standingFor(tx, args)) ?? { outcome: 'held' as const };
+        return this.standingFor(tx, args);
       }
     });
   }
@@ -237,5 +260,72 @@ export class BookingsRepository {
       select: BOOKING_SELECT,
     });
     return row ? { outcome: 'requested', booking: row } : { outcome: 'held' };
+  }
+
+  /** One of this student's own classes, or nothing. Somebody else's id is not a secret, so the
+   * caller answers it the same way an invented one is answered. */
+  async findOwned(bookingId: string, studentUserId: string): Promise<BookingRow | null> {
+    return this.prisma.booking.findFirst({
+      where: { id: bookingId, studentUserId, isActive: true },
+      select: BOOKING_SELECT,
+    });
+  }
+
+  /** Every class this student has ever asked for, soonest first.
+   *
+   * All of them, including the called-off and the taught: this is the record a student's own
+   * calendar screen reads, and a screen that wants next week filters on the start it is given.
+   * Deciding what counts as "upcoming" here would be one rule for that screen and another for
+   * whatever is built next.
+   */
+  async listOwned(studentUserId: string): Promise<BookingRow[]> {
+    return this.prisma.booking.findMany({
+      where: { studentUserId, isActive: true },
+      orderBy: { startsAt: 'asc' },
+      select: BOOKING_SELECT,
+    });
+  }
+
+  /**
+   * Stand a student down from one of their classes, and hand the minute back.
+   *
+   * One write, because the two halves have to happen together: a row that says cancelled while
+   * still holding `slotHeldAt` keeps a teacher's calendar free of a class nobody is coming to,
+   * which is the exact thing a cancel is for. Nothing is deleted — the row keeps its identity and
+   * its history, and the demo cap counts it a class later.
+   *
+   * The status the row was read at is part of the update's own `where`, which is what makes the
+   * answer honest when a teacher confirmed or refused the class in the moment between the read and
+   * the write: the swap matches no rows, and `changed` says the class is not the one the student
+   * was looking at rather than claiming something that has not happened.
+   */
+  async cancelOwned(args: {
+    bookingId: string;
+    studentUserId: string;
+    cancellableStatusValueIds: string[];
+    cancelledStatusValueId: string;
+  }): Promise<CancelOutcome> {
+    const row = await this.prisma.booking.findFirst({
+      where: { id: args.bookingId, studentUserId: args.studentUserId, isActive: true },
+      select: BOOKING_SELECT,
+    });
+    if (!row) return { outcome: 'missing' };
+    if (row.statusValueId === args.cancelledStatusValueId) return { outcome: 'done', booking: row };
+    if (!args.cancellableStatusValueIds.includes(row.statusValueId)) {
+      return { outcome: 'not-standing' };
+    }
+
+    const [after] = await this.prisma.booking.updateManyAndReturn({
+      where: {
+        id: args.bookingId,
+        studentUserId: args.studentUserId,
+        isActive: true,
+        statusValueId: row.statusValueId,
+      },
+      data: { statusValueId: args.cancelledStatusValueId, slotHeldAt: null },
+      select: BOOKING_SELECT,
+    });
+
+    return after ? { outcome: 'done', booking: after } : { outcome: 'changed' };
   }
 }

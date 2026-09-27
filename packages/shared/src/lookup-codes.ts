@@ -104,6 +104,22 @@ export const BLOCKING_BOOKING_STATUSES: readonly string[] = [
   BOOKING_STATUS_CODES.CONFIRMED,
 ];
 
+/**
+ * The statuses a student may stand down from: a request they are waiting on, and a class the
+ * teacher has said yes to. It is the same two codes `BLOCKING_BOOKING_STATUSES` holds, and it is
+ * written out again rather than reused because the two sets answer different questions — one asks
+ * whether a minute is occupied, the other asks whether leaving it is still an action — and a
+ * future status that occupies time without being cancellable (a class already under way, say)
+ * would have to pick one of the two and be wrong about the other.
+ *
+ * A cancelled row is not in here, and that is what makes a second cancel an answer rather than an
+ * error: the class is already stood down.
+ */
+export const CANCELLABLE_BOOKING_STATUSES: readonly string[] = [
+  BOOKING_STATUS_CODES.PENDING,
+  BOOKING_STATUS_CODES.CONFIRMED,
+];
+
 export const ACCOUNT_STATUS_CODES = {
   ACTIVE: 'active',
   DISABLED: 'disabled',

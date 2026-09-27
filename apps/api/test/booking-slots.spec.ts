@@ -198,7 +198,6 @@ describe('the open class times a student is offered', () => {
   let teacherId: string;
   let quietTeacher: string;
   let enrolled: string;
-  let enrolledId: string;
   let stranger: string;
   let strangerId: string;
   let course: { id: string; slug: string };
@@ -212,7 +211,6 @@ describe('the open class times a student is offered', () => {
     enrolled = await register('slotin', 'student');
     stranger = await register('slotstg', 'student');
     teacherId = await userIdFor('slottr');
-    enrolledId = await userIdFor('slotin');
     strangerId = await userIdFor('slotstg');
 
     // The zone that decides when a window opens lives on the account, not on the rule.

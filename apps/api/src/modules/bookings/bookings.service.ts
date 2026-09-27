@@ -10,6 +10,7 @@ import {
   BOOKING_HORIZON_DAYS,
   BOOKING_STATUS_CODES,
   BOOKING_TYPE_CODES,
+  CANCELLABLE_BOOKING_STATUSES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
   SLOT_DENIAL_CODES,
@@ -50,7 +51,7 @@ const MS_PER_MINUTE = 60 * 1000;
 function toBooking(row: BookingRow): Booking {
   return {
     id: row.id,
-    course: { id: row.courseId },
+    course: { id: row.course.id, slug: row.course.slug, title: row.course.title },
     type: row.type.code as BookingTypeCode,
     status: row.status.code as BookingStatusCode,
     startsAt: row.startsAt.toISOString(),
@@ -94,6 +95,29 @@ function fieldError(field: string, message: string): BadRequestException {
     code: API_ERROR_CODES.VALIDATION_FAILED,
     message: 'Check the highlighted fields.',
     details: { validation: { [field]: [message] } },
+  });
+}
+
+/** One message for "not yours" and "never there", the way every other owned row here answers: a
+ * student walking ids would otherwise learn which classes other students have. */
+function notFoundBooking(): NotFoundException {
+  return new NotFoundException({
+    code: API_ERROR_CODES.NOT_FOUND,
+    message: 'We cannot find that class.',
+  });
+}
+
+function nothingToCancel(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This class is not standing, so there is nothing to cancel.',
+  });
+}
+
+function answeredElsewhere(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This class was answered while you were leaving it. Refresh to see it.',
   });
 }
 
@@ -161,7 +185,7 @@ export class BookingsService {
     const windows = await this.rules.listActive(course.teacherUserId);
     const held = await this.bookings.heldStarts(
       course.teacherUserId,
-      await this.blockingStatusIds(),
+      await this.statusIds(BLOCKING_BOOKING_STATUSES),
       from,
       to,
     );
@@ -239,12 +263,62 @@ export class BookingsService {
         LKP_TYPE_CODES.BOOKING_STATUS,
         BOOKING_STATUS_CODES.PENDING,
       ),
-      blockingStatusValueIds: await this.blockingStatusIds(),
+      blockingStatusValueIds: await this.statusIds(BLOCKING_BOOKING_STATUSES),
     });
 
     if (result.outcome === 'held') throw takenMinute();
 
     return toBooking(result.booking);
+  }
+
+  /**
+   * Everything this student has booked, soonest first.
+   *
+   * No filter and no pagination, because the list is a student's own history with a handful of
+   * teachers and a screen that wants next week has the starts to sort on. Carving "upcoming" into
+   * the endpoint would put one portal's tab structure in the API, where the next screen to want a
+   * different cut would have to argue with it.
+   */
+  async listOwned(studentUserId: string): Promise<Booking[]> {
+    return (await this.bookings.listOwned(studentUserId)).map(toBooking);
+  }
+
+  /**
+   * Leave a class.
+   *
+   * The response is the class as it now reads, in `cancelled`, and the minute it was holding goes
+   * back on the teacher's calendar in the same write. The row itself stays: what a student booked
+   * and gave up is a fact the demo cap and any future account of attendance both still need, and
+   * releasing a seat has never meant erasing the person who sat in it.
+   *
+   * Pressing it twice is not an error, and that is a decision rather than an accident — a portal
+   * whose cancel button timed out has no way to know whether the class stood down, and making the
+   * retry answer `409` would turn a slow network into a screen that tells a student they are still
+   * booked when they are not.
+   *
+   * A class that has already been taught, missed, refused or left to expire is the one thing a
+   * student cannot undo here, and that comes back as a conflict rather than a field error: nothing
+   * the student typed was wrong, the state of the class is.
+   */
+  async cancel(studentUserId: string, bookingId: string): Promise<Booking> {
+    const cancelledStatusValueId = await this.reference.valueId(
+      LKP_TYPE_CODES.BOOKING_STATUS,
+      BOOKING_STATUS_CODES.CANCELLED,
+    );
+    const outcome = UUID.test(bookingId)
+      ? await this.bookings.cancelOwned({
+          bookingId,
+          studentUserId,
+          cancellableStatusValueIds: await this.statusIds(CANCELLABLE_BOOKING_STATUSES),
+          cancelledStatusValueId,
+        })
+      : ({ outcome: 'missing' } as const);
+
+    if (outcome.outcome === 'missing') throw notFoundBooking();
+    if (outcome.outcome === 'not-standing') throw nothingToCancel();
+    if (outcome.outcome === 'changed') throw answeredElsewhere();
+
+    return toBooking(outcome.booking);
   }
 
   /** A course this platform can take a booking for: published, live, and addressed either way. */
@@ -294,15 +368,13 @@ export class BookingsService {
       : { code: SLOT_ENTITLEMENT_CODES.DEMO, denial: null };
   }
 
-  /** The statuses that occupy a minute, resolved from the shared list rather than a query that
-   * could not answer it: the table holds lookup ids and knows nothing about vocabulary. */
-  private async blockingStatusIds(): Promise<string[]> {
-    const rows = await this.reference.valuesByCodes(
-      LKP_TYPE_CODES.BOOKING_STATUS,
-      BLOCKING_BOOKING_STATUSES,
-    );
-    if (rows.length !== BLOCKING_BOOKING_STATUSES.length) {
-      throw new Error('Not every blocking booking status is seeded');
+  /** The lookup ids behind a set of status codes, refusing to answer with a shorter list than the
+   * caller asked for: a status the code reaches but the seed does not carry would silently stop
+   * blocking, cancelling or expiring a class. */
+  private async statusIds(codes: readonly string[]): Promise<string[]> {
+    const rows = await this.reference.valuesByCodes(LKP_TYPE_CODES.BOOKING_STATUS, codes);
+    if (rows.length !== codes.length) {
+      throw new Error(`Not every booking status in [${codes.join(', ')}] is seeded`);
     }
     return rows.map((row) => row.id);
   }
