@@ -4,7 +4,7 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 3 in progress** — accounts sign in, hold a session and a teacher can save a
+**Status: Phase 3 done** — accounts sign in, hold a session and a teacher can save a
 profile and write, publish and archive courses in the teacher portal (`/courses`, backed by
 `/api/v1/courses`), order a course's syllabus of modules (`/courses/[id]/modules`, backed by
 `/api/v1/courses/:id/modules`), and write the lessons inside a module — the page, its rough
@@ -94,6 +94,43 @@ changed.
 The addresses sit under the reserved `.test` domain, so a demo account can never be pointed at
 a real mailbox.
 
+### Walking the demo
+
+Phase 3 is easiest to see as one course travelling from a teacher's page to a stranger's shelf.
+Because the portals share one session cookie, use **two browser profiles** (or one private
+window) so the teacher and the student are signed in as different people at the same time.
+
+**As the teacher** — <http://teacher.localtest.me:3000>, sign in with `teacher@example.test`:
+
+1. `/courses` → _New course_. Give it a title and a level, leave the price empty; _Save draft_
+   puts it on the list. The editor is the only place a course is written — a published course
+   reads back locked, and the fields refuse a change the server would refuse anyway.
+2. Open it → _write its syllabus_. Add modules and drag them into order; open a module and write
+   its lessons — a page of body text, a rough length, and the _free to read_ switch on one lesson
+   so a stranger gets a sample before committing.
+3. Back on the editor, fill the summary and description the publish check asks for, and quote a
+   price if you want one (`4999` + _Indian rupee_ prints as `₹4,999.00`; _No price_ stays empty,
+   which is not the same as `0` = free). _Publish_ puts the course on the shelf — and the API, not
+   the button, decides whether it was ready.
+4. `/courses/[id]/roster` shows who later takes a place: a headcount, a name and a day per row,
+   and no button that removes somebody.
+
+**As the student** — <http://student.localtest.me:3001>, in the second profile:
+
+1. The shelf opens with no sign-in: browse published courses by level, each card printing the
+   price the teacher quoted. Open a course to read its outline — modules, lessons, lengths — with
+   the one page the teacher left open readable, and every other row marked as a door it will not
+   yet open.
+2. _Sign in_ (`student@example.test`) and the same outline changes character: an _Enroll in this
+   course_ button appears, and taking a place unlocks the locked rows. A page flips from a free
+   preview to a member's page the moment you are inside.
+3. `/my-courses` lists the courses you hold a place in, and lets you leave one. Back in the
+   teacher's profile, `/courses/[id]/roster` now names you.
+
+That is the whole loop Phase 3 closes: a teacher writes and prices a course, a stranger reads
+enough of it to want it, enrolling turns that want into a place, and both sides see the same
+decision. Bookings, video and payments are Phase 4 and later.
+
 ## Commands
 
 | Command               | What it does                                                             |
@@ -168,7 +205,7 @@ decision was made, and what was deliberately left out.
 | 0     | Plan, architecture, data model                               | Approved    |
 | 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell | **Done**    |
 | 2     | Auth, accounts, roles, teacher profile                       | **Done**    |
-| 3     | Courses, lessons, enrollment                                 | In progress |
+| 3     | Courses, lessons, enrollment                                 | **Done**    |
 | 4     | Availability, bookings, scheduling across timezones          | Not started |
 | 5     | Video + storage + email behind provider ports                | On hold     |
 | 6     | Payments (free-tier provider only)                           | On hold     |
