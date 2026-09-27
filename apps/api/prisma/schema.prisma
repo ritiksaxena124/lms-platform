@@ -63,6 +63,12 @@ model LkpValue {
   /// Lessons in their own stage of being written.
   lessonsAsStatus Lesson[] @relation("lesson_status")
 
+  /// Bookings of each kind — an enrolled class, a demo call.
+  bookingsAsType Booking[] @relation("booking_type")
+
+  /// Bookings in each stage of their life.
+  bookingsAsStatus Booking[] @relation("booking_status")
+
   @@unique([typeId, code], map: "uk_lkp_value_type_code")
   @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
   @@map("lkp_value")
@@ -105,6 +111,14 @@ model User {
   /// course is: a teacher is archived, never deleted, so a past booking still names the
   /// window that made it possible.
   availabilityRules AvailabilityRule[] @relation("teacher_availability")
+
+  /// The classes this person booked. A student's own calendar, and the row a cancellation
+  /// stays on so the class list can show what was called off.
+  bookingsAsStudent Booking[] @relation("booking_student")
+
+  /// The classes booked on this person's calendar, whichever of their courses they came from.
+  /// A teacher's pool is one pool, so the claim is keyed on the account and not on a course.
+  bookingsAsTeacher Booking[] @relation("booking_teacher")
 
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
@@ -203,6 +217,15 @@ model Course {
   priceMinorUnits      Int?    @map("price_minor_units")
   priceCurrencyValueId String? @map("price_currency_value_id") @db.Uuid
 
+  /// Whether a student who has not enrolled may book a one-off demo call for this course. An
+  /// opt-in the teacher grants, not a service the platform assumes: a column defaulting to true
+  /// would open every published course's calendar to strangers on the day this migration ran.
+  ///
+  /// The cap that goes with it — one demo ever per student per course, and only for students not
+  /// already enrolled — is a query the booking endpoint takes over surviving rows, not a key on
+  /// either table. The numbers are business rules; the rows are history.
+  demoBookingsEnabled Boolean @default(false) @map("demo_bookings_enabled")
+
   isActive  Boolean   @default(true) @map("is_active")
   deletedAt DateTime? @map("deleted_at") @db.Timestamptz(6)
   createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -222,6 +245,9 @@ model Course {
   /// Who holds a place in this course. A roster is read from here, never from a count
   /// copied onto the course row, because the two would disagree the moment somebody left.
   enrollments Enrollment[] @relation("course_enrollments")
+
+  /// The classes booked out of this course's schedule, by enrolled students and by demos.
+  bookings Booking[] @relation("course_bookings")
 
   @@unique([teacherUserId, slug], map: "uk_course_teacher_slug")
   @@index([teacherUserId, isActive, createdAt], map: "ix_course_teacher_created")
@@ -379,6 +405,72 @@ model AvailabilityRule {
   @@unique([teacherUserId, weekday, startMinutes], map: "uk_availability_rule_start")
   @@index([teacherUserId, isActive, weekday], map: "ix_availability_rule_teacher_week")
   @@map("availability_rule")
+}
+
+/// One class a student claimed on a teacher's calendar: the row that keeps a minute from being
+/// taken twice.
+///
+/// The booking is the slot hold, so §5's race guard is a unique index rather than a second
+/// table. `slotHeldAt` names the instant this row keeps occupied and is null for a row that
+/// occupies nothing, and Postgres lets any number of rows share a null in a unique index — which
+/// makes `@@unique([teacherUserId, slotHeldAt])` exactly "one standing class per teacher per
+/// minute". The alternative was a partial index over the blocking statuses, and it is not
+/// available twice over: Prisma cannot write a `WHERE` into an index, and an index predicate
+/// could not read a status that is an `LkpValue` row (§3). So which statuses claim a minute is
+/// decided by the booking service, from `BLOCKING_BOOKING_STATUSES`, and the index is what
+/// separates the two writers that raced past each other's checks.
+///
+/// The teacher is a column and not only a join to `course`, because the pool is the teacher's
+/// rather than the course's: a minute claimed for one course is unavailable for another, and an
+/// index cannot reach through a relation. The service keeps the two agreeing on who owns the
+/// course.
+model Booking {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  studentUserId String @map("student_user_id") @db.Uuid
+  teacherUserId String @map("teacher_user_id") @db.Uuid
+  courseId      String @map("course_id") @db.Uuid
+
+  /// Enrolled class or demo call, and pending or confirmed or cancelled. Both are lookup rows,
+  /// so a new kind of trial or a new stage is an insert rather than a migration, and both are
+  /// decided by the endpoint that writes them: nothing here knows what a status implies.
+  typeValueId   String @map("type_value_id") @db.Uuid
+  statusValueId String @map("status_value_id") @db.Uuid
+
+  /// The start as a UTC instant, produced by expanding a wall-clock rule across the horizon in
+  /// the teacher's zone (§5). Storing the instant is what makes a DST change move a class rather
+  /// than mislabel it; the clock face a student reads is this, converted to the viewer's zone.
+  startsAt        DateTime  @map("starts_at") @db.Timestamptz(6)
+  /// The length booked, frozen here rather than read from the rule at display time: a class
+  /// taken as forty-five minutes stays a forty-five-minute class after the teacher starts
+  /// teaching an hour, so a student's past list cannot be redrawn by a schedule edit.
+  durationMinutes Int       @map("duration_minutes")
+  slotHeldAt      DateTime? @map("slot_held_at") @db.Timestamptz(6)
+
+  /// The row-level flag the convention requires. A cancelled class is not an archived row — it
+  /// is a standing row in a cancelled status — and releasing a minute is `slotHeldAt` going null,
+  /// which is why retirement clears the hold in the same write instead of leaving a row that
+  /// blocks a calendar nobody is using.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  student User @relation("booking_student", fields: [studentUserId], references: [id], onDelete: Restrict)
+  teacher User @relation("booking_teacher", fields: [teacherUserId], references: [id], onDelete: Restrict)
+
+  course Course   @relation("course_bookings", fields: [courseId], references: [id], onDelete: Restrict)
+  type   LkpValue @relation("booking_type", fields: [typeValueId], references: [id], onDelete: Restrict)
+  status LkpValue @relation("booking_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+
+  /// The claim, per teacher. A student may hold two minutes of one teacher's calendar — a term of
+  /// weekly classes is exactly that — so the pair that cannot repeat is the teacher and the
+  /// instant, never the student and the course. That is also why "one demo ever" is a count the
+  /// service takes over surviving rows: a key here would freeze the cap at one forever, and the
+  /// cap is a business number.
+  @@unique([teacherUserId, slotHeldAt], map: "uk_booking_slot_hold")
+  @@index([studentUserId, isActive, startsAt], map: "ix_booking_student_calendar")
+  @@index([teacherUserId, isActive, startsAt], map: "ix_booking_teacher_calendar")
+  @@index([courseId, isActive, startsAt], map: "ix_booking_course_schedule")
+  @@map("booking")
 }
 
 /// One issued refresh session. The plaintext token never reaches the database — only its
