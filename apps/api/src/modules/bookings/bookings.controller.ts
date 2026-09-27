@@ -1,5 +1,5 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { ROLE_CODES, type Booking, type OpenSlotsResponse } from '@lms/shared';
+import { ROLE_CODES, type Booking, type BookingRequest, type OpenSlotsResponse } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -75,5 +75,41 @@ export class BookingsController {
     @Param('id') id: string,
   ): Promise<{ booking: Booking }> {
     return { booking: await this.bookings.cancel(user.id, id) };
+  }
+
+  /**
+   * The teacher's door: what is waiting for them, and what they say to it.
+   *
+   * Three routes on one table read from the other side, all under `@Roles(TEACHER)` — which is
+   * why the student routes above carry their own `@Roles` rather than a controller-wide one. The
+   * requests are pending only, because the answered ones are not a queue; the teacher's own
+   * calendar is a different read, and it belongs to the screen that shows a week rather than the
+   * one that shows a decision.
+   */
+  @Get('requests')
+  @Roles(ROLE_CODES.TEACHER)
+  async requests(@CurrentUser() user: AuthenticatedUser): Promise<{ requests: BookingRequest[] }> {
+    return { requests: await this.bookings.requestsFor(user.id) };
+  }
+
+  @Post(':id/confirm')
+  @HttpCode(HttpStatus.OK)
+  @Roles(ROLE_CODES.TEACHER)
+  async confirm(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<{ booking: Booking }> {
+    return { booking: await this.bookings.answer(user.id, id, 'confirm') };
+  }
+
+  /** No, which gives the minute back to the teacher's calendar the same write that wrote the no. */
+  @Post(':id/reject')
+  @HttpCode(HttpStatus.OK)
+  @Roles(ROLE_CODES.TEACHER)
+  async reject(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<{ booking: Booking }> {
+    return { booking: await this.bookings.answer(user.id, id, 'reject') };
   }
 }

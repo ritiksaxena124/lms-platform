@@ -43,6 +43,17 @@ const BOOKING_SELECT = {
 
 export type BookingRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_SELECT }>;
 
+/** The same row with the student on it, which is the only thing a teacher's list needs that a
+ * student's own does not: a teacher answers about a person, not about an id. */
+const BOOKING_REQUEST_SELECT = {
+  ...BOOKING_SELECT,
+  student: { select: { id: true, fullName: true } },
+} as const satisfies Prisma.BookingSelect;
+
+export type BookingRequestRow = Prisma.BookingGetPayload<{
+  select: typeof BOOKING_REQUEST_SELECT;
+}>;
+
 /**
  * What the write decided, in the two ways a request can end without a new row.
  *
@@ -54,18 +65,19 @@ export type BookingRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_SELEC
 export type SlotRequestResult = { outcome: 'requested'; booking: BookingRow } | { outcome: 'held' };
 
 /**
- * What leaving a class came down to.
+ * What a status-changing write to one owned row came down to — the student leaving a class and
+ * the teacher answering one both report through this.
  *
- * `done` is written for two roads that arrive at the same place: the row this write just stood
- * down, and the row that was already stood down when the student pressed again. Both answer with
- * the class as it now reads, which is the whole difference between a cancel and an error.
+ * `done` is written for two roads that arrive at the same place: the row this write just changed,
+ * and the row that already said what the caller wanted it to say. Both answer with the class as it
+ * now reads, which is the whole difference between a retry and an error.
  *
- * `not-standing` is a class that has been taught, missed, refused or left to expire; `changed` is
- * the rarer one, where the status read a moment ago was answered by somebody else — the teacher —
- * before this write landed, so no row matched and the caller must not claim a release it did not
- * make.
+ * `not-standing` is a class whose state has moved past the one the caller could act on — taught,
+ * missed, refused, left to expire, or answered the other way already; `changed` is the rarer
+ * corner where the status read a moment ago was rewritten by somebody else before this write
+ * landed, so no row matched and the caller must not claim a change it did not make.
  */
-export type CancelOutcome =
+export type AnswerOutcome =
   | { outcome: 'done'; booking: BookingRow }
   | { outcome: 'not-standing' }
   | { outcome: 'changed' }
@@ -262,12 +274,20 @@ export class BookingsRepository {
     return row ? { outcome: 'requested', booking: row } : { outcome: 'held' };
   }
 
-  /** One of this student's own classes, or nothing. Somebody else's id is not a secret, so the
-   * caller answers it the same way an invented one is answered. */
-  async findOwned(bookingId: string, studentUserId: string): Promise<BookingRow | null> {
-    return this.prisma.booking.findFirst({
-      where: { id: bookingId, studentUserId, isActive: true },
-      select: BOOKING_SELECT,
+  /** The requests on this teacher's calendar that are still waiting for an answer, soonest first.
+   *
+   * Pending only, because the name of the route is the filter: everything else the teacher has
+   * already said something about lives on their class list instead, which is a different question
+   * asked of the same table.
+   */
+  async listRequests(
+    teacherUserId: string,
+    pendingStatusValueId: string,
+  ): Promise<BookingRequestRow[]> {
+    return this.prisma.booking.findMany({
+      where: { teacherUserId, isActive: true, statusValueId: pendingStatusValueId },
+      orderBy: { startsAt: 'asc' },
+      select: BOOKING_REQUEST_SELECT,
     });
   }
 
@@ -304,25 +324,77 @@ export class BookingsRepository {
     studentUserId: string;
     cancellableStatusValueIds: string[];
     cancelledStatusValueId: string;
-  }): Promise<CancelOutcome> {
+  }): Promise<AnswerOutcome> {
+    return this.swapOwnedStatus({
+      bookingId: args.bookingId,
+      owner: { studentUserId: args.studentUserId },
+      fromStatusValueIds: args.cancellableStatusValueIds,
+      toStatusValueId: args.cancelledStatusValueId,
+      releaseHold: true,
+    });
+  }
+
+  /**
+   * Answer one of this teacher's requests: yes, and the minute stays held; no, and it goes back.
+   *
+   * The row must still be `pending` for either answer to land, which is what keeps a teacher from
+   * taking back something they said last week and from overwriting a student's cancellation — the
+   * two roads a careless `update` would happily pave over.
+   */
+  async answerOwned(args: {
+    bookingId: string;
+    teacherUserId: string;
+    pendingStatusValueId: string;
+    answerStatusValueId: string;
+    releaseHold: boolean;
+  }): Promise<AnswerOutcome> {
+    return this.swapOwnedStatus({
+      bookingId: args.bookingId,
+      owner: { teacherUserId: args.teacherUserId },
+      fromStatusValueIds: [args.pendingStatusValueId],
+      toStatusValueId: args.answerStatusValueId,
+      releaseHold: args.releaseHold,
+    });
+  }
+
+  /**
+   * The one write behind both status changes, so the two doors cannot disagree about how a status
+   * moves: read the row this caller owns, refuse if it is not in a state the caller may act on,
+   * then update it with the status just read as part of the `where`.
+   *
+   * That last clause is the race. A teacher confirming at the same moment the student cancels gets
+   * one of the two answers, not a row whose status says one thing and whose hold says another — the
+   * loser's swap matches no rows and comes back `changed`, which is a retry, not a lie.
+   *
+   * Releasing the hold and setting the status are one statement for the same reason: a row that
+   * says cancelled while still holding a minute keeps a class off a calendar nobody is using.
+   */
+  private async swapOwnedStatus(args: {
+    bookingId: string;
+    owner: { studentUserId?: string; teacherUserId?: string };
+    fromStatusValueIds: string[];
+    toStatusValueId: string;
+    releaseHold: boolean;
+  }): Promise<AnswerOutcome> {
     const row = await this.prisma.booking.findFirst({
-      where: { id: args.bookingId, studentUserId: args.studentUserId, isActive: true },
+      where: { id: args.bookingId, ...args.owner, isActive: true },
       select: BOOKING_SELECT,
     });
     if (!row) return { outcome: 'missing' };
-    if (row.statusValueId === args.cancelledStatusValueId) return { outcome: 'done', booking: row };
-    if (!args.cancellableStatusValueIds.includes(row.statusValueId)) {
-      return { outcome: 'not-standing' };
-    }
+    if (row.statusValueId === args.toStatusValueId) return { outcome: 'done', booking: row };
+    if (!args.fromStatusValueIds.includes(row.statusValueId)) return { outcome: 'not-standing' };
 
     const [after] = await this.prisma.booking.updateManyAndReturn({
       where: {
         id: args.bookingId,
-        studentUserId: args.studentUserId,
+        ...args.owner,
         isActive: true,
         statusValueId: row.statusValueId,
       },
-      data: { statusValueId: args.cancelledStatusValueId, slotHeldAt: null },
+      data: {
+        statusValueId: args.toStatusValueId,
+        ...(args.releaseHold ? { slotHeldAt: null } : {}),
+      },
       select: BOOKING_SELECT,
     });
 

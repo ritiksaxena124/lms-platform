@@ -77,3 +77,17 @@ export interface Booking {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * A booking as the teacher reads it: the same class, plus the person asking.
+ *
+ * The name is the whole difference between this and `Booking`. A student deciding whether to keep
+ * a class is reading their own calendar; a teacher deciding whether they can teach Thursday
+ * evening is deciding about somebody, and a list of uuids would send them off to another screen to
+ * find out who. It comes from the account rather than from a student-profile table because that is
+ * the name the platform already shows a teacher, and it is stored on the booking's student rather
+ * than copied onto the row — a person who changes their name is not a class that changed.
+ */
+export interface BookingRequest extends Booking {
+  student: { id: string; displayName: string };
+}

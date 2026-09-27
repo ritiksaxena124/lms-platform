@@ -18,6 +18,7 @@ import {
   expandWindows,
   slotAt,
   type Booking,
+  type BookingRequest,
   type BookingStatusCode,
   type BookingTypeCode,
   type OpenSlot,
@@ -29,8 +30,7 @@ import {
 import { AvailabilityRepository } from '../availability/availability.repository';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
 import { ReferenceService } from '../../reference/reference.service';
-import type { BookingRow } from './bookings.repository';
-import type { BookableCourseRow } from './bookings.repository';
+import type { BookableCourseRow, BookingRequestRow, BookingRow } from './bookings.repository';
 import { BookingsRepository } from './bookings.repository';
 import type { CreateBookingDto } from './dto/create-booking.dto';
 
@@ -59,6 +59,14 @@ function toBooking(row: BookingRow): Booking {
     durationMinutes: row.durationMinutes,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+/** A request as the teacher reads it: the same class, and the person they are deciding about. */
+function toRequest(row: BookingRequestRow): BookingRequest {
+  return {
+    ...toBooking(row),
+    student: { id: row.student.id, displayName: row.student.fullName },
   };
 }
 
@@ -114,15 +122,26 @@ function nothingToCancel(): ConflictException {
   });
 }
 
-function answeredElsewhere(): ConflictException {
+/** Said to a teacher who pressed an answer on a request that no longer waits for one — including
+ * the case where the student has already left, which is the teacher's question having gone away. */
+function alreadyAnswered(): ConflictException {
   return new ConflictException({
     code: API_ERROR_CODES.CONFLICT,
-    message: 'This class was answered while you were leaving it. Refresh to see it.',
+    message: 'This request has already been answered, so it cannot be answered again.',
   });
 }
 
-/**
- * Who this student is to this course, or the reason they are nobody to it.
+/** The read said one thing and the write found another, because somebody acted in between. Both
+ * doors get this: the student who cancelled as the teacher confirmed and the teacher who confirmed
+ * as the student cancelled are the same event seen from opposite ends. */
+function changedElsewhere(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This class changed while you were deciding. Refresh to see it.',
+  });
+}
+
+/** Who this student is to this course, or the reason they are nobody to it.
  *
  * A place comes first and outranks everything: a student who enrolled is booking a class, not
  * sampling a teacher, whatever the trial setting says. After that the course has to have opened
@@ -316,7 +335,66 @@ export class BookingsService {
 
     if (outcome.outcome === 'missing') throw notFoundBooking();
     if (outcome.outcome === 'not-standing') throw nothingToCancel();
-    if (outcome.outcome === 'changed') throw answeredElsewhere();
+    if (outcome.outcome === 'changed') throw changedElsewhere();
+
+    return toBooking(outcome.booking);
+  }
+
+  /**
+   * The requests on this teacher's calendar that are still waiting for an answer.
+   *
+   * Read from the teacher rather than the course, because that is the shape of the decision: a
+   * teacher with four courses keeps one list of people wanting Thursday, and a screen per course
+   * would ask them to remember which shelf a request came from.
+   */
+  async requestsFor(teacherUserId: string): Promise<BookingRequest[]> {
+    const pending = await this.reference.valueId(
+      LKP_TYPE_CODES.BOOKING_STATUS,
+      BOOKING_STATUS_CODES.PENDING,
+    );
+    return (await this.bookings.listRequests(teacherUserId, pending)).map(toRequest);
+  }
+
+  /**
+   * Say yes or no to one of those requests.
+   *
+   * Only a pending row can be answered, and that is the load-bearing rule rather than a nicety:
+   * a teacher taking back last week's confirmation, or overwriting a student's cancellation, would
+   * both be a rewrite of something that already happened. A second press of the same answer is
+   * harmless and comes back as the class as it now reads, for the same reason a repeated cancel
+   * does — the button's response can be lost on the way home.
+   *
+   * Yes keeps the minute held and no gives it back, which is the only difference between the two
+   * beyond the word on the row. Neither deletes anything: a refused class is still a class the
+   * student asked for, and the reason they did not get it.
+   */
+  async answer(
+    teacherUserId: string,
+    bookingId: string,
+    answer: 'confirm' | 'reject',
+  ): Promise<Booking> {
+    const pendingStatusValueId = await this.reference.valueId(
+      LKP_TYPE_CODES.BOOKING_STATUS,
+      BOOKING_STATUS_CODES.PENDING,
+    );
+    const answerStatusValueId = await this.reference.valueId(
+      LKP_TYPE_CODES.BOOKING_STATUS,
+      answer === 'confirm' ? BOOKING_STATUS_CODES.CONFIRMED : BOOKING_STATUS_CODES.REJECTED,
+    );
+
+    const outcome = UUID.test(bookingId)
+      ? await this.bookings.answerOwned({
+          bookingId,
+          teacherUserId,
+          pendingStatusValueId,
+          answerStatusValueId,
+          releaseHold: answer === 'reject',
+        })
+      : ({ outcome: 'missing' } as const);
+
+    if (outcome.outcome === 'missing') throw notFoundBooking();
+    if (outcome.outcome === 'not-standing') throw alreadyAnswered();
+    if (outcome.outcome === 'changed') throw changedElsewhere();
 
     return toBooking(outcome.booking);
   }
