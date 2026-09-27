@@ -7,7 +7,11 @@
  * teacher to confirm it. The instants themselves are cut from availability rules by
  * `schedule.ts`; nothing in this file stores or recomputes them.
  */
-import type { BookingStatusCode, BookingTypeCode } from './lookup-codes';
+import {
+  BOOKING_STATUS_CODES,
+  type BookingStatusCode,
+  type BookingTypeCode,
+} from './lookup-codes';
 
 /**
  * How the caller relates to the course whose calendar they opened.
@@ -33,6 +37,29 @@ export const SLOT_DENIAL_CODES = {
 } as const;
 
 export type SlotDenialCode = (typeof SLOT_DENIAL_CODES)[keyof typeof SLOT_DENIAL_CODES];
+
+/**
+ * What each booking status reads as to a person.
+ *
+ * A booking arrives with bare codes — `status` is a string, where a course carries its lookup
+ * row's `{code, label}` pair — so every screen that lists classes has to supply the words, and
+ * they have to be the same words. "Cancelled" on the teacher's list and "Called off" on the
+ * student's is one fact said two ways, and the student is the one deciding whether they still
+ * have a class on Thursday.
+ *
+ * The keys are the codes themselves, typed as `Record<BookingStatusCode, string>`: a status some
+ * code can write that has no word here is a compile error and a failed shared test, not an
+ * `undefined` printed in the middle of a calendar.
+ */
+export const BOOKING_STATUS_LABELS: Record<BookingStatusCode, string> = {
+  [BOOKING_STATUS_CODES.PENDING]: 'Pending',
+  [BOOKING_STATUS_CODES.CONFIRMED]: 'Confirmed',
+  [BOOKING_STATUS_CODES.COMPLETED]: 'Completed',
+  [BOOKING_STATUS_CODES.CANCELLED]: 'Cancelled',
+  [BOOKING_STATUS_CODES.REJECTED]: 'Declined',
+  [BOOKING_STATUS_CODES.EXPIRED]: 'Expired',
+  [BOOKING_STATUS_CODES.NO_SHOW]: 'No show',
+};
 
 /** One class a student could take. Instants are UTC; the zone they read in is on the response. */
 export interface OpenSlot {

@@ -24,6 +24,18 @@ export async function listRequests(): Promise<BookingRequest[]> {
   return requests;
 }
 
+/**
+ * Every class on the teacher's schedule, including the ones that are over.
+ *
+ * The API answers soonest-first, and this client neither re-sorts nor trims: what counts as
+ * upcoming is the screen's decision, and the same list read from the student's side has to be
+ * cut the same way.
+ */
+export async function listClasses(): Promise<BookingRequest[]> {
+  const { bookings } = await apiJson<{ bookings: BookingRequest[] }>(`${path()}/classes`);
+  return bookings;
+}
+
 export async function confirmRequest(id: string): Promise<Booking> {
   const { booking } = await apiJson<{ booking: Booking }>(`${path(id)}/confirm`, {
     method: 'POST',

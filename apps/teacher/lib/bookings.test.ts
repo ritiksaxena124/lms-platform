@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BookingRequest } from '@lms/shared';
 
-import { confirmRequest, listRequests, refuseRequest } from './bookings';
+import { confirmRequest, listClasses, listRequests, refuseRequest } from './bookings';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -59,6 +59,26 @@ describe('booking request client', () => {
       url: `${BASE_URL}/api/v1/bookings/requests`,
       method: 'GET',
     });
+  });
+
+  it('reads the class list as one route of its own, because it is not the queue', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ bookings: [REQUEST] }));
+
+    await expect(listClasses()).resolves.toEqual([REQUEST]);
+    expect(requestAt(0)).toMatchObject({
+      url: `${BASE_URL}/api/v1/bookings/classes`,
+      method: 'GET',
+    });
+  });
+
+  it('hands the whole list back unfiltered, because every status is a fact about the schedule', async () => {
+    // The teacher's list holds answered, cancelled and expired classes beside the waiting ones.
+    // Deciding what counts as "upcoming" belongs to the screen, which is the only place that
+    // knows the split the person reading it wants.
+    const past: BookingRequest = { ...REQUEST, id: 'b2', status: 'completed' };
+    fetchMock.mockResolvedValueOnce(jsonResponse({ bookings: [past, REQUEST] }));
+
+    await expect(listClasses()).resolves.toEqual([past, REQUEST]);
   });
 
   it('confirms by id alone, with nothing in the body to disagree with the session', async () => {
