@@ -8,6 +8,7 @@ import { AppLogger } from './common/logging/app-logger.service';
 import { PrismaModule } from './common/prisma/prisma.module';
 import { EnvModule } from './config/env.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { AvailabilityModule } from './modules/availability/availability.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CourseModule } from './modules/course/course.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
@@ -25,6 +26,7 @@ import { ReferenceModule } from './reference/reference.module';
     CourseModule,
     CatalogModule,
     EnrollmentsModule,
+    AvailabilityModule,
     // Coarse default for the POC; auth endpoints get a tighter limit in Phase 2.
     ThrottlerModule.forRoot([{ ttl: 60_000, limit: 120 }]),
   ],
