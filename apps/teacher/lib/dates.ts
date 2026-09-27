@@ -1,4 +1,4 @@
-import { isValidIanaTimeZone } from '@lms/shared';
+import { getZoneParts, isValidIanaTimeZone } from '@lms/shared';
 
 /**
  * The one date format this portal shows a person about themselves.
@@ -27,4 +27,51 @@ export function formatDay(instant: string | Date, timeZone?: string | null): str
   }
 
   return formatter.format(new Date(instant));
+}
+
+/** The zone the reader is actually in, when the account cannot name one it trusts. */
+function zoneFor(timeZone?: string | null): string {
+  return timeZone && isValidIanaTimeZone(timeZone)
+    ? timeZone
+    : Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+/** `Thu 1 Oct`, named by the same locale that writes `formatDay`. */
+function namedDay(instant: string, zone: string): string {
+  const key = `day:${zone}`;
+  let formatter = CACHE.get(key);
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-GB', {
+      weekday: 'short',
+      day: 'numeric',
+      month: 'short',
+      timeZone: zone,
+    });
+    CACHE.set(key, formatter);
+  }
+  return formatter.format(new Date(instant));
+}
+
+function clockFace(instant: string, zone: string): string {
+  const { hour, minute } = getZoneParts(instant, zone);
+  return `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+}
+
+/**
+ * When a class runs, on the clock of whoever is reading it: `Thu 1 Oct, 09:00–09:45`.
+ *
+ * Twenty-four hours because that is how the same teacher wrote the windows these classes are cut
+ * from — a queue reading "9:00 am" under a grid drawn "09:00–11:00" is two dialects for one set
+ * of numbers, and the second is the easier one to turn up an hour late for.
+ *
+ * The day is read from the start alone. A class that runs across midnight says so in its own
+ * faces (`23:30–00:15`), which is the same thing a wall calendar does with it.
+ */
+export function formatClassWindow(
+  startsAt: string,
+  endsAt: string,
+  timeZone?: string | null,
+): string {
+  const zone = zoneFor(timeZone);
+  return `${namedDay(startsAt, zone)}, ${clockFace(startsAt, zone)}–${clockFace(endsAt, zone)}`;
 }

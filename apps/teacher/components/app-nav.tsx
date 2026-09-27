@@ -10,6 +10,7 @@ const ITEMS = [
   { href: '/', label: 'Overview' },
   { href: '/courses', label: 'Courses' },
   { href: '/availability', label: 'Availability' },
+  { href: '/requests', label: 'Requests' },
   { href: '/toolkit', label: 'Interface kit' },
 ] as const;
 
