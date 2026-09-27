@@ -445,7 +445,7 @@ describe('lessons', () => {
     const moduleId = await createModule(await createCourse(teacher), teacher);
     const one = await createLesson(moduleId, teacher, 'One');
     await createLesson(moduleId, teacher, 'Two');
-    const three = await createLesson(moduleId, teacher, 'Three');
+    await createLesson(moduleId, teacher, 'Three');
     await transition(moduleId, one.id, 'deactivate', teacher).expect(200);
 
     const held = await lessonIdsOf(moduleId, teacher);

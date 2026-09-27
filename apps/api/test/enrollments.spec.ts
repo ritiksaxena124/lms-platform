@@ -503,7 +503,7 @@ describe('enrollments', () => {
   });
 
   it('does not answer a request from nobody', async () => {
-    const courseId = await createPublishedCourse(teacher);
+    await createPublishedCourse(teacher);
 
     const list = await myEnrollments().expect(401);
     const cancel = await cancelEnrollment(undefined, randomUUID()).expect(401);

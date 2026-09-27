@@ -3,10 +3,10 @@ import {
   ConflictException,
   Controller,
   Get,
-  INestApplication,
   Post,
   Body,
 } from '@nestjs/common';
+import type { INestApplication } from '@nestjs/common';
 import { IsEmail, IsString, MinLength } from 'class-validator';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
