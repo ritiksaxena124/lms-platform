@@ -562,6 +562,15 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
 - **What holds it:** `apps/api/test/availability-schema.spec.ts` for what the table promises and
   what it deliberately does not decide, and `apps/api/test/availability.spec.ts` for the routes,
   the three rules, the reopen, and the silence about another teacher's week.
+- **A window repeats every week and nothing else, on purpose.** There is no exception list, no
+  holiday and no date range, because Phase 4's promise is only that a teacher's week becomes
+  minutes they can be asked for. Two things the user asked for later are Phase 10 for that reason:
+  a **course's own class series** (a course that keeps meeting on the same weekday and minute,
+  rather than being re-booked one slot at a time) and **blocked days** (a teacher marking a
+  holiday, so no minute of that date is offered even when the weekday says otherwise). Both are
+  edits to what a window expands into, so both belong after `slotAt` has been exercised by the
+  booking loop and by whatever Phase 5 attaches to a booked minute — an expansion is the one
+  function in this system where an exception would have to be honoured in three places at once.
 
 ## 14. Bookings
 

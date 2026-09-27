@@ -225,26 +225,31 @@ decision was made, and what was deliberately left out.
 
 ## Phases
 
-| Phase | Scope                                                                    | Status      |
-| ----- | ------------------------------------------------------------------------ | ----------- |
-| 0     | Plan, architecture, data model                                           | Approved    |
-| 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell             | **Done**    |
-| 2     | Auth, accounts, roles, teacher profile                                   | **Done**    |
-| 3     | Courses, lessons, enrollment                                             | **Done**    |
-| 4     | Availability, bookings and scheduling across timezones — with a calendar | **Done**    |
-| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons  | Not started |
-| 6     | Email notifications behind the SMTP port                                 | Not started |
-| 7     | Action log — who did what, to what, in which part of the app             | Not started |
-| 8     | Ops portal — moderation and the read-side of everything above            | Not started |
-| 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment      | Not started |
+| Phase | Scope                                                                     | Status      |
+| ----- | ------------------------------------------------------------------------- | ----------- |
+| 0     | Plan, architecture, data model                                            | Approved    |
+| 1     | Monorepo, API foundation, DB + Prisma, shared, UI kit, shell              | **Done**    |
+| 2     | Auth, accounts, roles, teacher profile                                    | **Done**    |
+| 3     | Courses, lessons, enrollment                                              | **Done**    |
+| 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
+| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | Not started |
+| 6     | Email notifications behind the SMTP port                                  | Not started |
+| 7     | Action log — who did what, to what, in which part of the app              | Not started |
+| 8     | Ops portal — moderation and the read-side of everything above             | Not started |
+| 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
+| 10    | The teacher's calendar — a course's class series, holidays, no-class days | Not started |
 
 Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
 and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
-request queue and class list, the student's booking page and own calendar. Phases 5–9 are the
+request queue and class list, the student's booking page and own calendar. Phases 5–10 are the
 ordered backlog: a live class needs a booked slot to attach to, which is why booking came first,
 the action log wants every kind of write to exist before it fixes what a record looks like, and
-coupons land last because a discount only means something next to a price that is charged — the
-same reason they sit after the portals are complete.
+coupons land last among the things a student touches, because a discount only means something
+next to a price that is charged — the same reason they sit after the portals are complete. The
+calendar work is after all of it: a teacher marking a course's classes to repeat weekly, and
+marking the days they are on holiday so no minute is offered on them, are both edits to what
+§13's windows mean, and that shape is only worth changing once the booking loop, the video
+inside it and the portals around it are settled.
 
 ## Environment variables
 
