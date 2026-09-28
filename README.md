@@ -340,7 +340,7 @@ decision was made, and what was deliberately left out.
 | 3     | Courses, lessons, enrollment                                              | **Done**    |
 | 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
 | 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | **Done**    |
-| 6     | Email notifications behind the SMTP port — queue filled, sweep to send    | In progress |
+| 6     | Email notifications behind the SMTP port — queue sent, live inbox left    | In progress |
 | 7     | Action log — who did what, to what, in which part of the app              | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above             | Not started |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
@@ -351,8 +351,9 @@ decision was made, and what was deliberately left out.
 ### All twelve, in order
 
 The table is the index; this is what each one is for. Phases 0–5 are shipped, Phase 6 is under way
-with its transport, its renderer and its queue, and 7–12 are the ordered backlog — each one sits
-where it does because of what it needs to exist before its shape stops moving.
+with its transport, its renderer, its queue and the sweep that drains them, and 7–12 are the ordered
+backlog — each one sits where it does because of what it needs to exist before its shape stops
+moving.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -376,7 +377,8 @@ where it does because of what it needs to exist before its shape stops moving.
   confirmed class and handed out only inside its window, and one recording per lesson that streams
   through the same gate as the page's text. Detailed below.
 - **Phase 6 — the news.** Email behind the SMTP port: the lifecycle of Phase 4's bookings said out
-  loud to the person it happened to. Scoped below, not started.
+  loud to the person it happened to. Transport, renderer, queue, send decisions and the sweep are in;
+  a real inbox is what is left.
 - **Phase 7 — the action log.** Who did what, to what, and in which part of the app — an
   append-only record the API writes beside its own business writes. It waits until every kind of
   write exists, because a record's shape is only worth fixing once.
@@ -491,6 +493,30 @@ links those messages carry are built from two new required absolute origins, `TE
 and `STUDENT_PORTAL_URL`, with every interpolated segment encoded, so a notification queued by a
 scheduler points at a page on a host the deployment named rather than at a request it has no part in
 (§6).
+
+**Step 6e, the sweep, is in** (`mail-delivery.service`). A cron named `mail-outbox-delivery` wakes
+every five minutes, takes the twenty-five oldest due rows, writes each letter from the copy standing
+that minute and hands it to 6a's port. A row is owned by a status write rather than a lock: the claim
+is `queued → sending` with `queued` still in its `where`, so two processes on one database split
+the queue rather than both working one row, and a claim whose process died is taken back after fifteen
+minutes — wider than a run, keeping the ask it never reported. That is at-least-once, not exactly-once,
+and deliberately: a class confirmation is worth repeating when a send cannot be proved, and the
+reclaim window is what makes a repeat rare. The claim counts that ask before the transport is touched,
+which is what lets the retry wait be read off the row itself: five waits (a minute, five, thirty, two
+hours, six) mean at most six asks and a row that stops being asked about inside a day of its news.
+What a failure earns is one distinction: only the transport's refusal is worth asking again, because a
+host that is unreachable now may not be in five minutes. Everything the renderer or the address book
+refused — a two-line subject, an unanswered slot, a payload with no envelope, an event nobody filed
+copy for — ends the row, because the input has not changed and a queue that retries a broken sentence
+keeps a person from ever being told. An error with no case for it leaves the row alone and the page
+carries on, since news that is perfectly sendable should not be written off because of a bug, and one
+row's outage should not leave twenty-four people unread. The three terminal writes answer with whether
+the row was still theirs, so a letter is never reported sent on a row another process took back; and
+on a box with no transport the rows are `dropped` with no ask counted and no reason invented, because
+the honest record of an undecided deployment is that its news went nowhere. Addresses are read at
+delivery and never logged — a log line carries an event code and a row id — and the sweep's two halves
+live in one spec file, because a sweep is global and two files sweeping one queue take each other's
+rows (§6).
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to

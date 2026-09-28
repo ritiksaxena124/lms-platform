@@ -368,12 +368,64 @@ letter queued after a commit is a letter about a class that a rollback may never
   by a scheduler has no request, and a link assembled from a `Host` header is a link an attacker
   chooses. The encoding is what makes "the path is ours" true for the part that is interpolated — a
   course id shaped like `../../evil.example` still lands on the portal, and a room address has no
-  parameter it could arrive through (§10).
+  parameter it could arrive through (§14).
 
 What the queue refuses to hold is inherited rather than restated: no address, no rendered letter,
 and no claim that anything was sent. `status`, `attempts` and `next_attempt_at` stay at 6c's column
 defaults, so a row written here says only that something happened and somebody should hear about it.
-Whether it hears is 6e's sweep.
+
+### Sending the news (Phase 6, step 6e)
+
+A cron named `mail-outbox-delivery` wakes every five minutes, takes a page of twenty-five due rows,
+writes each one's letter from the copy that stands that minute, and hands it to 6a's port. Those
+three numbers and the retry curve beside them are `@lms/shared` constants rather than figures in
+this file, because they are the answer to "how long until my confirmation arrives" — a question a
+person asks an operator, who should be able to answer it from one file.
+
+- **A row is owned by a status write, not by a lock.** The claim is `queued → sending` with `queued`
+  still in the `where`, so a second run — the cron overlapping itself, or two API processes on one
+  database — matches nothing and gets nothing back. There is no lock to expire and no read-then-write
+  window to lose. What that does not buy is exactly-once: a process whose transport accepted a letter
+  and died before the status write leaves a row `sending` that the reclaim sends again, so the promise
+  is at-least-once — the right way to be wrong about a class confirmation, and the reason the reclaim
+  window is wider than a run rather than tight. `updatedAt` is what makes that abandoned claim
+  reclaimable at all: a row still `sending` after fifteen minutes goes to `queued` keeping the ask it
+  never reported. An abandoned send was still a send, and a reclaim that reset the count would hand a
+  poisoned row an infinite budget.
+- **A row is asked about at most once per run.** The claim counts the ask *before* the transport is
+  touched, so `mailRetryDelayMinutes` reads the wait off the number in the row it is holding. Five
+  waits — a minute, five, thirty, two hours, six — mean six asks, and a row that stops being asked
+  about inside a day of the news it carries. A curve rather than a fixed gap because the two failure
+  kinds want different patience: a host that is briefly unreachable should be dialed again in a
+  minute, and a host that is unreachable for an afternoon should not be dialed every minute for it.
+- **Only the transport's refusal is retried.** `MailDeliveryError` carries 6a's sanitized code, and
+  it is the one failure whose next attempt could answer differently. Everything the renderer or the
+  address book refused — a subject spanning two lines, a slot nobody answers, a payload that holds
+  no envelope, an event nobody filed copy for — ends the row, because the input has not changed
+  between runs and a queue that retries a broken sentence keeps a person from ever being told while
+  filling the log with one error. This is what `event_code` not being a foreign key buys: a missing
+  template is a `failed` row, never a rollback of the write that recorded a place in a course.
+- **A surprise is not the row's fault.** An error with no case in this file leaves the row in
+  `sending` and the run carries on with the rest of the page. The reclaim brings it back once the
+  claim is old; writing it off would be the queue deciding that news which is perfectly sendable
+  should never be heard, and stopping the page would be twenty-four people unread because of one.
+- **A terminal write answers with whether the row was still its own.** A `false` there means another
+  process reclaimed the row mid-send, and the run counts it as released rather than as sent — the
+  one place a queue could lie about what went out, and the reason those three writes are not `void`.
+- **A box with no transport says so in the open.** `delivers: false` drops the due rows with
+  `attempts` still 0 and no reason written: nothing was asked, so nothing refused. On the deployment
+  that has not decided on mail yet, the honest record is that the news went nowhere.
+- **The address is read at delivery, and never logged.** The claim joins the recipient for their
+  `email`, which is why a person who corrected their account is mailed at the correction — 6c's
+  absence, honoured at the only moment it matters. Log lines carry the event code and the row id: a
+  log file is rotated, shipped and grepped by people who have no business reading a student's
+  address out of it, and a room address reaches no message at all (§14).
+
+The sweep's own tests are one file holding both halves — the seven statements and the decisions —
+because a sweep is by nature global. Two spec files sweeping one `lms_test` take each other's rows:
+every row 6d files is due the moment it exists, and the pages are chosen oldest-first. Inside that
+one file each test dates its rows hours in the past and asks for a page no larger than the rows it
+filed, which is what lets the counts be exact rather than `toBeGreaterThanOrEqual`.
 
 The choice has now been made, which is why these are phases rather than open questions:
 
