@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 
 import { StorageModule } from '../../providers/storage/storage.module';
+import { ActionLogModule } from '../action-log/action-log.module';
 import { AuthModule } from '../auth/auth.module';
 import { CourseModulesController } from './course-modules.controller';
 import { CourseModulesRepository } from './course-modules.repository';
@@ -28,7 +29,7 @@ import { LessonsService } from './lessons.service';
  * ownership reads rather than inventing a third answer to "is this page yours".
  */
 @Module({
-  imports: [AuthModule, StorageModule],
+  imports: [AuthModule, StorageModule, ActionLogModule],
   controllers: [
     CoursesController,
     CourseModulesController,

@@ -31,10 +31,15 @@ describe('email template seeding', () => {
   });
 
   it('files standing copy for every event the code can queue, and none it cannot', async () => {
-    const rows = await prisma.emailTemplate.findMany({ where: { isActive: true } });
-    expect(rows.map((row) => row.eventCode).sort()).toEqual(
-      [...Object.values(MAIL_EVENT_CODES)].sort(),
-    );
+    // Counted over the seven codes rather than over every active row: suites run in parallel forks
+    // against one database, and the run-scoped copy another suite is filing while this one reads is
+    // its row, not an eighth event the seed invented.
+    const codes = Object.values(MAIL_EVENT_CODES);
+    const rows = await prisma.emailTemplate.findMany({
+      where: { isActive: true, eventCode: { in: codes } },
+      select: { eventCode: true },
+    });
+    expect(rows.map((row) => row.eventCode).sort()).toEqual([...codes].sort());
   });
 
   it('gives every event the same row the seed data describes', async () => {

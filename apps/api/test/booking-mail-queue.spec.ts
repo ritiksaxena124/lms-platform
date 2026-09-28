@@ -222,6 +222,7 @@ describe('the class news a booking write files', () => {
     await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });

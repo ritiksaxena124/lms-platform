@@ -31,13 +31,4 @@ export class UsersRepository {
   async recordLogin(id: string): Promise<void> {
     await this.prisma.user.update({ where: { id }, data: { lastLoginAt: new Date() } });
   }
-
-  /**
-   * The zone belongs to the account, not to any one screen: it decides when a class is,
-   * what "today" means in a dashboard and which reminders arrive at a sane hour. Writing it
-   * here keeps one row holding it rather than a profile keeping a copy in step.
-   */
-  async updateTimezone(id: string, timezone: string): Promise<void> {
-    await this.prisma.user.update({ where: { id }, data: { timezone } });
-  }
 }

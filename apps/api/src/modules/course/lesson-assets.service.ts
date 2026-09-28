@@ -1,5 +1,5 @@
 import { Inject, Injectable, NotFoundException } from '@nestjs/common';
-import { API_ERROR_CODES, type LessonAsset } from '@lms/shared';
+import { ACTION_CODES, API_ERROR_CODES, type LessonAsset } from '@lms/shared';
 import type { LessonAsset as LessonAssetRow } from '@prisma/client';
 import type { Request, Response } from 'express';
 
@@ -7,6 +7,7 @@ import { ENV } from '../../config/env.module';
 import type { AppEnv } from '../../config/env';
 import { missingRecording, streamLessonVideo } from '../../common/http/lesson-video';
 import { STORAGE, type Storage } from '../../providers/storage/storage.port';
+import { ActionRecorder } from '../action-log/action-recorder';
 import { CourseModulesRepository } from './course-modules.repository';
 import { readLessonVideo } from './lesson-asset-upload';
 import { LessonAssetsRepository } from './lesson-assets.repository';
@@ -59,6 +60,7 @@ export class LessonAssetsService {
     private readonly assets: LessonAssetsRepository,
     @Inject(STORAGE) private readonly storage: Storage,
     @Inject(ENV) private readonly env: AppEnv,
+    private readonly actions: ActionRecorder,
   ) {}
 
   /**
@@ -83,13 +85,28 @@ export class LessonAssetsService {
       maxUploadMb: this.env.MAX_UPLOAD_MB,
     });
 
-    const row = await this.assets.replaceStanding({
-      lessonId: lesson.id,
-      displayName: upload.displayName,
-      storedKey: upload.key,
-      contentType: upload.contentType,
-      bytes: upload.bytes,
-    });
+    const row = await this.assets.replaceStanding(
+      {
+        lessonId: lesson.id,
+        displayName: upload.displayName,
+        storedKey: upload.key,
+        contentType: upload.contentType,
+        bytes: upload.bytes,
+      },
+      // Every upload is a change — a new row stands, and the one it took down stays retired — so
+      // this is the one authoring write with no no-op path. What it decides is worth naming: how
+      // much landed, what it is, and whether the page already had a recording.
+      (tx, written) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.LESSON_ASSET_ATTACHED,
+          targetId: written.asset.id,
+          detail: {
+            bytes: written.asset.bytes,
+            contentType: written.asset.contentType,
+            replaced: written.replaced,
+          },
+        }),
+    );
     return toAsset(row);
   }
 

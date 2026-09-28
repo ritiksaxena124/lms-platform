@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import type { WriteRecorder } from '../action-log/action-recorder';
 
 /** The four numbers that make a window, in the units the table holds them. */
 export interface RuleWindow {
@@ -79,24 +80,55 @@ export class AvailabilityRepository {
     return row && !row.isActive ? row : null;
   }
 
-  async open(teacherUserId: string, window: RuleWindow): Promise<AvailabilityRow> {
-    return this.prisma.availabilityRule.create({ data: { teacherUserId, ...window } });
+  async open(
+    teacherUserId: string,
+    window: RuleWindow,
+    record?: WriteRecorder<AvailabilityRow>,
+  ): Promise<AvailabilityRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const rule = await tx.availabilityRule.create({ data: { teacherUserId, ...window } });
+      await record?.(tx, rule);
+      return rule;
+    });
   }
 
-  async rewrite(id: string, window: RuleWindow): Promise<AvailabilityRow> {
-    return this.prisma.availabilityRule.update({ where: { id }, data: window });
+  async rewrite(
+    id: string,
+    window: RuleWindow,
+    record?: WriteRecorder<AvailabilityRow>,
+  ): Promise<AvailabilityRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const rule = await tx.availabilityRule.update({ where: { id }, data: window });
+      await record?.(tx, rule);
+      return rule;
+    });
   }
 
   /** The same call as `rewrite` plus the flag: a teacher setting a window at a minute they used
    * before is bringing that window back, and the row keeps the day it was first written. */
-  async reopen(id: string, window: RuleWindow): Promise<AvailabilityRow> {
-    return this.prisma.availabilityRule.update({
-      where: { id },
-      data: { ...window, isActive: true },
+  async reopen(
+    id: string,
+    window: RuleWindow,
+    record?: WriteRecorder<AvailabilityRow>,
+  ): Promise<AvailabilityRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const rule = await tx.availabilityRule.update({
+        where: { id },
+        data: { ...window, isActive: true },
+      });
+      await record?.(tx, rule);
+      return rule;
     });
   }
 
-  async retire(id: string): Promise<AvailabilityRow> {
-    return this.prisma.availabilityRule.update({ where: { id }, data: { isActive: false } });
+  async retire(id: string, record?: WriteRecorder<AvailabilityRow>): Promise<AvailabilityRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const rule = await tx.availabilityRule.update({
+        where: { id },
+        data: { isActive: false },
+      });
+      await record?.(tx, rule);
+      return rule;
+    });
   }
 }

@@ -39,3 +39,18 @@ export function planSlotMoves(
   }
   return moves;
 }
+
+/** How many of the rows would leave the slot they hold, given the new order.
+ *
+ * The pair of lists a reorder arrives as says what the teacher wants, not whether it differs from
+ * what the container already holds — and a request that lost its response and came back is the same
+ * order sent twice. So a caller asks this before it writes, and files no record and moves no row for
+ * an order that was already in place.
+ */
+export function countMovedSlots(slots: Slot[], orderedIds: string[]): number {
+  const positionById = new Map(slots.map((slot) => [slot.id, slot.position]));
+  return slots.reduce((moved, slot, index) => {
+    const id = orderedIds[index];
+    return id !== undefined && positionById.get(id) !== slot.position ? moved + 1 : moved;
+  }, 0);
+}

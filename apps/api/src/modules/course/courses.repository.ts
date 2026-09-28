@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import type { WriteRecorder } from '../action-log/action-recorder';
 
 export type CourseWithVocabulary = Prisma.CourseGetPayload<{
   include: typeof WITH_VOCABULARY;
@@ -33,19 +34,35 @@ export interface CourseColumns {
 }
 
 /**
- * Every read and write here is scoped by `teacherUserId` in the `where` clause rather than
- * checked afterwards, so ownership is not a step a later endpoint can forget to call. A
- * row that belongs to someone else and a row that does not exist produce the same answer,
- * which is the point: the database is not asked to confirm that the first one is there.
+ * Every read and write here is scoped by `teacherUserId` in the `where` clause rather than checked
+ * afterwards, so ownership is not a step a later endpoint can forget to call. A row that belongs to
+ * someone else and a row that does not exist produce the same answer, which is the point: the
+ * database is not asked to confirm that the first one is there.
+ *
+ * The three writes each take a `record` and call it inside their own transaction, the way the
+ * enrollment writes call `notify` (ARCHITECTURE §6). That is what makes a course row and the record
+ * of the decision to write it one unit of work: an edit that fails on its last statement leaves no
+ * record of an edit that never happened, and a record cannot be filed for a course that was never
+ * changed. A caller that has nothing to record passes nothing, and the write is still one
+ * transaction rather than a statement with a `BEGIN` around it.
  */
 @Injectable()
 export class CoursesRepository {
   constructor(private readonly prisma: PrismaService) {}
 
-  async create(teacherUserId: string, columns: CourseColumns, statusValueId: string) {
-    return this.prisma.course.create({
-      data: { teacherUserId, statusValueId, ...columns },
-      include: WITH_VOCABULARY,
+  async create(
+    teacherUserId: string,
+    columns: CourseColumns,
+    statusValueId: string,
+    record?: WriteRecorder<CourseWithVocabulary>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const course = await tx.course.create({
+        data: { teacherUserId, statusValueId, ...columns },
+        include: WITH_VOCABULARY,
+      });
+      await record?.(tx, course);
+      return course;
     });
   }
 
@@ -72,15 +89,35 @@ export class CoursesRepository {
     });
   }
 
-  async updateColumns(id: string, columns: Partial<CourseColumns>) {
-    return this.prisma.course.update({ where: { id }, data: columns, include: WITH_VOCABULARY });
+  async updateColumns(
+    id: string,
+    columns: Partial<CourseColumns>,
+    record?: WriteRecorder<CourseWithVocabulary>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const course = await tx.course.update({
+        where: { id },
+        data: columns,
+        include: WITH_VOCABULARY,
+      });
+      await record?.(tx, course);
+      return course;
+    });
   }
 
-  async updateStatus(id: string, statusValueId: string) {
-    return this.prisma.course.update({
-      where: { id },
-      data: { statusValueId },
-      include: WITH_VOCABULARY,
+  async updateStatus(
+    id: string,
+    statusValueId: string,
+    record?: WriteRecorder<CourseWithVocabulary>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const course = await tx.course.update({
+        where: { id },
+        data: { statusValueId },
+        include: WITH_VOCABULARY,
+      });
+      await record?.(tx, course);
+      return course;
     });
   }
 
@@ -92,11 +129,19 @@ export class CoursesRepository {
    * when a teacher is most likely to decide to offer trials. Two doors, two writes, so neither one
    * inherits the other's rule by accident.
    */
-  async setDemoBookings(id: string, demoBookingsEnabled: boolean) {
-    return this.prisma.course.update({
-      where: { id },
-      data: { demoBookingsEnabled },
-      include: WITH_VOCABULARY,
+  async setDemoBookings(
+    id: string,
+    demoBookingsEnabled: boolean,
+    record?: WriteRecorder<CourseWithVocabulary>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const course = await tx.course.update({
+        where: { id },
+        data: { demoBookingsEnabled },
+        include: WITH_VOCABULARY,
+      });
+      await record?.(tx, course);
+      return course;
     });
   }
 }

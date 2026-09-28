@@ -1,5 +1,11 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+import {
+  ACTION_CODES,
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LESSON_STATUS_CODES,
@@ -8,12 +14,24 @@ import {
 } from '@lms/shared';
 
 import { ReferenceService } from '../../reference/reference.service';
+import { ActionRecorder } from '../action-log/action-recorder';
+import { movedFields } from '../action-log/changed-fields';
 import { CoursesRepository } from './courses.repository';
 import { CourseModulesRepository } from './course-modules.repository';
 import type { CreateCourseModuleDto, UpdateCourseModuleDto } from './dto/course-module.dto';
+import { countMovedSlots } from './slot-moves';
 
 /** A course id is a uuid or it is a typo, and a typo must not reach Postgres. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The columns a patch writes, in the names the record of an edit should use. All three are the
+ * block's own prose, so the mapping is identity — and written out anyway, because the record
+ * speaks of `summary` rather than of a column, and that is a promise worth keeping in one place. */
+const FIELD_BY_COLUMN: Record<string, string> = {
+  title: 'title',
+  summary: 'summary',
+  description: 'description',
+};
 
 function toDocument(module: {
   id: string;
@@ -56,6 +74,7 @@ export class CourseModulesService {
     private readonly courses: CoursesRepository,
     private readonly modules: CourseModulesRepository,
     private readonly reference: ReferenceService,
+    private readonly actions: ActionRecorder,
   ) {}
 
   async list(teacherUserId: string, courseId: string): Promise<CourseModule[]> {
@@ -72,11 +91,22 @@ export class CourseModulesService {
     const position = (await this.modules.lastPosition(course.id)) + 1;
 
     return toDocument(
-      await this.modules.create(course.id, position, {
-        title: dto.title,
-        summary: dto.summary?.trim() || null,
-        description: dto.description?.trim() || null,
-      }),
+      await this.modules.create(
+        course.id,
+        position,
+        {
+          title: dto.title,
+          summary: dto.summary?.trim() || null,
+          description: dto.description?.trim() || null,
+        },
+        // A create decides nothing the row does not already say — which block, what it is called —
+        // so the record is the action and the id, with no detail beside it.
+        (tx, written) =>
+          this.actions.record(tx, {
+            action: ACTION_CODES.COURSE_MODULE_CREATED,
+            targetId: written.id,
+          }),
+      ),
     );
   }
 
@@ -97,7 +127,21 @@ export class CourseModulesService {
       ...(dto.description === undefined ? {} : { description: dto.description.trim() || null }),
     };
 
-    return toDocument(await this.modules.updateColumns(module.id, columns));
+    // A form posts every box it showed, so the body of a rename is often a whole block returned
+    // unchanged. Nothing moved, nothing was decided, nothing is filed — and the row keeps the
+    // `updatedAt` it has, which is the honest answer to a press that changed no fact about it.
+    const changed = movedFields(module, columns, FIELD_BY_COLUMN);
+    if (changed.length === 0) return toDocument(module);
+
+    return toDocument(
+      await this.modules.updateColumns(module.id, columns, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_MODULE_UPDATED,
+          targetId: module.id,
+          detail: { changed: changed.join(',') },
+        }),
+      ),
+    );
   }
 
   async reorder(
@@ -129,7 +173,21 @@ export class CourseModulesService {
       });
     }
 
-    await this.modules.placeInSlots(slots, moduleIds);
+    // The order the syllabus already has, sent back by a portal whose response was lost on the way
+    // home, is not a reorder. Counting the blocks that actually leave their slot is what lets the
+    // press file one record for the change rather than one per press.
+    const moved = countMovedSlots(slots, moduleIds);
+    if (moved === 0) return (await this.modules.listActive(course.id)).map(toDocument);
+
+    await this.modules.placeInSlots(slots, moduleIds, (tx) =>
+      this.actions.record(tx, {
+        // The course is the target, not the modules: what was decided is the order of the syllabus,
+        // and a record per block would be `moved` rows claiming `moved` decisions.
+        action: ACTION_CODES.COURSE_MODULES_REORDERED,
+        targetId: course.id,
+        detail: { moved },
+      }),
+    );
     return (await this.modules.listActive(course.id)).map(toDocument);
   }
 
@@ -162,7 +220,14 @@ export class CourseModulesService {
       }
     }
 
-    return toDocument(await this.modules.deactivate(module.id));
+    return toDocument(
+      await this.modules.deactivate(module.id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_MODULE_DEACTIVATED,
+          targetId: module.id,
+        }),
+      ),
+    );
   }
 
   private async ownedCourse(teacherUserId: string, courseId: string) {

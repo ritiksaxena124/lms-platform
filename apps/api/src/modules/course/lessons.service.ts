@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ACTION_CODES,
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LESSON_STATUS_CODES,
@@ -13,13 +14,31 @@ import {
 } from '@lms/shared';
 
 import { ReferenceService } from '../../reference/reference.service';
+import { ActionRecorder } from '../action-log/action-recorder';
+import { movedFields } from '../action-log/changed-fields';
 import { CourseModulesRepository } from './course-modules.repository';
 import type { LessonWithStatus } from './lessons.repository';
 import { LessonsRepository } from './lessons.repository';
 import type { CreateLessonDto, UpdateLessonDto } from './dto/lesson.dto';
+import { countMovedSlots } from './slot-moves';
 
 /** A lesson or module id is a uuid or it is a typo, and a typo must not reach Postgres. */
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** The columns a patch writes, in the names the record of an edit should use.
+ *
+ * `moduleId` and `position` are one field: a page changing block is a decision about where it
+ * belongs, and the number it lands on at the end of the new block is arithmetic the log has no
+ * reason to duplicate. Same argument as a course's price, opposite conclusion — there two columns
+ * made one thing the teacher quoted, here two columns make one thing the teacher chose. */
+const FIELD_BY_COLUMN: Record<string, string> = {
+  title: 'title',
+  body: 'body',
+  estimatedMinutes: 'estimatedMinutes',
+  isFreePreview: 'isFreePreview',
+  moduleId: 'module',
+  position: 'module',
+};
 
 function toDocument(lesson: LessonWithStatus): Lesson {
   return {
@@ -67,6 +86,7 @@ export class LessonsService {
     private readonly modules: CourseModulesRepository,
     private readonly lessons: LessonsRepository,
     private readonly reference: ReferenceService,
+    private readonly actions: ActionRecorder,
   ) {}
 
   async list(teacherUserId: string, moduleId: string): Promise<Lesson[]> {
@@ -74,21 +94,27 @@ export class LessonsService {
     return (await this.lessons.listActive(module.id)).map(toDocument);
   }
 
-  async create(
-    teacherUserId: string,
-    moduleId: string,
-    dto: CreateLessonDto,
-  ): Promise<Lesson> {
+  async create(teacherUserId: string, moduleId: string, dto: CreateLessonDto): Promise<Lesson> {
     const module = await this.ownedModule(teacherUserId, moduleId);
     const position = (await this.lessons.lastPosition(module.id)) + 1;
     const draft = await this.status(LESSON_STATUS_CODES.DRAFT);
 
     return toDocument(
-      await this.lessons.create(module.id, position, draft, {
-        title: dto.title,
-        body: dto.body?.trim() || null,
-        estimatedMinutes: dto.estimatedMinutes ?? null,
-      }),
+      await this.lessons.create(
+        module.id,
+        position,
+        draft,
+        {
+          title: dto.title,
+          body: dto.body?.trim() || null,
+          estimatedMinutes: dto.estimatedMinutes ?? null,
+        },
+        (tx, written) =>
+          this.actions.record(tx, {
+            action: ACTION_CODES.LESSON_CREATED,
+            targetId: written.id,
+          }),
+      ),
     );
   }
 
@@ -102,26 +128,31 @@ export class LessonsService {
     const lesson = await this.inModule(module.id, id);
 
     if (dto.moduleId !== undefined) {
-      return await this.move(teacherUserId, lesson.id, dto.moduleId);
+      return await this.move(teacherUserId, lesson, dto.moduleId);
     }
 
     const columns = {
       ...(dto.title === undefined ? {} : { title: dto.title }),
       ...(dto.body === undefined ? {} : { body: dto.body?.trim() || null }),
-      ...(dto.estimatedMinutes === undefined
-        ? {}
-        : { estimatedMinutes: dto.estimatedMinutes }),
+      ...(dto.estimatedMinutes === undefined ? {} : { estimatedMinutes: dto.estimatedMinutes }),
       ...(dto.isFreePreview === undefined ? {} : { isFreePreview: dto.isFreePreview }),
     };
 
-    return toDocument(await this.lessons.updateColumns(lesson.id, columns));
+    const changed = movedFields(lesson, columns, FIELD_BY_COLUMN);
+    if (changed.length === 0) return toDocument(lesson);
+
+    return toDocument(
+      await this.lessons.updateColumns(lesson.id, columns, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.LESSON_UPDATED,
+          targetId: lesson.id,
+          detail: { changed: changed.join(',') },
+        }),
+      ),
+    );
   }
 
-  async reorder(
-    teacherUserId: string,
-    moduleId: string,
-    lessonIds: string[],
-  ): Promise<Lesson[]> {
+  async reorder(teacherUserId: string, moduleId: string, lessonIds: string[]): Promise<Lesson[]> {
     const module = await this.ownedModule(teacherUserId, moduleId);
     const slots = await this.lessons.activeSlots(module.id);
 
@@ -141,7 +172,20 @@ export class LessonsService {
       );
     }
 
-    await this.lessons.placeInSlots(slots, lessonIds);
+    // An order sent back unchanged — the same list from a portal that lost its response — moves
+    // nothing, so it writes nothing and files nothing.
+    const moved = countMovedSlots(slots, lessonIds);
+    if (moved === 0) return (await this.lessons.listActive(module.id)).map(toDocument);
+
+    await this.lessons.placeInSlots(slots, lessonIds, (tx) =>
+      this.actions.record(tx, {
+        // The module is the target, not the pages: what was decided is the order of the block, and
+        // a record per lesson would be `moved` rows claiming `moved` decisions.
+        action: ACTION_CODES.LESSONS_REORDERED,
+        targetId: module.id,
+        detail: { moved },
+      }),
+    );
     return (await this.lessons.listActive(module.id)).map(toDocument);
   }
 
@@ -161,7 +205,15 @@ export class LessonsService {
     }
 
     const published = await this.status(LESSON_STATUS_CODES.PUBLISHED);
-    return toDocument(await this.lessons.updateStatus(lesson.id, published));
+    return toDocument(
+      await this.lessons.updateStatus(lesson.id, published, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.LESSON_PUBLISHED,
+          targetId: lesson.id,
+          detail: { from: lesson.status.code, to: LESSON_STATUS_CODES.PUBLISHED },
+        }),
+      ),
+    );
   }
 
   /** Allowed wherever `deactivate` is not: taking a page out of what a student is reading by
@@ -177,7 +229,15 @@ export class LessonsService {
     }
 
     const draft = await this.status(LESSON_STATUS_CODES.DRAFT);
-    return toDocument(await this.lessons.updateStatus(lesson.id, draft));
+    return toDocument(
+      await this.lessons.updateStatus(lesson.id, draft, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.LESSON_UNPUBLISHED,
+          targetId: lesson.id,
+          detail: { from: lesson.status.code, to: LESSON_STATUS_CODES.DRAFT },
+        }),
+      ),
+    );
   }
 
   /**
@@ -203,7 +263,14 @@ export class LessonsService {
       });
     }
 
-    return toDocument(await this.lessons.deactivate(lesson.id));
+    return toDocument(
+      await this.lessons.deactivate(lesson.id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.LESSON_DEACTIVATED,
+          targetId: lesson.id,
+        }),
+      ),
+    );
   }
 
   /**
@@ -215,12 +282,27 @@ export class LessonsService {
    */
   private async move(
     teacherUserId: string,
-    lessonId: string,
+    lesson: LessonWithStatus,
     targetModuleId: string,
   ): Promise<Lesson> {
     const target = await this.ownedModule(teacherUserId, targetModuleId);
     const position = (await this.lessons.lastPosition(target.id)) + 1;
-    return toDocument(await this.lessons.moveTo(lessonId, target.id, position));
+
+    // Filed as `lesson_updated` with one field, because a page changing block is an edit of where
+    // it belongs rather than a fifth lifecycle: there is no `lesson_moved` in the vocabulary, and
+    // the two columns the write touches are one decision about one thing.
+    const changed = movedFields(lesson, { moduleId: target.id, position }, FIELD_BY_COLUMN);
+    if (changed.length === 0) return toDocument(lesson);
+
+    return toDocument(
+      await this.lessons.moveTo(lesson.id, target.id, position, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.LESSON_UPDATED,
+          targetId: lesson.id,
+          detail: { changed: changed.join(',') },
+        }),
+      ),
+    );
   }
 
   private async status(code: string) {

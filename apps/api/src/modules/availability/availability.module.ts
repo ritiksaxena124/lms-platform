@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { ActionLogModule } from '../action-log/action-log.module';
 import { AvailabilityController } from './availability.controller';
 import { AvailabilityRepository } from './availability.repository';
 import { AvailabilityService } from './availability.service';
@@ -19,6 +20,7 @@ import { AvailabilityService } from './availability.service';
  * of rows, and a database CHECK could only answer them for one row at a time.
  */
 @Module({
+  imports: [ActionLogModule],
   controllers: [AvailabilityController],
   providers: [AvailabilityService, AvailabilityRepository],
   // A slot is a window expanded into instants, so the booking calendar reads these rows through

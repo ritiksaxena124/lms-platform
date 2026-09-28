@@ -234,6 +234,7 @@ afterAll(async () => {
   await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
   await prisma.emailTemplate.deleteMany({ where: { eventCode: { startsWith: `${RUN}.` } } });
   await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+  await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   await prisma.$disconnect();
 });

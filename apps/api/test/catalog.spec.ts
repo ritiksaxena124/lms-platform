@@ -214,6 +214,7 @@ describe('catalog', () => {
     await prisma.module.deleteMany({ where: { id: { in: moduleIds } } });
     await prisma.course.deleteMany({ where: { id: { in: courseIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });

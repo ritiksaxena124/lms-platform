@@ -151,6 +151,7 @@ describe('the place news an enrollment write files', () => {
     await prisma.enrollment.deleteMany({ where: { studentUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });

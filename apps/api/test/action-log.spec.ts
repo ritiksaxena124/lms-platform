@@ -285,7 +285,14 @@ describe('a write beside its own change', () => {
         recorder.record(tx, { action: ACTION_CODES.COURSE_ARCHIVED, targetId: SOME_COURSE }),
       ),
     ).rejects.toThrow(/no session|nobody/i);
-    expect(await prisma.actionLog.count({ where: { actionCode: 'course_archived' } })).toBe(0);
+    // Counted against the course this call named, not against the action code: suites run in
+    // parallel forks over one database, and another suite archiving a course of its own is that
+    // suite's record, not a row this refused write somehow left behind.
+    expect(
+      await prisma.actionLog.count({
+        where: { targetId: SOME_COURSE, actionCode: 'course_archived' },
+      }),
+    ).toBe(0);
   });
 
   it('answers a scheduler’s action in full, with nobody credited and nothing to link', async () => {

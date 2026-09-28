@@ -1,8 +1,10 @@
 import { Injectable } from '@nestjs/common';
+import type { Module as ModuleRow } from '@prisma/client';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { planSlotMoves, type Slot } from './slot-moves';
+import type { WriteRecorder } from '../action-log/action-recorder';
+import { planSlotMoves, type Slot, type SlotMove } from './slot-moves';
 
 /** What a lesson route needs from a module: that it exists, that the caller's course holds
  * it, and what that course's life is. The lesson's own status is not here, because at this
@@ -26,6 +28,11 @@ export interface CourseModuleColumns {
  * fact, so a module id alone is never a key: it has to sit inside the course the route
  * named. `isActive` is part of every read, which is what makes deactivating a module the
  * same answer as it never existing.
+ *
+ * Each write takes the `record` callback the course repository takes, and for the same reason: a
+ * block and the record of the decision to write it are one unit of work. `placeInSlots` already
+ * owned a transaction — the two-phase lift — so a reorder files its record inside the transaction
+ * it was already in, after the last position has landed.
  */
 @Injectable()
 export class CourseModulesRepository {
@@ -94,16 +101,37 @@ export class CourseModulesRepository {
     return page !== null;
   }
 
-  async create(courseId: string, position: number, columns: CourseModuleColumns) {
-    return this.prisma.module.create({ data: { courseId, position, ...columns } });
+  async create(
+    courseId: string,
+    position: number,
+    columns: CourseModuleColumns,
+    record?: WriteRecorder<ModuleRow>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const module = await tx.module.create({ data: { courseId, position, ...columns } });
+      await record?.(tx, module);
+      return module;
+    });
   }
 
-  async updateColumns(id: string, columns: Partial<CourseModuleColumns>) {
-    return this.prisma.module.update({ where: { id }, data: columns });
+  async updateColumns(
+    id: string,
+    columns: Partial<CourseModuleColumns>,
+    record?: WriteRecorder<ModuleRow>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const module = await tx.module.update({ where: { id }, data: columns });
+      await record?.(tx, module);
+      return module;
+    });
   }
 
-  async deactivate(id: string) {
-    return this.prisma.module.update({ where: { id }, data: { isActive: false } });
+  async deactivate(id: string, record?: WriteRecorder<ModuleRow>) {
+    return this.prisma.$transaction(async (tx) => {
+      const module = await tx.module.update({ where: { id }, data: { isActive: false } });
+      await record?.(tx, module);
+      return module;
+    });
   }
 
   /**
@@ -114,8 +142,13 @@ export class CourseModulesRepository {
    * already taken the slot the second still stands in. Every row is lifted above the highest
    * slot a course can reach before any of them is set down, which is the one ordering that
    * cannot collide with itself.
+   *
+   * The record is filed after the second pass, so a course whose reorder died on a constraint
+   * keeps no record of an order it never reached. `moves` travels with the callback because the
+   * rows that were lifted are the transaction's own business, and a caller that wants to name
+   * them should not have to recompute what it just asked for.
    */
-  async placeInSlots(slots: Slot[], orderedIds: string[]) {
+  async placeInSlots(slots: Slot[], orderedIds: string[], record?: WriteRecorder<SlotMove[]>) {
     const moves = planSlotMoves(slots, orderedIds, 'module');
 
     await this.prisma.$transaction(async (tx) => {
@@ -125,6 +158,7 @@ export class CourseModulesRepository {
       for (const move of moves) {
         await tx.module.update({ where: { id: move.id }, data: { position: move.into } });
       }
+      await record?.(tx, moves);
     });
   }
 }

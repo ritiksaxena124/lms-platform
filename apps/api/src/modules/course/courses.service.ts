@@ -5,6 +5,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import {
+  ACTION_CODES,
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
@@ -14,6 +15,8 @@ import {
 
 import type { ReferenceValue } from '../../reference/reference.service';
 import { ReferenceService } from '../../reference/reference.service';
+import { ActionRecorder } from '../action-log/action-recorder';
+import { movedFields } from '../action-log/changed-fields';
 import type { CourseColumns, CourseWithVocabulary } from './courses.repository';
 import { CoursesRepository } from './courses.repository';
 import type { CoursePriceDto, CreateCourseDto, UpdateCourseDto } from './dto/course.dto';
@@ -27,6 +30,22 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 type PriceColumns = Pick<CourseColumns, 'priceMinorUnits' | 'priceCurrencyValueId'>;
 
 const NO_PRICE: PriceColumns = { priceMinorUnits: null, priceCurrencyValueId: null };
+
+/** The columns a patch writes, in the names the record of the edit should use.
+ *
+ * `price` is one field over two columns, because the pair is the rule and a record saying the edit
+ * moved two things when the teacher moved one would be a record of the implementation. The lifecycle
+ * columns are absent because this patch cannot reach them — `publish` and `archive` file their own
+ * rows, with the transition in them. */
+const FIELD_BY_COLUMN: Record<string, string> = {
+  title: 'title',
+  slug: 'slug',
+  summary: 'summary',
+  description: 'description',
+  levelValueId: 'level',
+  priceMinorUnits: 'price',
+  priceCurrencyValueId: 'price',
+};
 
 /**
  * A title is a sentence and a slug is a URL segment; this is the translation a teacher
@@ -87,6 +106,7 @@ export class CoursesService {
   constructor(
     private readonly courses: CoursesRepository,
     private readonly reference: ReferenceService,
+    private readonly actions: ActionRecorder,
   ) {}
 
   async create(teacherUserId: string, dto: CreateCourseDto): Promise<Course> {
@@ -113,6 +133,13 @@ export class CoursesService {
         ...(price ?? NO_PRICE),
       },
       draft.id,
+      // The row the insert just made, not the `course` this call is still waiting for: the record is
+      // filed inside the transaction, before the create has a value to return.
+      (tx, written) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_CREATED,
+          targetId: written.id,
+        }),
     );
 
     return toDocument(course);
@@ -168,7 +195,20 @@ export class CoursesService {
       await this.requireSlugFree(teacherUserId, dto.slug, course.id);
     }
 
-    return toDocument(await this.courses.updateColumns(course.id, columns));
+    // What moved, not what was sent. A form that posts the title back unchanged edited nothing, and
+    // the second half of 7a's rule is that a write which changed nothing earns no row — so the
+    // statement is skipped as well as the record, and `updatedAt` stays where the edit left it.
+    const changed = movedFields(course, columns, FIELD_BY_COLUMN);
+    if (changed.length === 0) return toDocument(course);
+
+    const updated = await this.courses.updateColumns(course.id, columns, (tx) =>
+      this.actions.record(tx, {
+        action: ACTION_CODES.COURSE_UPDATED,
+        targetId: course.id,
+        detail: { changed: changed.join(',') },
+      }),
+    );
+    return toDocument(updated);
   }
 
   async publish(teacherUserId: string, id: string): Promise<Course> {
@@ -198,7 +238,15 @@ export class CoursesService {
     }
 
     const published = await this.status(COURSE_STATUS_CODES.PUBLISHED);
-    return toDocument(await this.courses.updateStatus(course.id, published.id));
+    return toDocument(
+      await this.courses.updateStatus(course.id, published.id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_PUBLISHED,
+          targetId: course.id,
+          detail: { from: course.status.code, to: COURSE_STATUS_CODES.PUBLISHED },
+        }),
+      ),
+    );
   }
 
   async archive(teacherUserId: string, id: string): Promise<Course> {
@@ -212,7 +260,15 @@ export class CoursesService {
     }
 
     const archived = await this.status(COURSE_STATUS_CODES.ARCHIVED);
-    return toDocument(await this.courses.updateStatus(course.id, archived.id));
+    return toDocument(
+      await this.courses.updateStatus(course.id, archived.id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_ARCHIVED,
+          targetId: course.id,
+          detail: { from: course.status.code, to: COURSE_STATUS_CODES.ARCHIVED },
+        }),
+      ),
+    );
   }
 
   /**
@@ -234,7 +290,21 @@ export class CoursesService {
     demoBookingsEnabled: boolean,
   ): Promise<Course> {
     const course = await this.owned(teacherUserId, id);
-    return toDocument(await this.courses.setDemoBookings(course.id, demoBookingsEnabled));
+    if (course.demoBookingsEnabled === demoBookingsEnabled) {
+      // The switch was already where the teacher wants it: same answer, no write, no record — the
+      // log that says they opened trials twice is a log that cannot be counted.
+      return toDocument(course);
+    }
+
+    return toDocument(
+      await this.courses.setDemoBookings(course.id, demoBookingsEnabled, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_DEMO_BOOKINGS_CHANGED,
+          targetId: course.id,
+          detail: { from: course.demoBookingsEnabled, to: demoBookingsEnabled },
+        }),
+      ),
+    );
   }
 
   /** A code the catalogue does not carry is the teacher's mistake, not the API's, so it

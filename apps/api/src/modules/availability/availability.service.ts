@@ -5,8 +5,16 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
-import { API_ERROR_CODES, wallClock, weekdayLabel, type AvailabilityRule } from '@lms/shared';
+import {
+  ACTION_CODES,
+  API_ERROR_CODES,
+  wallClock,
+  weekdayLabel,
+  type AvailabilityRule,
+} from '@lms/shared';
 
+import { ActionRecorder, type WriteRecorder } from '../action-log/action-recorder';
+import { movedFields } from '../action-log/changed-fields';
 import {
   AvailabilityRepository,
   type AvailabilityRow,
@@ -16,6 +24,16 @@ import type {
   CreateAvailabilityRuleDto,
   UpdateAvailabilityRuleDto,
 } from './dto/availability-rule.dto';
+
+/** The four numbers, named as the API names them — which here is as the table names them too,
+ * because a window is the one document this platform writes in the units a teacher reads off a
+ * clock face. `isActive` is absent because retirement is a transition with its own action. */
+const FIELD_BY_COLUMN: Record<string, string> = {
+  weekday: 'weekday',
+  startMinutes: 'startMinutes',
+  endMinutes: 'endMinutes',
+  slotMinutes: 'slotMinutes',
+};
 
 function toDocument(rule: AvailabilityRow): AvailabilityRule {
   return {
@@ -72,7 +90,10 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  */
 @Injectable()
 export class AvailabilityService {
-  constructor(private readonly rules: AvailabilityRepository) {}
+  constructor(
+    private readonly rules: AvailabilityRepository,
+    private readonly actions: ActionRecorder,
+  ) {}
 
   async list(teacherUserId: string): Promise<AvailabilityRule[]> {
     return (await this.rules.listActive(teacherUserId)).map(toDocument);
@@ -90,11 +111,18 @@ export class AvailabilityService {
       window.startMinutes,
     );
     await this.requireFree(teacherUserId, window);
+    // One record for both roads: a reopened row is the window the teacher is opening now, and the
+    // fact the log keeps is that this minute became teachable again, not which statement said so.
+    const opened: WriteRecorder<AvailabilityRow> = (tx, written) =>
+      this.actions.record(tx, {
+        action: ACTION_CODES.AVAILABILITY_RULE_CREATED,
+        targetId: written.id,
+      });
     try {
       return toDocument(
         retired
-          ? await this.rules.reopen(retired.id, window)
-          : await this.rules.open(teacherUserId, window),
+          ? await this.rules.reopen(retired.id, window, opened)
+          : await this.rules.open(teacherUserId, window, opened),
       );
     } catch (error) {
       // Two tabs saving the same window: the check above passed for both, and the business key is
@@ -116,9 +144,22 @@ export class AvailabilityService {
       slotMinutes: dto.slotMinutes ?? rule.slotMinutes,
     });
 
+    // A form posts four boxes, and a save that moved none of them decided nothing — so neither the
+    // overlap check nor the write runs, and the row keeps the instant it was last moved.
+    const changed = movedFields(rule, window, FIELD_BY_COLUMN);
+    if (changed.length === 0) return toDocument(rule);
+
     await this.requireFree(teacherUserId, window, id);
     try {
-      return toDocument(await this.rules.rewrite(id, window));
+      return toDocument(
+        await this.rules.rewrite(id, window, (tx) =>
+          this.actions.record(tx, {
+            action: ACTION_CODES.AVAILABILITY_RULE_UPDATED,
+            targetId: id,
+            detail: { changed: changed.join(',') },
+          }),
+        ),
+      );
     } catch (error) {
       // The minute this window moved to belongs to a retired row, which the overlap check cannot
       // see because it is not standing. Reopen that one instead.
@@ -136,7 +177,14 @@ export class AvailabilityService {
       });
     }
 
-    return toDocument(await this.rules.retire(id));
+    return toDocument(
+      await this.rules.retire(id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.AVAILABILITY_RULE_RETIRED,
+          targetId: id,
+        }),
+      ),
+    );
   }
 
   /**

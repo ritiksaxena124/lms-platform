@@ -80,6 +80,7 @@ afterAll(async () => {
   ).map((row) => row.id);
   // Fixture teardown, in the order the Restrict keys allow.
   await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
+  await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   await prisma.$disconnect();
 });

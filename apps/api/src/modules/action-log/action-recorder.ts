@@ -38,6 +38,22 @@ export interface ActionActor {
   userRole: RoleCode;
 }
 
+/** What a repository's write method calls inside its own transaction to file the record of the
+ * change it just made.
+ *
+ * The row that was written comes with the transaction, because a create cannot know the id its own
+ * record has to name until the insert has happened. A caller that already knows the id — a lifecycle
+ * move, an edit of a row it loaded first — takes only the first half, which TypeScript allows.
+ *
+ * This is 6d's `PlaceNotifier` restated for the log: the service decides *what happened* and names
+ * the action, the statement that wrote the row decides *whether anything happened at all*, and the
+ * callback is where the two meet. Neither half knows about the other, which is why a repository stays
+ * a repository of one table. */
+export type WriteRecorder<Written> = (
+  tx: Prisma.TransactionClient,
+  written: Written,
+) => Promise<unknown>;
+
 /**
  * Files the record of a decision beside the decision.
  *

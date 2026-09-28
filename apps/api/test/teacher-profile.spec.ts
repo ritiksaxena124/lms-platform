@@ -77,6 +77,7 @@ describe('teacher profile', () => {
     await prisma.teacherSubject.deleteMany({ where: { profile: { userId: { in: userIds } } } });
     await prisma.teacherProfile.deleteMany({ where: { userId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });

@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import type { WriteRecorder } from '../action-log/action-recorder';
 
 /**
  * Subjects come back in the catalogue's order, not the order a teacher pasted them, so
@@ -45,9 +46,27 @@ export class TeacherProfilesRepository {
     });
   }
 
-  async save(userId: string, fields: ProfileFields): Promise<ProfileWithSubjects> {
+  /**
+   * The one save, in one transaction.
+   *
+   * The zone is the account's column and the document's field, so it moves here rather than in a
+   * call of its own before this one: a teacher who changed the headline and the zone made one
+   * decision, and the record of it has to describe a profile and an account that agree. A save
+   * that left the zone alone passes `null` and does not touch the account row, so the account is
+   * not stamped with an instant nothing moved at.
+   */
+  async save(
+    userId: string,
+    fields: ProfileFields,
+    timezone: string | null,
+    record?: WriteRecorder<ProfileWithSubjects>,
+  ): Promise<ProfileWithSubjects> {
     return this.prisma.$transaction(async (tx) => {
       const { subjectValueIds, ...columns } = fields;
+
+      if (timezone !== null) {
+        await tx.user.update({ where: { id: userId }, data: { timezone } });
+      }
 
       const profile = await tx.teacherProfile.upsert({
         where: { userId },
@@ -74,10 +93,15 @@ export class TeacherProfilesRepository {
         });
       }
 
-      return tx.teacherProfile.findUniqueOrThrow({
+      // Read back after the subject rows settle, so what the record is filed from is the document
+      // as it now stands rather than the row as it was when the upsert returned.
+      const saved = await tx.teacherProfile.findUniqueOrThrow({
         where: { id: profile.id },
         include: WITH_SUBJECTS,
       });
+      await record?.(tx, saved);
+
+      return saved;
     });
   }
 }

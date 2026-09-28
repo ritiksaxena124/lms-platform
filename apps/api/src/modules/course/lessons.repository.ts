@@ -2,7 +2,8 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { planSlotMoves, type Slot } from './slot-moves';
+import type { WriteRecorder } from '../action-log/action-recorder';
+import { planSlotMoves, type Slot, type SlotMove } from './slot-moves';
 
 /** The status travels with every lesson the API returns, code and label together — the same
  * promise a course makes about its own vocabulary. */
@@ -18,6 +19,9 @@ export interface LessonColumns {
   title: string;
   body: string | null;
   estimatedMinutes: number | null;
+  /** Optional because a create has no such box — the page starts locked, and opening it is a
+   * decision the edit form makes. It belongs to the writable columns because that form writes it. */
+  isFreePreview?: boolean;
 }
 
 /**
@@ -25,6 +29,11 @@ export interface LessonColumns {
  * fact, so a lesson id alone is never a key: it has to sit inside the module the route named.
  * `isActive` is part of every read, which is what makes deactivating a lesson the same answer
  * as it never existing.
+ *
+ * Every write takes the `record` callback the course and module repositories take, and each one now
+ * owns a transaction so that the page and the record of the decision to write it commit together.
+ * `moveTo` is the one that needs saying: a page changing block touches two of a lesson's columns at
+ * once, and it is still one decision, so it still files one row.
  */
 @Injectable()
 export class LessonsRepository {
@@ -75,22 +84,43 @@ export class LessonsRepository {
     position: number,
     statusValueId: string,
     columns: LessonColumns,
+    record?: WriteRecorder<LessonWithStatus>,
   ) {
-    return this.prisma.lesson.create({
-      data: { moduleId, position, statusValueId, ...columns },
-      include: WITH_STATUS,
+    return this.prisma.$transaction(async (tx) => {
+      const lesson = await tx.lesson.create({
+        data: { moduleId, position, statusValueId, ...columns },
+        include: WITH_STATUS,
+      });
+      await record?.(tx, lesson);
+      return lesson;
     });
   }
 
-  async updateColumns(id: string, columns: Partial<LessonColumns>) {
-    return this.prisma.lesson.update({ where: { id }, data: columns, include: WITH_STATUS });
+  async updateColumns(
+    id: string,
+    columns: Partial<LessonColumns>,
+    record?: WriteRecorder<LessonWithStatus>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const lesson = await tx.lesson.update({
+        where: { id },
+        data: columns,
+        include: WITH_STATUS,
+      });
+      await record?.(tx, lesson);
+      return lesson;
+    });
   }
 
-  async updateStatus(id: string, statusValueId: string) {
-    return this.prisma.lesson.update({
-      where: { id },
-      data: { statusValueId },
-      include: WITH_STATUS,
+  async updateStatus(id: string, statusValueId: string, record?: WriteRecorder<LessonWithStatus>) {
+    return this.prisma.$transaction(async (tx) => {
+      const lesson = await tx.lesson.update({
+        where: { id },
+        data: { statusValueId },
+        include: WITH_STATUS,
+      });
+      await record?.(tx, lesson);
+      return lesson;
     });
   }
 
@@ -101,19 +131,32 @@ export class LessonsRepository {
    * retired lesson's is — nothing in that module points at it any more. The next page written
    * there starts from the highest slot the module still contains.
    */
-  async moveTo(id: string, moduleId: string, position: number) {
-    return this.prisma.lesson.update({
-      where: { id },
-      data: { moduleId, position },
-      include: WITH_STATUS,
+  async moveTo(
+    id: string,
+    moduleId: string,
+    position: number,
+    record?: WriteRecorder<LessonWithStatus>,
+  ) {
+    return this.prisma.$transaction(async (tx) => {
+      const lesson = await tx.lesson.update({
+        where: { id },
+        data: { moduleId, position },
+        include: WITH_STATUS,
+      });
+      await record?.(tx, lesson);
+      return lesson;
     });
   }
 
-  async deactivate(id: string) {
-    return this.prisma.lesson.update({
-      where: { id },
-      data: { isActive: false },
-      include: WITH_STATUS,
+  async deactivate(id: string, record?: WriteRecorder<LessonWithStatus>) {
+    return this.prisma.$transaction(async (tx) => {
+      const lesson = await tx.lesson.update({
+        where: { id },
+        data: { isActive: false },
+        include: WITH_STATUS,
+      });
+      await record?.(tx, lesson);
+      return lesson;
     });
   }
 
@@ -126,7 +169,7 @@ export class LessonsRepository {
    * slot a module can reach before any of them is set down, which is the one ordering that
    * cannot collide with itself.
    */
-  async placeInSlots(slots: Slot[], orderedIds: string[]) {
+  async placeInSlots(slots: Slot[], orderedIds: string[], record?: WriteRecorder<SlotMove[]>) {
     const moves = planSlotMoves(slots, orderedIds, 'lesson');
 
     await this.prisma.$transaction(async (tx) => {
@@ -136,6 +179,9 @@ export class LessonsRepository {
       for (const move of moves) {
         await tx.lesson.update({ where: { id: move.id }, data: { position: move.into } });
       }
+      // After the last position lands: a reorder that died halfway keeps no record of an order
+      // the module never held.
+      await record?.(tx, moves);
     });
   }
 }

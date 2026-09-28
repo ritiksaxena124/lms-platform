@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
+import type { LessonAsset as LessonAssetRow } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import type { WriteRecorder } from '../action-log/action-recorder';
 
 /** The columns a new standing recording arrives with. `isActive` is not one of them: the row
  * this writes *is* the standing one, and the retire below is what makes the other one not. */
@@ -10,6 +12,14 @@ export interface NewLessonAsset {
   storedKey: string;
   contentType: string;
   bytes: number;
+}
+
+/** What the recorder is told about an upload: the row that now stands, and whether it had to take
+ * one down to get there. `displayName` is deliberately not part of it — the name the teacher's
+ * finder gave the file is on the row, and is not a decision worth a record. */
+export interface AttachedLessonAsset {
+  asset: LessonAssetRow;
+  replaced: boolean;
 }
 
 /**
@@ -38,13 +48,18 @@ export class LessonAssetsRepository {
     });
   }
 
-  async replaceStanding(asset: NewLessonAsset) {
+  async replaceStanding(asset: NewLessonAsset, record?: WriteRecorder<AttachedLessonAsset>) {
     return this.prisma.$transaction(async (tx) => {
-      await tx.lessonAsset.updateMany({
+      // The retired rows come back rather than only their count, because "was there already a
+      // recording on this page?" is a fact this transaction decides and the record cannot ask it
+      // afterwards without a second read.
+      const retired = await tx.lessonAsset.updateManyAndReturn({
         where: { lessonId: asset.lessonId, isActive: true },
         data: { isActive: false },
       });
-      return tx.lessonAsset.create({ data: asset });
+      const created = await tx.lessonAsset.create({ data: asset });
+      await record?.(tx, { asset: created, replaced: retired.length > 0 });
+      return created;
     });
   }
 }
