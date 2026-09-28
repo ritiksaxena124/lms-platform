@@ -348,6 +348,53 @@ decision was made, and what was deliberately left out.
 | 11    | Product website — the public face of the marketplace                      | Not started |
 | 12    | Docs site — guide, data model, API reference and the phase record         | Not started |
 
+### All twelve, in order
+
+The table is the index; this is what each one is for. Phases 0–5 are shipped, Phase 6 is scoped,
+and 7–12 are the ordered backlog — each one sits where it does because of what it needs to exist
+before its shape stops moving.
+
+- **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
+  one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
+  lookup tables rather than enums, and one envelope for every failure. Approved before any code was
+  written, and recorded in `ARCHITECTURE.md`.
+- **Phase 1 — the ground under it.** Bun workspaces; the Nest modular monolith answering under
+  `/api/v1`; Postgres with `lms` and `lms_test` and Prisma owning the schema; `@lms/shared` with no
+  framework in it; `@lms/ui` as the Graphite system with Storybook; and the teacher app's frame.
+- **Phase 2 — an account.** Registration behind a hashing port, login with refresh-token rotation,
+  the session endpoint, role guards, the teacher's profile, and the three demo accounts `db:seed`
+  writes. A session that one cookie lets three portals share.
+- **Phase 3 — the thing a teacher sells.** Course, module and lesson with their publish gates; the
+  public catalog a stranger can browse without signing in, including the one page a teacher leaves
+  open; a student portal that signs in, takes a place and leaves it; the teacher's roster; and a
+  price as a quote rather than a checkout.
+- **Phase 4 — the calendar.** Weekly windows a teacher keeps open in their own timezone, expanded
+  into a rolling 30-day grid of minutes to ask for; an ask that holds the minute as `pending` until
+  the teacher confirms or refuses it; a sweep that ends the ones nobody answered; the trial call a
+  course can opt into; and both portals' screens, with the `Calendar` primitive in `@lms/ui`.
+- **Phase 5 — the class itself.** Video and storage behind their ports: a room minted for a
+  confirmed class and handed out only inside its window, and one recording per lesson that streams
+  through the same gate as the page's text. Detailed below.
+- **Phase 6 — the news.** Email behind the SMTP port: the lifecycle of Phase 4's bookings said out
+  loud to the person it happened to. Scoped below, not started.
+- **Phase 7 — the action log.** Who did what, to what, and in which part of the app — an
+  append-only record the API writes beside its own business writes. It waits until every kind of
+  write exists, because a record's shape is only worth fixing once.
+- **Phase 8 — the ops portal.** The third app, `ops.localtest.me:3002`, for the role the sign-up
+  form will not hand out: moderation and the read-side of everything above it, including the outbox
+  Phase 6 fills and the log Phase 7 writes.
+- **Phase 9 — money.** Coupons a teacher generates per course, each with its own discount and its
+  own run-time, redeemed on enrollment, and `PAYMENT_PROVIDER` ceasing to be `none`. Last among the
+  surfaces a student touches, because a discount only means something beside a price that is
+  charged.
+- **Phase 10 — the teacher's calendar.** A course's classes repeating weekly, and the holidays and
+  no-class days that stop minutes being offered at all. Both are edits to what §13's windows mean,
+  so they come after booking, video and both portals have settled.
+- **Phase 11 — the product's face.** A public website a school or a teacher reads before anybody
+  signs up: an `apps/*` workspace member on `@lms/ui` and `@lms/shared`, and not a second backend.
+- **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
+  published from what the code already says rather than restated into a second copy that drifts.
+
 **Phases 0 through 5 are closed.** The first four are the ground the product stands on —
 ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 is the one that changed most
 recently, and it went one brick at a time:
@@ -398,15 +445,12 @@ course's classes to repeat weekly, and marking the days they are on holiday so n
 on them, are both edits to what §13's windows mean, and that shape is only worth changing once the
 booking loop, the video inside it and the portals around it are settled.
 
-**Phases 11 and 12 are the two apps that sit outside the product:** a **website** — the public face
-a school or a teacher reads before anyone signs up — and a **docs site** carrying the guide, the
-data model, the API reference and this phase record. Both would be `apps/*` workspace members on
-`@lms/ui` and `@lms/shared`, and neither would be a backend: the API stays the only writer to the
-database, and a docs page renders what the code already says rather than becoming a second copy of
-it that drifts. They are last for the plainest reason — a website advertises a thing that has to
-exist, and a guide written while a phase is still moving is a guide that gets rewritten. The table
-above is the seed for both: it is what the docs site will publish, and what the website will point
-at.
+Phases 11 and 12 are the two apps that sit outside the product, and they are last for the plainest
+reason — a website advertises a thing that has to exist, and a guide written while a phase is still
+moving is a guide that gets rewritten. Neither would be a backend: the API stays the only writer to
+the database, and a docs page renders what the code already says rather than becoming a second copy
+of it that drifts. The table above is the seed for both: it is what the docs site will publish, and
+what the website will point at.
 
 ## Environment variables
 
