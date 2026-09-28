@@ -4,6 +4,8 @@ import { API_ERROR_CODES } from '@lms/shared';
 
 import {
   ApiError,
+  apiBytes,
+  apiForm,
   apiJson,
   describeFailure,
   fieldErrors,
@@ -30,6 +32,11 @@ function authHeaderOf(call: number): string | null {
   const headers = lastRequest(call).init.headers as Record<string, string> | undefined;
   const key = Object.keys(headers ?? {}).find((name) => name.toLowerCase() === 'authorization');
   return (key && headers?.[key]) || null;
+}
+
+function headerNamesOf(call: number): string[] {
+  const headers = lastRequest(call).init.headers as Record<string, string> | undefined;
+  return Object.keys(headers ?? {}).map((name) => name.toLowerCase());
 }
 
 let fetchMock: ReturnType<typeof vi.fn>;
@@ -253,6 +260,140 @@ describe('token refresh', () => {
 
     expect(authHeaderOf(0)).toBeNull(); // bootstrapping authenticates with the cookie alone
     expect(authHeaderOf(1)).toBe('Bearer bootstrapped');
+  });
+});
+
+/**
+ * The two shapes a recording needs and a JSON transport cannot serve.
+ *
+ * A take goes up as `multipart/form-data`, where the browser has to invent the boundary itself —
+ * a client that sets `content-type` the way it does for a JSON body hands the API a request with
+ * no file in it. And a take comes back as bytes through a door that opens on a bearer token, which
+ * no `<video src>` can send, so the portal reads them here and gives the player an object URL
+ * instead of an address. Both keep the refresh-and-replay rule, because an upload that dies from an
+ * ageing token should not cost a teacher the file they just chose.
+ */
+describe('a recording going up and coming back down', () => {
+  const UPLOAD_PATH = '/modules/m1/lessons/l1/asset';
+
+  const take = () => {
+    const form = new FormData();
+    form.append(
+      'file',
+      new Blob([new Uint8Array([1, 2, 3, 4])], { type: 'video/mp4' }),
+      'take.mp4',
+    );
+    return form;
+  };
+
+  /** A response that carries bytes rather than JSON, which is all the client reads from it. */
+  function fakeByteResponse(status: number, bytes: number[], body?: unknown) {
+    return {
+      status,
+      ok: status >= 200 && status < 300,
+      text: async () => (body === undefined ? '' : JSON.stringify(body)),
+      blob: async () => new Blob([new Uint8Array(bytes)]),
+    };
+  }
+
+  const expired = fakeResponse(401, {
+    statusCode: 401,
+    code: API_ERROR_CODES.TOKEN_EXPIRED,
+    message: 'x',
+  });
+  const revived = fakeResponse(200, {
+    user: { id: 'u1', email: 'teacher@example.test', fullName: 'Aditi Sharma', role: 'teacher' },
+    accessToken: 'fresh',
+    tokenType: 'Bearer' as const,
+    expiresIn: 900,
+  });
+
+  it('sends the form with the token and no content type of its own', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValue(
+      fakeResponse(201, { asset: { id: 'a1', displayName: 'take.mp4' } }),
+    );
+
+    const form = take();
+    const res = await apiForm<{ asset: { id: string } }>(UPLOAD_PATH, form);
+
+    expect(res.asset.id).toBe('a1');
+    const { url, init } = lastRequest(0);
+    expect(url).toBe(`${BASE_URL}/api/v1${UPLOAD_PATH}`);
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(form);
+    expect(init.credentials).toBe('include');
+    expect(authHeaderOf(0)).toBe('Bearer token-abc');
+    // The boundary belongs to a header the browser generates, and anything written here would
+    // win over it: the API would then read a body with no file in it.
+    expect(headerNamesOf(0)).not.toContain('content-type');
+  });
+
+  it('replays the upload once after a refresh, with the same bytes', async () => {
+    setAccessToken('stale');
+    const form = take();
+    fetchMock
+      .mockResolvedValueOnce(expired)
+      .mockResolvedValueOnce(revived)
+      .mockResolvedValueOnce(fakeResponse(201, { asset: { id: 'a1' } }));
+
+    await expect(apiForm(UPLOAD_PATH, form)).resolves.toEqual({ asset: { id: 'a1' } });
+
+    expect(lastRequest(1).url).toBe(`${BASE_URL}/api/v1/auth/refresh`);
+    expect(authHeaderOf(2)).toBe('Bearer fresh');
+    expect(lastRequest(2).init.body).toBe(form);
+  });
+
+  it('keeps a refusal about the file itself readable', async () => {
+    fetchMock.mockResolvedValue(
+      fakeResponse(413, {
+        statusCode: 413,
+        code: API_ERROR_CODES.VALIDATION_FAILED,
+        message: 'Check the highlighted fields.',
+        details: { validation: { file: ['The recording must be 200 MB or smaller.'] } },
+      }),
+    );
+
+    const error = (await apiForm(UPLOAD_PATH, take()).catch(
+      (caught: unknown) => caught,
+    )) as ApiError;
+
+    expect(error.statusCode).toBe(413);
+    // The panel prints this against the file field, so it has to arrive as a field error rather
+    // than as a toast saying the request did not succeed.
+    expect(fieldErrors(error).file).toEqual(['The recording must be 200 MB or smaller.']);
+  });
+
+  it('reads bytes with the token, because a video element cannot carry one', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValue(fakeByteResponse(200, [7, 8, 9]));
+
+    const blob = await apiBytes('/modules/m1/lessons/l1/asset/video');
+
+    expect(blob.size).toBe(3);
+    const { url, init } = lastRequest(0);
+    expect(url).toBe(`${BASE_URL}/api/v1/modules/m1/lessons/l1/asset/video`);
+    expect(init.method).toBe('GET');
+    expect(authHeaderOf(0)).toBe('Bearer token-abc');
+    expect(headerNamesOf(0)).not.toContain('content-type');
+  });
+
+  it('refuses bytes for a page that has none rather than playing an empty file', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValue(
+      fakeByteResponse(404, [], {
+        statusCode: 404,
+        code: API_ERROR_CODES.NOT_FOUND,
+        message: 'We cannot find that recording.',
+      }),
+    );
+
+    const error = (await apiBytes('/modules/m1/lessons/l1/asset/video').catch(
+      (caught: unknown) => caught,
+    )) as ApiError;
+
+    expect(error.code).toBe(API_ERROR_CODES.NOT_FOUND);
+    expect(error.message).toBe('We cannot find that recording.');
   });
 });
 
