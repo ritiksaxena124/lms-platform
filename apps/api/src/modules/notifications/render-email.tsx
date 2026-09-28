@@ -40,9 +40,11 @@ export class UnfilledEmailSlotError extends Error {
   }
 }
 
-/** The row or the caller is wrong: a subject spanning lines, or half of a button. Thrown at render
- * time rather than at send time, so an outbox row cannot retry a broken template until somebody
- * notices it. The caller that decided to notify names which event this was. */
+/** The row or the caller is wrong: a subject spanning lines, or half of a button. The sweep (6e)
+ * renders inside its own attempt, so this refusal ends a row's retries rather than starting them —
+ * the message it names is what lands in `failureReason`, and a copy that cannot be filled needs
+ * somebody to edit it rather than another hour of the transport being dialed. The caller that
+ * decided to notify names which event this was. */
 export class UnusableEmailTemplateError extends Error {
   constructor(detail: string) {
     super(`A notification is not usable: ${detail}`);

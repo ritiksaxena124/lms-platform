@@ -120,6 +120,11 @@ model User {
   /// A teacher's pool is one pool, so the claim is keyed on the account and not on a course.
   bookingsAsTeacher Booking[] @relation("booking_teacher")
 
+  /// The notifications addressed to this account. Not the address they were sent to: the sweep
+  /// reads `email` when it sends, so a correction to the account is honoured by a letter that was
+  /// already queued.
+  mailOutbox MailOutbox[] @relation("mail_outbox_recipient")
+
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
 }
@@ -616,4 +621,81 @@ model EmailTemplate {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   @@map("email_template")
+}
+
+/// The decision to notify, written in the same transaction as the change it reports.
+///
+/// A row is the news rather than the letter: the event and the facts as they stood, which the
+/// delivery sweep renders into a message when it goes to send it (§6). Rendering at the far end
+/// rather than at the request is what makes a retry able to succeed at all — a reworded template,
+/// or a payload with the sentence the row was missing, repairs a queued row instead of leaving it
+/// wrong forever. It is also what keeps a notification from being able to break a booking: the
+/// write inside the request is one insert, and every rule about what may be sent lives on the other
+/// side of it.
+///
+/// The table holds no address, on purpose. `User.email` is read when the sweep sends, so a person
+/// who corrected their address is not mailed at the old one, and a queue table stays out of the
+/// business of copying personal data forward into a row that outlives the correction and the
+/// deletion both. A log line about this row may name the recipient's id, which §6 allows.
+///
+/// `event_code` is a string rather than a foreign key into `email_template` for the same reason:
+/// an FK would let a missing template row fail the transaction that was only trying to record a
+/// place in a course. An event with no copy is a message the sweep refuses to render — it becomes
+/// `failed` with the reason the renderer gave, and the class still happened.
+///
+/// `status` is a text column whose values live in `@lms/shared`, not a lookup type: a state whose
+/// only writer is a scheduler is a step in a program, not reference data an operator maintains.
+/// Which states follow which, and how many times a row may be tried, are the sweep's rules; no
+/// constraint here knows what a status implies.
+model MailOutbox {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// Which send decision wrote this, and so which template row the sweep will render against.
+  eventCode String @map("event_code")
+
+  /// The answers to the copy's `{slot}` names, frozen at the moment the news happened. `jsonb`
+  /// keeps no key order and nothing here is read by position; the payload is a set of named
+  /// answers, which is exactly the contract between a send decision and a template.
+  payload Json @default("{}")
+
+  /// Who is to be told. Kept alive by the same restriction as every other record of what happened
+  /// to an account: a person with a letter waiting cannot be deleted out from under it.
+  recipientUserId String @map("recipient_user_id") @db.Uuid
+
+  /// `queued` on write. The sweep's read is this column plus `nextAttemptAt`, which is why the
+  /// pair is indexed together rather than either alone.
+  status String @default("queued")
+
+  /// How many times the transport was asked. Kept as a count rather than derived from timestamps
+  /// because the retry budget is a number in `@lms/shared` that a reader must be able to compare
+  /// against without reconstructing the sweep's history.
+  attempts Int @default(0)
+
+  /// When this row may next be tried. Not nullable, because `null` would have to mean both "never
+  /// scheduled" and "never again"; a finished row keeps the last time it was due as a fact, and
+  /// `status` is what says it is over.
+  nextAttemptAt DateTime @default(now()) @map("next_attempt_at") @db.Timestamptz(6)
+
+  /// Set once by the transport's acceptance. `sentAt` rather than `updatedAt`, because a retry
+  /// touching the row would otherwise move the date a person asks about.
+  sentAt DateTime? @map("sent_at") @db.Timestamptz(6)
+
+  /// The transport's error code from the last refusal (`EAUTH`, `smtp 550`) — never its message,
+  /// which names the host and on an auth failure the login. The sanitising is 6a's adapter
+  /// guarantee, so no shape rule belongs here; this column records what the port was willing to
+  /// say.
+  failureReason String? @map("failure_reason")
+
+  /// The row-level flag the convention requires. Nothing in Phase 6 writes it false: a delivered,
+  /// failed or dropped row is a standing row in a terminal status, which is a fact about what
+  /// happened rather than an archive. It is here for the day an operator retires a mistaken burst
+  /// of a thousand rows without deleting the record that they were queued.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  recipient User @relation("mail_outbox_recipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+
+  @@index([status, nextAttemptAt], map: "ix_mail_outbox_due")
+  @@map("mail_outbox")
 }
