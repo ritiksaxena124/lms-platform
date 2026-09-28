@@ -291,6 +291,41 @@ identity half of the split §2 uses elsewhere: a code names a send decision in t
 answering to one would leave a caller unable to say which a reader got. A reword is an update in
 place; what a message once said is Phase 7's action log to hold.
 
+### Queueing the news (Phase 6, step 6c)
+
+`mail_outbox` is where a send decision is written down, and it holds the news rather than the
+letter: an event code, the payload that answers the copy's `{slot}` names, and the account to tell.
+Four choices follow from that one.
+
+- **Rendered at delivery, not at the request.** A retry can only succeed if the letter is assembled
+  again, so a reworded template or a payload that was missing a sentence repairs a queued row
+  instead of leaving it wrong forever. The other half of the reason is the harder one: the write
+  inside a booking's transaction is one insert of facts nobody can get wrong, and no notification
+  can fail a class.
+- **`event_code` is a string, not a foreign key into `email_template`.** An FK would make a missing
+  template row an error in the transaction that recorded a place in a course. An event with no copy
+  is instead a row the sweep refuses to render: it becomes `failed` with the reason the renderer
+  gave, and the class still happened.
+- **No column can hold an address.** `recipient_user_id` is the reference and `User.email` is read
+  when the sweep sends, so a person who fixed a typo is not mailed at the old one, and the queue
+  never carries a copy of personal data that outlives the correction or the deletion. This is the
+  same rule §7 states for a JWT and §6 for a log line, applied to a table: the schema test asserts
+  the exact column set, so a `recipient_email` column cannot arrive by drift.
+- **The status vocabulary is a list in `@lms/shared`, not a lookup type.** `Lkp*` exists so Ops can
+  add a value without a migration, and nobody can add an outbox state without writing the sweep code
+  that would honour it; a state whose only writer is a scheduler is a step in a program. The five
+  names are `queued`, `sending`, `sent`, `failed`, `dropped` — and `dropped` is kept apart from
+  `sent` because 6a's port promised a box with no mail would never record a throwaway as a
+  delivery.
+
+`nextAttemptAt` is not nullable, because `null` would have to mean both "never scheduled" and
+"never again": a finished row keeps the last time it was due as a fact and `status` is what says it
+is over. `sentAt` is its own column rather than a read of `updatedAt`, because a retry touching the
+row would otherwise move the date a person asks about. `failureReason` holds the transport's code,
+which 6a's adapter guarantees is short and sterile — a CHECK on its shape would be a second, weaker
+copy of that guarantee in the wrong place. And nothing is unique here: the same news legitimately
+happens twice to one reader, and a queue with a unique key is a ledger that refuses to say anything.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API

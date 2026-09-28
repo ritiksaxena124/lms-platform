@@ -351,8 +351,8 @@ decision was made, and what was deliberately left out.
 ### All twelve, in order
 
 The table is the index; this is what each one is for. Phases 0–5 are shipped, Phase 6 is under way
-with its transport and its renderer, and 7–12 are the ordered backlog — each one sits where it does
-because of what it needs to exist before its shape stops moving.
+with its transport, its renderer and its queue, and 7–12 are the ordered backlog — each one sits
+where it does because of what it needs to exist before its shape stops moving.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -457,8 +457,23 @@ destination with no label and an href that is not absolute http(s) are all refus
 is being built rather than at the transport, and the refusal names the problem without repeating the
 address. `email_template` holds the half an operator edits — subject, heading, a sentence per line,
 an optional button label — and `event_code` is unique across every row rather than the standing
-ones, so a reword is an update in place and what a message once said is Phase 7's log to hold. The
-outbox, the seven send decisions and the sweep are the steps after it.
+ones, so a reword is an update in place and what a message once said is Phase 7's log to hold.
+
+**Step 6c, the queue, is in** (`mail_outbox`). A row holds the news rather than the letter — the
+event code, the payload that answers the copy's `{slot}` names, and the account to tell — written in
+the same transaction as the change it reports, and rendered when the sweep goes to send it. That
+order is what makes a retry able to succeed, and what keeps a notification from being able to fail a
+booking: the insert inside the request carries no markup and no template lookup, so an event whose
+copy is missing or broken becomes a row that ends up `failed`, not a class that did not happen.
+There is no column for an address: the recipient is a `User` reference and the email is read when the
+message goes out, so a person who corrected their account is not mailed at the old one. `status` is
+a five-word list in `@lms/shared` — `queued`, `sending`, `sent`, `failed`, `dropped`, with `dropped`
+kept apart from `sent` because 6a's port promised never to record a throwaway as a delivery — because
+a state whose only writer is a scheduler is a step in a program, not reference data an operator
+maintains. `nextAttemptAt` is not-null-by-default rather than nullable, since `null` would have to
+mean both "never scheduled" and "never again"; `sentAt` is its own column so a retry cannot move the
+date a person asks about; and nothing is unique, because the same news legitimately happens twice to
+one reader. The seven send decisions and the sweep are the steps after it.
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to
