@@ -481,8 +481,9 @@ The choice has now been made, which is why these are phases rather than open que
   in one app and honoured in another is exactly the drift this system keeps to one API.
 - **Every entity's writes will be recorded** (Phase 7): an append-only `ActionLog` of who did
   what, to which row, and in which part of the app. It is a phase rather than a column added
-  now because a record needs to name the screen an action came from, and several of those
-  screens do not exist yet.
+  now because a record's shape is only worth fixing once every kind of write exists — and
+  because the part of the app an action came from is a name over the whole write surface, not a
+  field one table can hold.
 
 ## 7. Sessions and passwords
 

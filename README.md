@@ -534,6 +534,29 @@ mailbox stands behind them, so a wrong address would have read `sent` here too, 
 the reclaim and `NoMail`'s drop are shown against doubles in a spec rather than against a host that
 refused twice.
 
+**Phase 7 is scoped, not started.** An append-only `action_log` — who did what, to which row, and in
+which part of the app — because nothing in this API is audited today: no service logs its own writes,
+and the outbox has a recipient but no column for who caused the news. Four decisions give it a shape.
+**What earns a row is a write that changed something**, plus the three account events a person later
+asks about: signed in, signed out, and the replayed token that ends every session an account has
+(ARCHITECTURE §7). The mail sweep's status churn is left out because `mail_outbox` already _is_ that
+record, and the token rotation on every portal load is left out because a log a machine floods is a
+log nobody reads. **Which part of the app is named by the action rather than by the caller** — a table
+in `@lms/shared` gives every action code one section code, so the answer lives with the vocabulary and
+never arrives in a header a client could fill in. **A row
+remembers the decided facts**: a status from one code to another, a price before and after, a switch
+going on. Never a copy of the row it touched, because a snapshot carries personal data forward past
+both the correction and the deletion, and grows with every column the table gains — and the room name
+a confirming teacher mints is precisely the value that changes a booking and may not change a log
+(§14). **The record is written inside the transaction that owns the change**, for the reason Phase 6's
+notifier is a parameter rather than a line after the write: a write that rolled back leaves nothing
+behind, and a replay that changed nothing records nothing. The actor reaches the write from the request
+context the middleware already builds, as an id plus the role as it stood; the target is a table-and-id
+pair with no foreign key, because an FK would let a missing row fail the very write it was reporting.
+The table has `created_at` and neither `updated_at` nor `isActive` — a mutable column on an append-only
+ledger is an invitation to edit history. Phase 7 ends at an ops-gated read endpoint: a log that cannot
+be asked a question is not yet a feature, and the screen that draws it is Phase 8's.
+
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to
 exist before it fixes what a record looks like. Coupons land last among the things a student
