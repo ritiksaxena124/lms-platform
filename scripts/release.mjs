@@ -32,16 +32,24 @@ function fail(message) {
   process.exit(1);
 }
 
-function step(command, commandArgs, { gate = false } = {}) {
+function step(command, commandArgs, { gate = false, shell = false } = {}) {
   console.log(`\n$ ${[command, ...commandArgs].join(' ')}`);
   if (dryRun) return;
   try {
-    execFileSync(command, commandArgs, {
+    // `shell` exists for one call: Windows keeps `bun` behind an extensionless shim that node will
+    // not spawn directly. Under a shell the command goes as one fixed string rather than
+    // command-plus-args, which is the form node deprecates — so nothing routed through `shell` may
+    // carry a word the caller built from user input.
+    execFileSync(shell ? [command, ...commandArgs].join(' ') : command, shell ? [] : commandArgs, {
       cwd: root,
       stdio: gate ? 'inherit' : 'ignore',
       encoding: 'utf8',
+      shell,
     });
-  } catch {
+  } catch (error) {
+    // A command that never started is not a command that failed, and the difference is the whole
+    // diagnosis: that read as "verify is not green" twice on a Windows box before anyone looked.
+    if (error.code === 'ENOENT') fail(`${command} is not on this PATH, so the gate could not run`);
     fail(
       command === 'bun'
         ? 'verify is not green. Nothing was tagged — fix the gate, then run this again.'
@@ -70,7 +78,9 @@ console.log(`release ${tag} from ${git('rev-parse', '--short', 'HEAD')} on ${bra
 if (flags.has('--skip-verify')) {
   console.log('\nskipping the gate — a tag with no `verify` behind it is a label, not a release');
 } else {
-  step('bun', ['run', 'verify'], { gate: true });
+  // The shell is only for Windows, where `bun` is an extensionless shim; on the Linux box and in CI
+  // the spawn is direct, exactly as it was.
+  step('bun', ['run', 'verify'], { gate: true, shell: process.platform === 'win32' });
 }
 
 step('git', ['tag', '-a', tag, '-m', title, ...(notes ? ['-m', notes] : [])]);
