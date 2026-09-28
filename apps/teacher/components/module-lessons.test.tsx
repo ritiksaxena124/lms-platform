@@ -25,6 +25,16 @@ vi.mock('@/lib/courses', () => ({ readCourse: api.readCourse }));
 vi.mock('@/lib/course-modules', () => ({ listModules: api.listModules }));
 vi.mock('@/lib/lessons', () => api);
 
+// The recording block reads its own state per lesson, so the screen's test only needs it to
+// answer without a file on the page.
+const assets = vi.hoisted(() => ({
+  standingLessonAsset: vi.fn(),
+  attachLessonAsset: vi.fn(),
+  lessonAssetBytes: vi.fn(),
+}));
+
+vi.mock('@/lib/lesson-assets', () => assets);
+
 const { notify } = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn() } }));
 vi.mock('@lms/ui', async (importOriginal) => {
   const actual = (await importOriginal()) as Record<string, unknown>;
@@ -128,6 +138,7 @@ beforeEach(() => {
     moduleOf({ id: 'm2', title: 'Adding fractions', position: 2 }),
   ]);
   api.listLessons.mockResolvedValue(LESSONS);
+  assets.standingLessonAsset.mockResolvedValue(null);
 });
 
 describe('ModuleLessons', () => {
@@ -523,5 +534,23 @@ describe('ModuleLessons', () => {
       ),
     );
     expect(within((await rows())[0] as HTMLElement).queryByText(/free/i)).not.toBeInTheDocument();
+  });
+
+  it('carries that page’s recording in the panel that edits it, and nowhere else', async () => {
+    renderScreen();
+    expect(screen.queryByText(/recording/i)).not.toBeInTheDocument();
+
+    const before = await rows();
+    await userEvent.click(
+      within(before[0] as HTMLElement).getByRole('button', {
+        name: /edit halves on a number line/i,
+      }),
+    );
+
+    expect(await screen.findByText('The recording')).toBeInTheDocument();
+    expect(assets.standingLessonAsset).toHaveBeenCalledWith('m1', 'l1');
+
+    await userEvent.click(screen.getByRole('button', { name: /^cancel$/i }));
+    expect(screen.queryByText('The recording')).not.toBeInTheDocument();
   });
 });

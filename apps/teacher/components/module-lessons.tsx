@@ -31,6 +31,7 @@ import {
   unpublishLesson,
   updateLesson,
 } from '@/lib/lessons';
+import { LessonRecording } from './lesson-recording';
 
 const STATUS_TONE: Record<string, StatusTone> = {
   draft: 'neutral',
@@ -521,6 +522,7 @@ export function ModuleLessons({ courseId, moduleId }: { courseId: string; module
                       error={fields.isFreePreview}
                       disabled={rowBusy}
                     />
+                    <LessonRecording moduleId={moduleId} lessonId={lesson.id} />
                     <div className="flex items-center gap-2">
                       <Button type="button" loading={rowBusy} onClick={() => void saveEdit(lesson)}>
                         Save
