@@ -1,26 +1,28 @@
 import { Module } from '@nestjs/common';
 
+import { MailModule } from '../../providers/mail/mail.module';
+import { MailDeliveryService } from './mail-delivery.service';
 import { MailQueue } from './mail-queue.service';
 import { MailOutboxRepository } from './mail-outbox.repository';
 
 /**
- * The platform's send decisions, filed as news, and the statements that will send them.
+ * The platform's send decisions, filed as news, and the sweep that sends them.
  *
- * Three parts live here and the join is still one step away. `MailQueue` writes an outbox row
- * inside somebody else's transaction — it is the part a booking or an enrollment write calls.
- * `render-email` turns a row and a template into a message. `MailOutboxRepository` is the set of
- * writes the delivery sweep (6e) is made of: the claim that decides which rows a run owns, and the
- * terminal writes that record what happened to each one. The sweep itself, and the mail transport
- * from 6a it will call, are the next step — so nothing outside this module asks for the repository
- * yet, which is why it is a provider here and not an export.
+ * Three parts, and the split between them is the design: `MailQueue` writes an outbox row inside
+ * somebody else's transaction — it is the half a booking or an enrollment write calls.
+ * `MailOutboxRepository` is the set of writes the delivery run is made of: the claim that decides
+ * which rows a run owns, and the terminal writes that record what happened to each one.
+ * `MailDeliveryService` is the run itself, and it is the only thing in the platform that reaches
+ * 6a's transport, which is why this is where `MailModule` is imported.
  *
- * What the module does export is the queue, because that is the half bookings and enrollments
- * import. Neither of them learns anything about SMTP, about copy, or about when the message
- * actually goes; they learn only that a row named `mail_outbox` is standing in for the letter, and
- * that it survives or vanishes with their own write (§6).
+ * So the sweep knows the queue only as rows, and the senders know it only as a row. Neither of them
+ * learns anything about SMTP from the other: bookings and enrollments import the queue, and nobody
+ * outside this module asks for the repository or the service — the cron is the only caller the
+ * sweep needs (§6).
  */
 @Module({
-  providers: [MailQueue, MailOutboxRepository],
+  imports: [MailModule],
+  providers: [MailQueue, MailOutboxRepository, MailDeliveryService],
   exports: [MailQueue],
 })
 export class NotificationsModule {}
