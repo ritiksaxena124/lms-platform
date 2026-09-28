@@ -168,6 +168,29 @@ and the student's:
 | `bun run dev:ui`      | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
 | `bun run test`        | All test suites (Vitest, per workspace package).                         |
 | `bun run format`      | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
+| `bun run release`     | Cut a tagged GitHub release: verify, tag, push, publish.                 |
+
+## Releases
+
+A release is a phase boundary, not a deploy. `main` carries work in flight; a tag says
+"this commit passed the gate", and the tag is what a demo, a hand-off or a rollback points
+at. Versions track the phase table below — Phase 4 closed at `v0.4.0`, and `v0.5.0` will be
+Phase 5.
+
+```
+bun run release v0.5.0 --title="Phase 5: live classes and recordings"
+bun run release v0.5.0 --notes="What a person gets at this tag."   # instead of generated notes
+bun run release v0.5.0 --dry-run
+```
+
+`scripts/release.mjs` refuses a dirty tree, a branch that is not `main` and a tag that
+already exists on origin; runs `bun run verify` and stops if it is not green; then writes an
+**annotated** tag (the message is the title, so `git show v0.5.0` explains the decision),
+pushes `main` and the tag, and opens the GitHub release with `gh`. Nothing is pushed unless
+the gate passed first, and `--skip-verify` exists only for a tag that is being moved after a
+mistake — a tag with no gate behind it is a label rather than a release.
+
+Releases need `gh auth login` once, and the repository's `LMS_PLATFORM` remote over SSH.
 
 ## Layout
 
@@ -179,6 +202,8 @@ apps/
 packages/
   shared/     Framework-free TypeScript: error codes, lookup codes, money, timezones
   ui/         Design tokens, primitives and motion shared by all three portals
+scripts/
+  release.mjs Tag a phase boundary, push it, publish the release
 ```
 
 `@lms/shared` is consumed as compiled CommonJS by the API and as source by the apps
@@ -238,6 +263,8 @@ decision was made, and what was deliberately left out.
 | 8     | Ops portal — moderation and the read-side of everything above             | Not started |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
 | 10    | The teacher's calendar — a course's class series, holidays, no-class days | Not started |
+| 11    | Product website — the public face of the marketplace                      | Not started |
+| 12    | Docs site — guide, data model, API reference and the phase record         | Not started |
 
 Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
 and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
@@ -259,7 +286,7 @@ same panel that edits the page it belongs to, and a class row that grows a Join 
 window its list already published, opening the room in a frame rather than a link
 (ARCHITECTURE.md §15). What is left of the phase is the student's side of the same two doors — a
 player on a lesson page, and the room when their own class is open.
-What is left of Phases 5–10 is the ordered backlog: a
+What is left of Phases 5–12 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and
 coupons land last among the things a student touches, because a discount only means something
@@ -268,6 +295,16 @@ calendar work is after all of it: a teacher marking a course's classes to repeat
 marking the days they are on holiday so no minute is offered on them, are both edits to what
 §13's windows mean, and that shape is only worth changing once the booking loop, the video
 inside it and the portals around it are settled.
+
+Phases 11 and 12 are the two apps that sit outside the product: a **website** — the public face
+a school or a teacher reads before anyone signs up — and a **docs site** carrying the guide, the
+data model, the API reference and this phase record. Both would be `apps/*` workspace members on
+`@lms/ui` and `@lms/shared`, and neither would be a backend: the API stays the only writer to the
+database, and a docs page renders what the code already says rather than becoming a second copy
+of it that drifts. They are last for the plainest reason — a website advertises a thing that has
+to exist, and a guide written while Phase 5 is still moving is a guide that gets rewritten. The
+table above is the seed for both: it is what the docs site will publish, and what the website
+will point at.
 
 ## Environment variables
 
