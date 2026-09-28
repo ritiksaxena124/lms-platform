@@ -4,47 +4,88 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 4 done** — accounts sign in, hold a session and a teacher can save a
-profile and write, publish and archive courses in the teacher portal (`/courses`, backed by
-`/api/v1/courses`), order a course's syllabus of modules (`/courses/[id]/modules`, backed by
-`/api/v1/courses/:id/modules`), and write the lessons inside a module — the page, its rough
-length, its slot in that block's order, its own draft/published flag and whether one of them is
-free to read before enrolling
-(`/courses/[id]/modules/[moduleId]/lessons`, backed by `/api/v1/modules/:moduleId/lessons`).
-A stranger can already browse what that makes readable, on a second portal:
-<http://student.localtest.me:3001> is the shelf (`/api/v1/catalog/courses`) and a course's
-outline (`/api/v1/catalog/courses/:id`, and the same course by its slug) — titles, order and
-rough length, plus one page a teacher left open to read — on screen at
-`/courses/[id]/lessons/[lessonId]`, backed by `/api/v1/catalog/courses/:id/lessons/:lessonId` —
-and no account needed to look. Enrollment is in on both sides now: a student can take a place in a
-published course, list the courses they are inside and leave one (`/api/v1/enrollments`), and both
-catalog routes above answer a stranger and an enrolled student — the page opens, and each outline
-row says whether it is a door (`isReadable`) beside what the teacher marked free (`isFreePreview`).
-One pair of routes, so there is only one list of gates to keep. The student portal has a session
-of its own now (`/login`, `/register` on :3001) and sends it on the reads whose answer depends on
-who is asking. That session is on screen too: an enroll button on a course outline, the outline
-rows it unlocks, a lesson that reads like a member's page, and a `/my-courses` shelf where a place
-can be left. The teacher's side of the same table is on both ends now:
-`/api/v1/courses/:courseId/roster` names who holds a place in a course they own and the day they
-took it, and the portal shows it at `/courses/[id]/roster` — a headcount, a name and a day per
-row, and no button that removes somebody. A course can now carry a price the teacher sets in the
-editor and the shelf prints — a quote rather than a checkout (`PAYMENT_PROVIDER` is still `none`),
-stored as minor units plus a `Currency` lookup value, `null` when nobody has quoted it and `0` when
-the teacher says free, and enrollment still grants a place for nothing. A calendar sits on top of
-all that now. A teacher keeps weekly windows open (`/availability`, `/api/v1/availability/rules`)
-and can give a live course a trial-call switch (`/api/v1/courses/:id/demo-bookings`); a student
-inside that course — or a stranger taking the one trial the teacher allows — sees the teacher's
-next 30 days as minutes to ask for (`/courses/[id]/book`, `/api/v1/bookings/slots`). The ask waits
-in the teacher's `/requests` queue as `pending` until it is confirmed or refused, and nothing is a
-class until that answer. Both sides then read the same rows in their own clock: `/classes` for the
-teacher, `/my-classes` for the student, who can also leave. And a booked minute is now a class
-worth being in: a teacher's confirm gives it a room on the video provider behind the port, and
-both portals show a Join button only inside the window that room opens in — the address is asked
-for at the moment of use and appears in a frame, never a link. A lesson page carries the same
-kind of door for the recording attached to it: the response that sent the text names the file and
-its size, and the bytes themselves go out only to a reader the catalog admits, piece by piece so
-the player can seek. The action log, the ops portal, email and coupons are still ahead.
-See [Phase plan](#phases).
+**Status: Phase 5 done** — a teacher writes a course and opens a week in it, a learner reads enough
+of that course to want a place, asks for a minute of the teacher's time, and is let into a room for
+it when the teacher says yes. Everything listed under [What each portal
+does](#what-each-portal-does) is shipped, tested and clickable; the action log, the ops portal,
+email and money are still ahead, and [Phases](#phases) keeps the ordered record of why.
+
+## Contents
+
+| Section                                                           | What it covers                                               |
+| ----------------------------------------------------------------- | ------------------------------------------------------------ |
+| [What each portal does](#what-each-portal-does)                   | The routes that exist today, by the door they are reachable  |
+| [Prerequisites](#prerequisites)                                   | The three tools this repo needs                              |
+| [First run](#first-run)                                           | Environment, database, seed, and the ports the apps answer   |
+| [Signing in](#signing-in)                                         | The three demo accounts `db:seed` writes                     |
+| [Walking the demo](#walking-the-demo)                             | The same course, from a teacher's page to a stranger's shelf |
+| [Commands](#commands)                                             | The gate, the dev servers, the release                       |
+| [Releases](#releases)                                             | What a tag means here, and how one is cut                    |
+| [Layout](#layout)                                                 | The five workspace packages and what each one owns           |
+| [Design system — Graphite](#design-system--graphite)              | The five rules that outrank taste                            |
+| [Conventions](#conventions-that-are-enforced-not-documented-away) | The four rules ESLint holds                                  |
+| [Phases](#phases)                                                 | The twelve, their status, and why that order                 |
+| [Environment variables](#environment-variables)                   | The four worth knowing early                                 |
+
+## What each portal does
+
+### The teacher's portal
+
+- **Courses** — `/courses`, backed by `/api/v1/courses`. Title, level, summary, description and a
+  price, then the draft/published/archive lifecycle. The editor is the only place a course is
+  written: a published course reads back locked, and the fields refuse a change the server would
+  refuse anyway.
+- **The syllabus** — `/courses/[id]/modules` (`/api/v1/courses/:id/modules`) for the modules and
+  their order, `/courses/[id]/modules/[moduleId]/lessons`
+  (`/api/v1/modules/:moduleId/lessons`) for the lessons inside one: the page of body text, its rough
+  length, its slot in that block's order, its own draft/published flag, and whether one of them is
+  free to read before enrolling.
+- **A price, as a quote** — set in the editor, printed on the shelf, stored as minor units plus a
+  `Currency` lookup value: `null` when nobody has quoted it, `0` when the teacher says free.
+  `PAYMENT_PROVIDER` is still `none`, so enrollment grants a place for nothing.
+- **A roster** — `/courses/[id]/roster` (`/api/v1/courses/:courseId/roster`) names who holds a place
+  in a course they own and the day they took it: a headcount, a name and a day per row, and no
+  button that removes somebody.
+- **The week** — `/availability` (`/api/v1/availability/rules`). A window is four numbers — weekday,
+  opens, closes, how long a class runs — kept in the teacher's own timezone, and the grid below it
+  fills with the minutes that window offers over the next thirty days.
+- **The queue, and the classes** — an ask lands in `/requests` as `pending` and holds the minute;
+  nothing is a class until the teacher confirms or refuses it. `/classes` holds the answer either
+  way, soonest first.
+- **A room, while the class is live** — a confirm gives the class its own Jitsi address, minted from
+  a uuid, stored and never sent. A class row grows a Join button inside the window that door opens
+  in, and opens it in a frame rather than a link.
+- **A recording on a lesson** — attached, named, replaced and played from the same panel that edits
+  the page it belongs to.
+- **Trial calls** — `/api/v1/courses/:id/demo-bookings` grants a course the switch that lets a
+  not-yet-enrolled reader book one class from it, once, ever.
+
+### The student's portal
+
+- **A shelf that asks nothing** — <http://student.localtest.me:3001> is
+  `/api/v1/catalog/courses`: published courses browsable by level, each card printing the price the
+  teacher quoted, with no account needed to look.
+- **An outline, to a stranger and to a member** — `/api/v1/catalog/courses/:id`, by id or by slug:
+  titles, order and rough length, plus one page a teacher left open to read. Each row carries two
+  flags because they answer two questions — `isFreePreview` is the teacher's statement about the
+  page, `isReadable` says what _this_ caller will be handed. One pair of routes, so there is only
+  one list of gates to keep.
+- **A lesson page, and the recording on it** — `/courses/[id]/lessons/[lessonId]`, backed by
+  `/api/v1/catalog/courses/:id/lessons/:lessonId`. The response that sent the text also names the
+  file and says how big it is, so the size is printed before a byte is asked for; the bytes go out
+  only to a reader the catalog admits, piece by piece so the player can seek.
+- **A session of its own** — `/login` and `/register` on :3001, sent on the reads whose answer
+  depends on who is asking.
+- **Places** — an enroll button on a course outline, the locked rows that become links once it is
+  pressed, and `/my-courses`, the shelf of courses the student is inside, where a place can be left.
+  All of it is one table on the API's side: `/api/v1/enrollments`.
+- **Classes** — `/courses/[id]/book` shows the teacher's next thirty days as minutes to ask for
+  (`/api/v1/bookings/slots`), under the caption "Times are the teacher's clock"; `/my-classes`
+  shows the same class in the student's own timezone, _Leave this class_ gives the minute back
+  while it still stands, and Join opens the room for the class happening now.
+
+The action log, the ops portal, email and coupons are still ahead — [Phases](#phases) says in which
+order they arrive.
 
 ---
 
@@ -108,11 +149,15 @@ a real mailbox.
 
 ### Walking the demo
 
-Phase 3 is easiest to see as one course travelling from a teacher's page to a stranger's shelf.
-Because the portals share one session cookie, use **two browser profiles** (or one private
-window) so the teacher and the student are signed in as different people at the same time.
+The demo is one course travelling: from a teacher's page to a stranger's shelf, from the shelf to a
+booked minute, and from that minute to a room and a recording. Each loop below is the same course
+one phase further along. Because the portals share one session cookie, use **two browser profiles**
+(or one private window) so the teacher and the student are signed in as different people at the
+same time.
 
-**As the teacher** — <http://teacher.localtest.me:3000>, sign in with `teacher@example.test`:
+#### As the teacher
+
+<http://teacher.localtest.me:3000>, signed in as `teacher@example.test`:
 
 1. `/courses` → _New course_. Give it a title and a level, leave the price empty; _Save draft_
    puts it on the list. The editor is the only place a course is written — a published course
@@ -127,7 +172,9 @@ window) so the teacher and the student are signed in as different people at the 
 4. `/courses/[id]/roster` shows who later takes a place: a headcount, a name and a day per row,
    and no button that removes somebody.
 
-**As the student** — <http://student.localtest.me:3001>, in the second profile:
+#### As the student
+
+<http://student.localtest.me:3001>, in the second profile:
 
 1. The shelf opens with no sign-in: browse published courses by level, each card printing the
    price the teacher quoted. Open a course to read its outline — modules, lessons, lengths — with
@@ -143,8 +190,9 @@ That is the whole loop Phase 3 closes: a teacher writes and prices a course, a s
 enough of it to want it, enrolling turns that want into a place, and both sides see the same
 decision.
 
-**Then the same course, as a class to book** — Phase 4's loop, still in the teacher's course page
-and the student's:
+#### Then the same course, as a class to book
+
+Phase 4's loop, still in the teacher's course page and the student's:
 
 1. As the teacher, `/availability`: a window is four numbers — weekday, opens, closes, how long a
    class runs — and the week is kept in the teacher's own timezone. Save one and the grid below it
@@ -160,6 +208,27 @@ and the student's:
    `/classes` holds the answer either way, soonest first.
 5. As the student, `/my-classes` shows the same class in your own timezone — and _Leave this
    class_ gives the minute back while it still stands.
+
+#### Then the class itself, and the recording on a page
+
+Phase 5's loop. It needs the seeded teacher's availability to put a class within reach of the
+clock, so book one for the next few minutes and confirm it from `/requests`:
+
+1. As either account, the class row grows a **Join** button inside the window the door opens in —
+   five minutes before the class to fifteen after it ends. Before that the row says when it opens;
+   after, that it is shut. Pressing Join asks the API for the address and opens the room in a frame
+   in the page: there is no link to copy, and a class confirmed before this phase has no room at
+   all.
+2. As the teacher, open a lesson's panel and attach a video file. The panel prints its name and
+   size, and a second upload replaces it — the old recording is retired, not deleted.
+3. As the student, that lesson's page prints the same name and size with a **Play** gate in front
+   of them. Nothing is fetched until the press, and what comes back is the page's own bytes over
+   the page's own door: a locked page refuses the video the same way it refuses the text.
+
+Two things this demo needs to know: the file has to be one the browser decodes — an H.264 MP4 —
+because the platform stores bytes and does not transcode them; and a room is only as private as its
+name, so `JITSI_DOMAIN` and the minted room name are the whole lock, which is why no list, log or
+link carries an address.
 
 ## Commands
 
@@ -214,6 +283,14 @@ scripts/
 `@lms/shared` is consumed as compiled CommonJS by the API and as source by the apps
 (`transpilePackages`). `@lms/ui` is always consumed as source — it ships no build step,
 which is why editing a component hot-reloads in the portal.
+
+| Package        | Owns                                                       | Dev address                           |
+| -------------- | ---------------------------------------------------------- | ------------------------------------- |
+| `@lms/api`     | Every route, every write, and the database's only owner    | <http://api.localtest.me:4000/api/v1> |
+| `@lms/teacher` | The teacher's work: courses, syllabus, the week, the queue | <http://teacher.localtest.me:3000>    |
+| `@lms/student` | The reader's work: shelf, outline, places, classes         | <http://student.localtest.me:3001>    |
+| `@lms/ui`      | Tokens, primitives, motion, illustrations                  | Storybook on <http://localhost:6006>  |
+| `@lms/shared`  | Error codes, lookup codes, money, timezones                | — a library, not a server             |
 
 ## Design system — Graphite
 
@@ -271,46 +348,50 @@ decision was made, and what was deliberately left out.
 | 11    | Product website — the public face of the marketplace                      | Not started |
 | 12    | Docs site — guide, data model, API reference and the phase record         | Not started |
 
-Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
-and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
-request queue and class list, the student's booking page and own calendar. Phase 5 is closed on
-top of it, one brick at a time. The storage port is real: bytes are filed with no URL of their
-own, a lesson names the recording that stands behind it, and a replacement retires the previous
-row rather than deleting it (ARCHITECTURE.md §6 and §10). The video port is real too — a room
-address built from a name the API mints, with `none` still an adapter rather than an `if` in
-every route. A teacher's yes now gives that class its own room name, minted from a uuid, written
-beside the status, stored and never sent, and every class list carries the window its door opens
-in, so a screen can draw a Join button and say when it works (ARCHITECTURE.md §14). The endpoint
-that hands the address out is the other half of that: one POST, answered only for the two accounts
-a standing class is about and only while its window is open. A recording is watched through the
-same kind of door: a page's bytes go out only to a caller its own gate admits — a free preview, or
-a place in the course — and they go out as the piece the player asked for, because a `<video>`
-element seeks rather than downloads (ARCHITECTURE.md §11 and §14). Both portals now stand on those
-two doors. The teacher's carries a recording attached, named and played from the same panel that
-edits the page it belongs to, and a class row that grows a Join button inside the window its list
-already published. The student's lesson page offers the recording its own response named — the
-size printed before a byte is asked for — and `/my-classes` opens the room for the class that is
-happening now, in the student's clock like every other time on that screen (ARCHITECTURE.md §15).
-Neither portal puts a room address in a link, in a list, or anywhere a browser keeps it.
-What is left of Phases 6–12 is the ordered backlog: a
-live class needs a booked slot to attach to, which is why booking came first, the action log
-wants every kind of write to exist before it fixes what a record looks like, and
-coupons land last among the things a student touches, because a discount only means something
-next to a price that is charged — the same reason they sit after the portals are complete. The
-calendar work is after all of it: a teacher marking a course's classes to repeat weekly, and
-marking the days they are on holiday so no minute is offered on them, are both edits to what
-§13's windows mean, and that shape is only worth changing once the booking loop, the video
-inside it and the portals around it are settled.
+**Phases 0 through 5 are closed.** The first four are the ground the product stands on —
+ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 is the one that changed most
+recently, and it went one brick at a time:
 
-Phases 11 and 12 are the two apps that sit outside the product: a **website** — the public face
+- **Storage.** Bytes are filed with no URL of their own; a lesson names the recording that stands
+  behind it, and a replacement retires the previous row rather than deleting it
+  (ARCHITECTURE.md §6 and §10).
+- **The video port.** A room address built from a name the API mints, with `none` still an adapter
+  rather than an `if` in every route. A teacher's yes now gives that class its own room name,
+  minted from a uuid, written beside the status, stored and never sent — and every class list
+  carries the window its door opens in, so a screen can draw a Join button and say when it works
+  (§14).
+- **The address, handed out.** One POST, answered only for the two accounts a standing class is
+  about and only while its window is open.
+- **A recording, watched through the same kind of door.** A page's bytes go out only to a caller
+  its own gate admits — a free preview, or a place in the course — and they go out as the piece the
+  player asked for, because a `<video>` element seeks rather than downloads (§11 and §14).
+- **Both portals now stand on those two doors.** The teacher's carries a recording attached, named
+  and played from the same panel that edits the page it belongs to, and a class row that grows a
+  Join button inside the window its list already published. The student's lesson page offers the
+  recording its own response named — the size printed before a byte is asked for — and
+  `/my-classes` opens the room for the class that is happening now, in the student's clock like
+  every other time on that screen (§15).
+
+Neither portal puts a room address in a link, in a list, or anywhere a browser keeps it.
+
+**Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
+to attach to, which is why booking came before video. The action log wants every kind of write to
+exist before it fixes what a record looks like. Coupons land last among the things a student
+touches, because a discount only means something next to a price that is charged — the same reason
+they sit after the portals are complete. The calendar work is after all of it: a teacher marking a
+course's classes to repeat weekly, and marking the days they are on holiday so no minute is offered
+on them, are both edits to what §13's windows mean, and that shape is only worth changing once the
+booking loop, the video inside it and the portals around it are settled.
+
+**Phases 11 and 12 are the two apps that sit outside the product:** a **website** — the public face
 a school or a teacher reads before anyone signs up — and a **docs site** carrying the guide, the
 data model, the API reference and this phase record. Both would be `apps/*` workspace members on
 `@lms/ui` and `@lms/shared`, and neither would be a backend: the API stays the only writer to the
-database, and a docs page renders what the code already says rather than becoming a second copy
-of it that drifts. They are last for the plainest reason — a website advertises a thing that has
-to exist, and a guide written while Phase 5 is still moving is a guide that gets rewritten. The
-table above is the seed for both: it is what the docs site will publish, and what the website
-will point at.
+database, and a docs page renders what the code already says rather than becoming a second copy of
+it that drifts. They are last for the plainest reason — a website advertises a thing that has to
+exist, and a guide written while a phase is still moving is a guide that gets rewritten. The table
+above is the seed for both: it is what the docs site will publish, and what the website will point
+at.
 
 ## Environment variables
 
