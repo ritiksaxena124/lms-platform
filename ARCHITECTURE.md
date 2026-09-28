@@ -832,6 +832,26 @@ offered at, and everything else about the hour happens somewhere else.
   for. Both lists split Coming up / Earlier on the start date alone: on status alone a confirmed
   class keeps claiming to be upcoming after its hour has passed, and on whether the minute is
   still held a called-off class vanishes from the week it happened in.
+- **A door shows only when the list says there is one to open.** A class row renders its `live`
+  window as words rather than as a button before the window and a refusal after it, and the
+  screen's clock re-reads itself on an interval so a teacher who opened the page at 08:00 finds
+  Join waiting at 09:25 without a reload. Pressing it asks the room route for the address and puts
+  that answer in an `<iframe>` with `referrerPolicy="no-referrer"`, never in a link: a `<video>`-
+  shaped `<a>` would leave the room's only lock in the history, the status line and the referrer
+  header of the site it just opened, and a browser prefetches some of those on hover. Leaving takes
+  the frame back out of the document. On a `VIDEO_PROVIDER=none` deployment every row arrives with
+  `live: null` and no screen in the portal mentions a room, which is the same answer §6 gives and
+  the reason the branch is a missing prop rather than a disabled button.
+- **A recording is fetched, not pointed at.** The portal's transport has three shapes over one
+  refresh-and-replay loop — `apiJson` for an object, `apiForm` for a file, `apiBytes` for bytes
+  back — because a `<video src>` cannot carry the bearer token that authorizes the bytes behind it,
+  and adding a cookie surface to the video route to make a `src` work would be a second way into the
+  same file. So the player is handed `URL.createObjectURL(blob)` and every lease on it is closed:
+  hiding, replacing and unmounting all revoke, and a second Play re-reads. Replace is one upload
+  rather than a delete and an upload, because the API's retire-and-file is one decision and a
+  half-way failure would leave a page with no recording at all. A refusal about the file lands as
+  field-keyed text under the control that caused it while the standing row keeps its name and size;
+  any other refusal is a toast, because the file was fine.
 - **A session change re-reads what the session decided.** The outline keys its request on the
   course, a retry counter and the session's state, so signing in re-fetches the same address and
   the locked rows become links without a reload; keyed on the address alone, the screen would go

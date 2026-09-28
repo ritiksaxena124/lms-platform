@@ -253,9 +253,12 @@ works. The endpoint that hands the address out is now the other half of that: on
 only for the two accounts a standing class is about and only while its window is open
 (ARCHITECTURE.md §14). A recording is watched through the same kind of door: a page's bytes go out
 only to a caller its own gate admits — a free preview, or a place in the course — and they go out
-as the piece the player asked for, because a `<video>` element seeks rather than downloads. What
-is left of the phase is both portals: a teacher attaching and playing a recording, a student's
-player, and the Join button that opens the room.
+as the piece the player asked for, because a `<video>` element seeks rather than downloads. The
+teacher's portal now carries both halves of it: a recording attached, named and played from the
+same panel that edits the page it belongs to, and a class row that grows a Join button inside the
+window its list already published, opening the room in a frame rather than a link
+(ARCHITECTURE.md §15). What is left of the phase is the student's side of the same two doors — a
+player on a lesson page, and the room when their own class is open.
 What is left of Phases 5–10 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and
