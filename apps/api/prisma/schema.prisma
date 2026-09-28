@@ -561,3 +561,59 @@ model RefreshToken {
   @@index([userId, isActive, expiresAt], map: "ix_refresh_token_user_active")
   @@map("refresh_token")
 }
+
+/// The copy half of one notification.
+///
+/// Phase 6 split a message in two and this table holds one half: the words an operator may
+/// reword without a deploy. The layout is not here — a row of HTML would be an unreviewed,
+/// untested document that every mail client renders differently, and Outlook reads markup with
+/// Word's engine, so the primitives in `modules/notifications` own the tables and inline styles
+/// instead (§6). An `href` is not here either: where a button goes is decided by the code that
+/// owns the thing the message is about, and a link an operator can point anywhere is a second
+/// door around every page the portals authenticate.
+///
+/// `{slot}` names are the contract between the two halves. The copy asks for a value by name and
+/// the caller supplies it; nothing here evaluates, branches or loops, so a row cannot ask for
+/// something the renderer would have to work out.
+///
+/// `eventCode` is unique across every row rather than across the standing ones, which is the
+/// identity half of the split this schema uses elsewhere: a code names a send decision in the
+/// code, and two rows answering to one code would leave a caller unable to say which one a
+/// reader received. A reword is therefore an update to the standing row, and the history of what
+/// a message once said belongs to Phase 7's action log rather than to retired rows.
+///
+/// The renderer refuses a filled sentence whose slot the payload cannot answer, so a typo in
+/// here shows up as a notification that was not written rather than as a reader being handed
+/// "Your class is on {when}".
+model EmailTemplate {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// The send decision this copy belongs to, from the list in `@lms/shared`. A lookup row would
+  /// have been the convention, and it is the wrong one: nothing outside this codebase adds a
+  /// value to it, and a value with no code that reaches it is a row that cannot be true.
+  eventCode String @unique @map("event_code")
+
+  /// The line a reader sees before opening anything. Kept as a column rather than built from the
+  /// heading, because a mailbox lists them side by side and an operator needs both.
+  subject String
+  heading String
+
+  /// The body, one sentence per element, in order. Postgres arrays keep that order without a
+  /// position column a caller could write twice, and a list of sentences is what lets an operator
+  /// reword the middle of a message without retyping the ends of it.
+  bodyLines String[] @default([]) @map("body_lines")
+
+  /// Null means this event sends no button — a notice, not a request. The label only: the
+  /// destination it would lead to is the caller's, and a row holding both would be a row holding
+  /// an address.
+  ctaLabel String? @map("cta_label")
+
+  /// A deactivated row means the event stopped being worth sending. The renderer is given the
+  /// standing row by the caller, so this flag is read where the decision is made rather than
+  /// assumed here.
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@map("email_template")
+}
