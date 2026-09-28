@@ -37,8 +37,13 @@ inside that course — or a stranger taking the one trial the teacher allows —
 next 30 days as minutes to ask for (`/courses/[id]/book`, `/api/v1/bookings/slots`). The ask waits
 in the teacher's `/requests` queue as `pending` until it is confirmed or refused, and nothing is a
 class until that answer. Both sides then read the same rows in their own clock: `/classes` for the
-teacher, `/my-classes` for the student, who can also leave. Live video, the action log, the ops
-portal and coupons are still ahead.
+teacher, `/my-classes` for the student, who can also leave. And a booked minute is now a class
+worth being in: a teacher's confirm gives it a room on the video provider behind the port, and
+both portals show a Join button only inside the window that room opens in — the address is asked
+for at the moment of use and appears in a frame, never a link. A lesson page carries the same
+kind of door for the recording attached to it: the response that sent the text names the file and
+its size, and the bytes themselves go out only to a reader the catalog admits, piece by piece so
+the player can seek. The action log, the ops portal, email and coupons are still ahead.
 See [Phase plan](#phases).
 
 ---
@@ -166,7 +171,7 @@ and the student's:
 | `bun run dev:teacher` | Next.js teacher portal.                                                  |
 | `bun run dev:student` | Next.js student portal — the public catalog.                             |
 | `bun run dev:ui`      | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
-| `bun run test`        | All test suites (Vitest, per workspace package).                         |
+| `bun run test`        | All test suites (Vitest, one package at a time — see ARCHITECTURE §17).  |
 | `bun run format`      | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
 | `bun run release`     | Cut a tagged GitHub release: verify, tag, push, publish.                 |
 
@@ -174,18 +179,18 @@ and the student's:
 
 A release is a phase boundary, not a deploy. `main` carries work in flight; a tag says
 "this commit passed the gate", and the tag is what a demo, a hand-off or a rollback points
-at. Versions track the phase table below — Phase 4 closed at `v0.4.0`, and `v0.5.0` will be
-Phase 5.
+at. Versions track the phase table below — Phase 4 closed at `v0.4.0` and Phase 5 at `v0.5.0`;
+`v0.6.0` will be Phase 6.
 
 ```
-bun run release v0.5.0 --title="Phase 5: live classes and recordings"
-bun run release v0.5.0 --notes="What a person gets at this tag."   # instead of generated notes
-bun run release v0.5.0 --dry-run
+bun run release v0.6.0 --title="Phase 6: email behind the SMTP port"
+bun run release v0.6.0 --notes="What a person gets at this tag."   # instead of generated notes
+bun run release v0.6.0 --dry-run
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main` and a tag that
 already exists on origin; runs `bun run verify` and stops if it is not green; then writes an
-**annotated** tag (the message is the title, so `git show v0.5.0` explains the decision),
+**annotated** tag (the message is the title, so `git show v0.6.0` explains the decision),
 pushes `main` and the tag, and opens the GitHub release with `gh`. Nothing is pushed unless
 the gate passed first, and `--skip-verify` exists only for a tag that is being moved after a
 mistake — a tag with no gate behind it is a label rather than a release.
@@ -257,7 +262,7 @@ decision was made, and what was deliberately left out.
 | 2     | Auth, accounts, roles, teacher profile                                    | **Done**    |
 | 3     | Courses, lessons, enrollment                                              | **Done**    |
 | 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
-| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | In progress |
+| 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | **Done**    |
 | 6     | Email notifications behind the SMTP port                                  | Not started |
 | 7     | Action log — who did what, to what, in which part of the app              | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above             | Not started |
@@ -268,25 +273,26 @@ decision was made, and what was deliberately left out.
 
 Phase 4 is closed: the availability rules, the slot grid and the booking lifecycle are shipped
 and tested (ARCHITECTURE.md §13 and §14), and both portals show them — the teacher's week,
-request queue and class list, the student's booking page and own calendar. Phase 5 has begun
-underneath that, one brick at a time: the storage port is real, a lesson can name the bytes of
-a recording, and a teacher can attach one to a page of their own — the route decides it is their
-page before it reads a byte of the body (ARCHITECTURE.md §6 and §10). The video port is real as
-of the same phase: a Jitsi room address built from a name the API mints, with `none` still an
-adapter rather than an `if` in every route. A teacher's yes now gives that class its own room
-name — minted from a uuid, written beside the status, stored and never sent — and every class
-list carries the window its door opens in, so a screen can draw a Join button and say when it
-works. The endpoint that hands the address out is now the other half of that: one POST, answered
-only for the two accounts a standing class is about and only while its window is open
-(ARCHITECTURE.md §14). A recording is watched through the same kind of door: a page's bytes go out
-only to a caller its own gate admits — a free preview, or a place in the course — and they go out
-as the piece the player asked for, because a `<video>` element seeks rather than downloads. The
-teacher's portal now carries both halves of it: a recording attached, named and played from the
-same panel that edits the page it belongs to, and a class row that grows a Join button inside the
-window its list already published, opening the room in a frame rather than a link
-(ARCHITECTURE.md §15). What is left of the phase is the student's side of the same two doors — a
-player on a lesson page, and the room when their own class is open.
-What is left of Phases 5–12 is the ordered backlog: a
+request queue and class list, the student's booking page and own calendar. Phase 5 is closed on
+top of it, one brick at a time. The storage port is real: bytes are filed with no URL of their
+own, a lesson names the recording that stands behind it, and a replacement retires the previous
+row rather than deleting it (ARCHITECTURE.md §6 and §10). The video port is real too — a room
+address built from a name the API mints, with `none` still an adapter rather than an `if` in
+every route. A teacher's yes now gives that class its own room name, minted from a uuid, written
+beside the status, stored and never sent, and every class list carries the window its door opens
+in, so a screen can draw a Join button and say when it works (ARCHITECTURE.md §14). The endpoint
+that hands the address out is the other half of that: one POST, answered only for the two accounts
+a standing class is about and only while its window is open. A recording is watched through the
+same kind of door: a page's bytes go out only to a caller its own gate admits — a free preview, or
+a place in the course — and they go out as the piece the player asked for, because a `<video>`
+element seeks rather than downloads (ARCHITECTURE.md §11 and §14). Both portals now stand on those
+two doors. The teacher's carries a recording attached, named and played from the same panel that
+edits the page it belongs to, and a class row that grows a Join button inside the window its list
+already published. The student's lesson page offers the recording its own response named — the
+size printed before a byte is asked for — and `/my-classes` opens the room for the class that is
+happening now, in the student's clock like every other time on that screen (ARCHITECTURE.md §15).
+Neither portal puts a room address in a link, in a list, or anywhere a browser keeps it.
+What is left of Phases 6–12 is the ordered backlog: a
 live class needs a booked slot to attach to, which is why booking came first, the action log
 wants every kind of write to exist before it fixes what a record looks like, and
 coupons land last among the things a student touches, because a discount only means something

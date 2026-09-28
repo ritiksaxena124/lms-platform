@@ -489,7 +489,10 @@ no writes, and — but for the routes below — no session either.
   answer the one `404` — and then streams the standing `LessonAsset` with its range honoured (§6).
   It is a route rather than a link on the page because a guessable URL for these bytes would be a
   second door around every gate on this shelf, which is also why no response here carries the
-  store's key.
+  store's key. The page route answers for it, though: `video` on a readable page is
+  `{ displayName, bytes }` or `null`, read off the standing `LessonAsset` row rather than a `stat`
+  of the file, because a screen has to be able to say whether a lesson was filmed — and how big it
+  is — before it asks for a byte of it.
 - **Each outline row carries two flags, because they answer two questions.** `isFreePreview` is
   the teacher's statement about the page — true whether or not anybody is signed in, and worth a
   badge. `isReadable` is about the reader: it says the page route will hand _this_ caller the
@@ -834,14 +837,17 @@ offered at, and everything else about the hour happens somewhere else.
   still held a called-off class vanishes from the week it happened in.
 - **A door shows only when the list says there is one to open.** A class row renders its `live`
   window as words rather than as a button before the window and a refusal after it, and the
-  screen's clock re-reads itself on an interval so a teacher who opened the page at 08:00 finds
+  screen's clock re-reads itself on an interval so a person who opened the page at 08:00 finds
   Join waiting at 09:25 without a reload. Pressing it asks the room route for the address and puts
   that answer in an `<iframe>` with `referrerPolicy="no-referrer"`, never in a link: a `<video>`-
   shaped `<a>` would leave the room's only lock in the history, the status line and the referrer
   header of the site it just opened, and a browser prefetches some of those on hover. Leaving takes
-  the frame back out of the document. On a `VIDEO_PROVIDER=none` deployment every row arrives with
-  `live: null` and no screen in the portal mentions a room, which is the same answer §6 gives and
-  the reason the branch is a missing prop rather than a disabled button.
+  the frame back out of the document. Both portals draw it from the one rule their list already
+  carries, and the student's two leaving buttons stay worded apart: **Leave the room** closes the
+  frame, **Leave this class** cancels the booking, and a screen that gave both the same words would
+  let one press read as the other. On a `VIDEO_PROVIDER=none` deployment every row arrives with
+  `live: null` and no screen in either portal mentions a room, which is the same answer §6 gives
+  and the reason the branch is a missing prop rather than a disabled button.
 - **A recording is fetched, not pointed at.** The portal's transport has three shapes over one
   refresh-and-replay loop — `apiJson` for an object, `apiForm` for a file, `apiBytes` for bytes
   back — because a `<video src>` cannot carry the bearer token that authorizes the bytes behind it,
@@ -851,11 +857,19 @@ offered at, and everything else about the hour happens somewhere else.
   rather than a delete and an upload, because the API's retire-and-file is one decision and a
   half-way failure would leave a page with no recording at all. A refusal about the file lands as
   field-keyed text under the control that caused it while the standing row keeps its name and size;
-  any other refusal is a toast, because the file was fine.
-- **A session change re-reads what the session decided.** The outline keys its request on the
-  course, a retry counter and the session's state, so signing in re-fetches the same address and
-  the locked rows become links without a reload; keyed on the address alone, the screen would go
-  on showing a stranger's outline to a student who has just taken a place in it.
+  any other refusal is a toast, because the file was fine. The student's player is the same fetch
+  with one thing decided earlier: the response that carried the page's text also named its file and
+  said how long it is, so the screen prints the name and `2.0 MB` and offers Play without asking a
+  second question of the API — a student on a phone connection does not download a lesson to find
+  out whether the lesson was filmed, and a page with no recording draws no player at all.
+- **A session change re-reads what the session decided.** The outline and a lesson page each key
+  their request on the reader as much as on the address — the outline on the course, a retry counter
+  and the session's state, the page on its course and lesson likewise — because the catalog answers
+  the same URL differently depending on who sends it, and the browser sends the cookie whether or
+  not the portal has worked that out yet. So signing in re-fetches the same address and the locked
+  rows become links without a reload, and a page that 404'd for a stranger paints for the student
+  who holds a place in it. Keyed on the address alone, both screens would go on showing a
+  stranger's answer to somebody who has just become a member.
 - **A settled read is written through the functional updater.** The roster arrives in a
   microtask and the component keeps `{key, roster}` as one value, so the write is
   `setSettled(current => current?.key === key ? current : {key, roster})` — one expression that
@@ -1005,14 +1019,15 @@ validation are exercised as shipped rather than as mocked; data isolation is a t
 rolled back per test. Migrations are applied to `lms_test` automatically, and the Prisma CLI
 is only spawned when a migration is genuinely missing.
 
-**Every package's tests run at once, so a suite cannot also ask for every core.** The API holds
-at four forks (§16's Prisma pool) and each portal at two threads, and a portal's tests wait
-fifteen seconds rather than vitest's five. Those caps are the same decision written down twice:
-`bun run --filter '*' test` runs the packages concurrently, so an uncapped portal suite asking for
-eleven workers on a twelve-core box slows every `userEvent` wait on the machine, and a form test
-that finishes in three seconds alone starts failing at fifteen. A timeout in the gate then says
-nothing about the component under it. The numbers were set by running the gate until it stopped
-being wrong, not by a theory about core counts.
+**The packages test one at a time, and a suite still does not get to ask for every core.**
+`bun run test` runs each package's own suite in order and stops at the first failure, because five
+vitest processes sharing one box stopped being a gate: the teacher's 245 tests finish in 75 seconds
+alone and were timing single `userEvent` waits past fifteen seconds inside the parallel run, with a
+different set of files failing every time — which is a gate measuring the machine, not the code.
+Ordering is the cheapest cap there is, so the per-suite caps stay as well: the API holds at four
+forks (§16's Prisma pool), the UI kit and both portals at two threads each, and a component test
+waits fifteen seconds rather than vitest's five. The numbers were set by running the gate until it
+stopped being wrong, not by a theory about core counts.
 
 A phase is not "done" when the code compiles. It is done when the tests pass, the browser
 behaviour has been checked by hand, and the next phase has been approved.
