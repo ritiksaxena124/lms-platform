@@ -245,6 +245,7 @@ describe('the door of a live class', () => {
     await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
@@ -399,6 +400,7 @@ describe('the door on a deployment with no live video', () => {
     await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 

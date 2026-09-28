@@ -15,6 +15,7 @@ import {
   CANCELLABLE_BOOKING_STATUSES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
+  MAIL_EVENT_CODES,
   SLOT_DENIAL_CODES,
   SLOT_ENTITLEMENT_CODES,
   expandWindows,
@@ -33,6 +34,7 @@ import {
 
 import { AvailabilityRepository } from '../availability/availability.repository';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
+import { MailQueue } from '../notifications/mail-queue.service';
 import { ReferenceService } from '../../reference/reference.service';
 import { VIDEO, type Video } from '../../providers/video/video.port';
 import type { BookableCourseRow, BookingRequestRow, BookingRow } from './bookings.repository';
@@ -240,6 +242,7 @@ export class BookingsService {
     private readonly rules: AvailabilityRepository,
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
+    private readonly mail: MailQueue,
     @Inject(VIDEO) private readonly video: Video,
   ) {}
 
@@ -347,6 +350,10 @@ export class BookingsService {
         BOOKING_STATUS_CODES.PENDING,
       ),
       blockingStatusValueIds: await this.statusIds(BLOCKING_BOOKING_STATUSES),
+      // Filed by the insert, not by this method afterwards: a request the transaction rolled back
+      // must not have a teacher told about it. Which of the two `requested` roads this was — a new
+      // ask or a replay of the same one — is settled down there, and only the new one reaches this.
+      notify: (tx, row) => this.mail.aboutBooking(tx, MAIL_EVENT_CODES.BOOKING_REQUESTED, row),
     });
 
     if (result.outcome === 'held') throw takenMinute();
@@ -394,6 +401,9 @@ export class BookingsService {
           studentUserId,
           cancellableStatusValueIds: await this.statusIds(CANCELLABLE_BOOKING_STATUSES),
           cancelledStatusValueId,
+          // The teacher is the one who has to know: the minute they were holding is free again, and
+          // the queue decides who reads a `booking_cancelled` rather than this caller.
+          notify: (tx, row) => this.mail.aboutBooking(tx, MAIL_EVENT_CODES.BOOKING_CANCELLED, row),
         })
       : ({ outcome: 'missing' } as const);
 
@@ -477,6 +487,17 @@ export class BookingsService {
           answerStatusValueId,
           releaseHold: answer === 'reject',
           mintRoomName: answer === 'confirm' ? this.video.room(randomUUID())?.name : undefined,
+          // One of the two answers, chosen by the same `answer` that chose the status. A confirm
+          // filed as a refusal is not a bug in the copy but in this line, and it is the line that
+          // decides what a student is told about their own class.
+          notify: (tx, row) =>
+            this.mail.aboutBooking(
+              tx,
+              answer === 'confirm'
+                ? MAIL_EVENT_CODES.BOOKING_CONFIRMED
+                : MAIL_EVENT_CODES.BOOKING_REFUSED,
+              row,
+            ),
         })
       : ({ outcome: 'missing' } as const);
 

@@ -199,6 +199,7 @@ describe('a confirmed class and the room it happens in', () => {
     await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
@@ -358,6 +359,7 @@ describe('a deployment with no live video', () => {
     await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 

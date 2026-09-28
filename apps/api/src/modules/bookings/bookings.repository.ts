@@ -57,6 +57,35 @@ export type BookingRequestRow = Prisma.BookingGetPayload<{
   select: typeof BOOKING_REQUEST_SELECT;
 }>;
 
+/** A written row with *both* parties on it, which is what the three status writes and the one
+ * insert answer to: a class is news for a person, and the person has to be read in the same
+ * statement that decided the news.
+ *
+ * The zones are the reason this is a select of its own rather than a widening of `BOOKING_SELECT`.
+ * A read needs one name for a screen; a write needs two names and two clocks, because the instant a
+ * class starts is a different minute in each of them and the letter is written in the reader's.
+ * Nothing here goes on the wire — `toBooking` has never heard of any of it. */
+const BOOKING_WRITE_SELECT = {
+  ...BOOKING_SELECT,
+  student: { select: { id: true, fullName: true, timezone: true } },
+  teacher: { select: { id: true, fullName: true, timezone: true } },
+} as const satisfies Prisma.BookingSelect;
+
+export type BookingNewsRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_WRITE_SELECT }>;
+
+/** The one seam a write hands its news through, and the reason it is a parameter rather than a
+ * dependency of this class: which event a row *is* is a decision about vocabulary and belongs to the
+ * service, while *when* it is filed belongs here, next to the statement that moved the row.
+ *
+ * It is called with the transaction still open, so the news and the write commit together or not at
+ * all; and it is called only on the road where the row changed, never on a replay — a second press
+ * of the same button is the same request, and a teacher told twice about it stops believing the
+ * queue. */
+export type BookingNotifier = (
+  tx: Prisma.TransactionClient,
+  row: BookingNewsRow,
+) => Promise<unknown>;
+
 /** The four facts the join gate needs, and the one column no list of this table ever carries.
  *
  * `BOOKING_SELECT` says whether a class has a room; this says what its address is built from, for
@@ -79,6 +108,10 @@ export type BookingRoomRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_R
  * student pressed a button and there is a class with their name on that minute, which is the same
  * answer to give either way. `held` is the minute belonging to somebody else's class, or to this
  * student's other course, and the caller turns it into a conflict on the field they typed.
+ *
+ * Which of the two `requested` roads a caller arrived on is deliberately invisible here, and it is
+ * also the one thing a notification cannot be blind to — so the split is settled where it is made,
+ * at the insert, and the notifier is never reached by a replay.
  */
 export type SlotRequestResult = { outcome: 'requested'; booking: BookingRow } | { outcome: 'held' };
 
@@ -88,7 +121,9 @@ export type SlotRequestResult = { outcome: 'requested'; booking: BookingRow } | 
  *
  * `done` is written for two roads that arrive at the same place: the row this write just changed,
  * and the row that already said what the caller wanted it to say. Both answer with the class as it
- * now reads, which is the whole difference between a retry and an error.
+ * now reads, which is the whole difference between a retry and an error. Only the first of them
+ * files news — the second is the same answer given twice, and a person told twice about one
+ * confirmation starts wondering which of the two was real.
  *
  * `not-standing` is a class whose state has moved past the one the caller could act on — taught,
  * missed, refused, left to expire, or answered the other way already; `changed` is the rarer
@@ -113,6 +148,11 @@ export type AnswerOutcome =
  *
  * Ownership is in every `where` clause rather than checked afterwards, the rule every repository
  * here runs on.
+ *
+ * The three writes that change a class — the insert, the status swap, the expiry sweep — each take a
+ * `notify` and call it inside their own transaction. That is the outbox rule (ARCHITECTURE §6) in
+ * one sentence: the news is filed by the write that made it, so a class that rolled back cannot have
+ * a letter about it waiting to send.
  */
 @Injectable()
 export class BookingsRepository {
@@ -194,6 +234,7 @@ export class BookingsRepository {
     typeValueId: string;
     pendingStatusValueId: string;
     blockingStatusValueIds: string[];
+    notify?: BookingNotifier;
   }): Promise<SlotRequestResult> {
     const endsAt = new Date(args.startsAt.getTime() + args.durationMinutes * MS_PER_MINUTE);
 
@@ -210,6 +251,7 @@ export class BookingsRepository {
         },
         select: BOOKING_SELECT,
       });
+      // Their own standing request, so nothing happened that the first press did not already report.
       if (own) return { outcome: 'requested', booking: own };
 
       if (await this.overlapWithin(tx, args, endsAt)) return { outcome: 'held' };
@@ -226,8 +268,9 @@ export class BookingsRepository {
             durationMinutes: args.durationMinutes,
             slotHeldAt: args.startsAt,
           },
-          select: BOOKING_SELECT,
+          select: BOOKING_WRITE_SELECT,
         });
+        await args.notify?.(tx, created);
         return { outcome: 'requested', booking: created };
       } catch (error) {
         // Somebody took the minute in the gap this transaction could not cover — an older row
@@ -365,35 +408,56 @@ export class BookingsRepository {
   }
 
   /**
-   * End every request that has run out, and hand back the minutes it was holding. Returns how
-   * many rows the sweep changed.
+   * End every request that has run out, hand back the minutes it was holding, and tell the students
+   * whose requests they were. Returns how many rows the sweep changed.
    *
    * Two clocks, because they ask different questions. `olderThan` is a teacher's silence read as
    * the answer it is, whatever the class time; `at` is a class minute that arrived without a yes,
    * however recently the student asked. Either one on its own is enough to end the request, and a
    * week of nightly classes swept on age alone would hold seven minutes nobody is standing in.
    *
-   * One `updateMany` rather than a read-and-swap per row, because there is no caller here to give
-   * an outcome to: whoever wanted the decision has already gone. The pending status in the `where`
-   * is what makes the sweep safe to run twice and safe to run in two places at once — an expired
-   * row is no longer pending, so a second pass finds nothing, and a row that some newer request
-   * has just been given the hold to cannot be taken back by an older sweep arriving late.
+   * Row by row rather than in one `updateMany`, and the notifier is why: a bulk update comes back
+   * with a count, and a count cannot be addressed. A letter has to go to the student who asked for
+   * *that* minute, so the sweep has to learn which rows it moved, not merely how many — and it can
+   * only learn that by asking for each row's own after-image inside the transaction that files the
+   * news about it.
+   *
+   * What makes it safe to run twice, and in two places at once, is unchanged: the pending status is
+   * in every row's own `where`, so an expired row matches nothing on a second pass, and a minute a
+   * newer request has just been given the hold to cannot be taken back by an older sweep arriving
+   * late.
    */
   async expirePending(args: {
     pendingStatusValueId: string;
     expiredStatusValueId: string;
     olderThan: Date;
     at: Date;
+    notify?: BookingNotifier;
   }): Promise<number> {
-    const { count } = await this.prisma.booking.updateMany({
+    const standing = await this.prisma.booking.findMany({
       where: {
         isActive: true,
         statusValueId: args.pendingStatusValueId,
         OR: [{ createdAt: { lte: args.olderThan } }, { startsAt: { lte: args.at } }],
       },
-      data: { statusValueId: args.expiredStatusValueId, slotHeldAt: null },
+      select: { id: true },
     });
-    return count;
+
+    let expired = 0;
+    for (const { id } of standing) {
+      const moved = await this.prisma.$transaction(async (tx) => {
+        const [after] = await tx.booking.updateManyAndReturn({
+          where: { id, isActive: true, statusValueId: args.pendingStatusValueId },
+          data: { statusValueId: args.expiredStatusValueId, slotHeldAt: null },
+          select: BOOKING_WRITE_SELECT,
+        });
+        if (!after) return false;
+        await args.notify?.(tx, after);
+        return true;
+      });
+      if (moved) expired += 1;
+    }
+    return expired;
   }
 
   /**
@@ -414,6 +478,7 @@ export class BookingsRepository {
     studentUserId: string;
     cancellableStatusValueIds: string[];
     cancelledStatusValueId: string;
+    notify?: BookingNotifier;
   }): Promise<AnswerOutcome> {
     return this.swapOwnedStatus({
       bookingId: args.bookingId,
@@ -421,6 +486,7 @@ export class BookingsRepository {
       fromStatusValueIds: args.cancellableStatusValueIds,
       toStatusValueId: args.cancelledStatusValueId,
       releaseHold: true,
+      notify: args.notify,
     });
   }
 
@@ -441,6 +507,7 @@ export class BookingsRepository {
      * the same statement as the status, because a confirmed class whose room arrived in a second
      * write is a class with a missing half whenever that second write fails. */
     mintRoomName?: string;
+    notify?: BookingNotifier;
   }): Promise<AnswerOutcome> {
     return this.swapOwnedStatus({
       bookingId: args.bookingId,
@@ -449,6 +516,7 @@ export class BookingsRepository {
       toStatusValueId: args.answerStatusValueId,
       releaseHold: args.releaseHold,
       mintRoomName: args.mintRoomName,
+      notify: args.notify,
     });
   }
 
@@ -463,6 +531,10 @@ export class BookingsRepository {
    *
    * Releasing the hold and setting the status are one statement for the same reason: a row that
    * says cancelled while still holding a minute keeps a class off a calendar nobody is using.
+   *
+   * The read and the swap run in one transaction, which is not needed for the swap's honesty and is
+   * entirely needed for the notifier's: the news about a change has to be filed while the change is
+   * still uncommitted, so a write that rolls back cannot leave a letter about it behind.
    */
   private async swapOwnedStatus(args: {
     bookingId: string;
@@ -471,30 +543,37 @@ export class BookingsRepository {
     toStatusValueId: string;
     releaseHold: boolean;
     mintRoomName?: string;
+    notify?: BookingNotifier;
   }): Promise<AnswerOutcome> {
-    const row = await this.prisma.booking.findFirst({
-      where: { id: args.bookingId, ...args.owner, isActive: true },
-      select: BOOKING_SELECT,
-    });
-    if (!row) return { outcome: 'missing' };
-    if (row.statusValueId === args.toStatusValueId) return { outcome: 'done', booking: row };
-    if (!args.fromStatusValueIds.includes(row.statusValueId)) return { outcome: 'not-standing' };
+    return this.prisma.$transaction(async (tx) => {
+      const row = await tx.booking.findFirst({
+        where: { id: args.bookingId, ...args.owner, isActive: true },
+        select: BOOKING_WRITE_SELECT,
+      });
+      if (!row) return { outcome: 'missing' };
+      if (row.statusValueId === args.toStatusValueId) return { outcome: 'done', booking: row };
+      if (!args.fromStatusValueIds.includes(row.statusValueId)) return { outcome: 'not-standing' };
 
-    const [after] = await this.prisma.booking.updateManyAndReturn({
-      where: {
-        id: args.bookingId,
-        ...args.owner,
-        isActive: true,
-        statusValueId: row.statusValueId,
-      },
-      data: {
-        statusValueId: args.toStatusValueId,
-        ...(args.releaseHold ? { slotHeldAt: null } : {}),
-        ...(args.mintRoomName ? { roomName: args.mintRoomName } : {}),
-      },
-      select: BOOKING_SELECT,
-    });
+      const [after] = await tx.booking.updateManyAndReturn({
+        where: {
+          id: args.bookingId,
+          ...args.owner,
+          isActive: true,
+          statusValueId: row.statusValueId,
+        },
+        data: {
+          statusValueId: args.toStatusValueId,
+          ...(args.releaseHold ? { slotHeldAt: null } : {}),
+          ...(args.mintRoomName ? { roomName: args.mintRoomName } : {}),
+        },
+        select: BOOKING_WRITE_SELECT,
+      });
 
-    return after ? { outcome: 'done', booking: after } : { outcome: 'changed' };
+      // `changed` is the loser of the race, and a message about a class this write did not change is
+      // exactly the lie the outcome exists to prevent. So the notifier is reached by one road only.
+      if (!after) return { outcome: 'changed' };
+      await args.notify?.(tx, after);
+      return { outcome: 'done', booking: after };
+    });
   }
 }

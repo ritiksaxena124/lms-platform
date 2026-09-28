@@ -1,9 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { BOOKING_STATUS_CODES, LKP_TYPE_CODES, PENDING_REQUEST_HOURS } from '@lms/shared';
+import {
+  BOOKING_STATUS_CODES,
+  LKP_TYPE_CODES,
+  MAIL_EVENT_CODES,
+  PENDING_REQUEST_HOURS,
+} from '@lms/shared';
 
 import { AppLogger } from '../../common/logging/app-logger.service';
 import { ReferenceService } from '../../reference/reference.service';
+import { MailQueue } from '../notifications/mail-queue.service';
 import { BookingsRepository } from './bookings.repository';
 
 const MS_PER_HOUR = 60 * 60 * 1000;
@@ -37,6 +43,7 @@ export class BookingExpiryService {
   constructor(
     private readonly bookings: BookingsRepository,
     private readonly reference: ReferenceService,
+    private readonly mail: MailQueue,
   ) {}
 
   /**
@@ -81,6 +88,10 @@ export class BookingExpiryService {
       expiredStatusValueId,
       olderThan: new Date(now.getTime() - PENDING_REQUEST_HOURS * MS_PER_HOUR),
       at: now,
+      // The one send decision with nobody pressing a button for it, which is exactly why it needs
+      // one: a student who was promised an answer has to be told the answer was silence. Filed per
+      // row the sweep actually ended — see `BookingsRepository.expirePending`.
+      notify: (tx, row) => this.mail.aboutBooking(tx, MAIL_EVENT_CODES.BOOKING_EXPIRED, row),
     });
   }
 }

@@ -236,6 +236,7 @@ describe('the open class times a student is offered', () => {
     await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.course.deleteMany({ where: { teacherUserId: { in: userIds } } });
     await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
     await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });

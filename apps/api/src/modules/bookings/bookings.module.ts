@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { AvailabilityModule } from '../availability/availability.module';
 import { EnrollmentsModule } from '../enrollments/enrollments.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { VideoModule } from '../../providers/video/video.module';
 import { BookingExpiryService } from './booking-expiry.service';
 import { BookingsController } from './bookings.controller';
@@ -26,9 +27,14 @@ import { BookingsService } from './bookings.service';
  * `VideoModule` is where a confirmed class gets its room. The booking module asks the port for a
  * name and never learns where the bridge lives, which is the difference between a booking table
  * that stores a URL and one that stores what a booking actually owns (§6).
+ *
+ * `NotificationsModule` is where this module's five outcomes are filed as news — asked about,
+ * confirmed, refused, left to expire, and given back by the student. The repository calls the queue
+ * inside the same transaction as the write, so this module owns the decision that a thing happened
+ * and the queue owns who hears about it (§6).
  */
 @Module({
-  imports: [AvailabilityModule, EnrollmentsModule, VideoModule],
+  imports: [AvailabilityModule, EnrollmentsModule, NotificationsModule, VideoModule],
   controllers: [BookingsController],
   providers: [BookingsService, BookingsRepository, BookingExpiryService],
 })

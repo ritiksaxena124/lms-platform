@@ -148,6 +148,7 @@ afterAll(async () => {
   await prisma.enrollment.deleteMany({ where: { courseId: { in: courseIds } } });
   await prisma.availabilityRule.deleteMany({ where: { teacherUserId: { in: userIds } } });
   await prisma.course.deleteMany({ where: { id: { in: courseIds } } });
+  await prisma.mailOutbox.deleteMany({ where: { recipientUserId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   await prisma.$disconnect();
 });
