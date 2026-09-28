@@ -125,6 +125,11 @@ model User {
   /// already queued.
   mailOutbox MailOutbox[] @relation("mail_outbox_recipient")
 
+  /// The actions this account took. Kept alive by the same restriction as everything else that
+  /// records what happened to whom: a person with a record of their decisions cannot be deleted out
+  /// from under it, and a log whose actor resolves to nobody no longer answers "who".
+  actions ActionLog[] @relation("action_log_actor")
+
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
 }
@@ -698,4 +703,90 @@ model MailOutbox {
 
   @@index([status, nextAttemptAt], map: "ix_mail_outbox_due")
   @@map("mail_outbox")
+}
+
+/// The record of a decision: who took it, which row it landed on, and which part of the app it was
+/// taken in. Written inside the same transaction as the change it describes, and never edited
+/// afterwards.
+///
+/// This is a ledger rather than a table with a state. §2 asks major tables for `isActive` and
+/// `updatedAt` and excludes them from ledgers, and this is the table that finds out what that costs:
+/// a column saying when a row was edited is an invitation to edit a row that records what somebody
+/// else did, and a flag saying it was retired is a record that somebody decided to stop believing it.
+/// A correction here is a second row, with the first staying as the record that it was believed.
+/// `createdAt` is the only timestamp on it.
+///
+/// The four columns carrying vocabulary — `actionCode`, `sectionCode`, `actorKind`, `targetTable` —
+/// are text rather than foreign keys or lookup rows, for the reason 6c gave for `event_code`: they
+/// name lists only this codebase writes, an operator adding a value to one could only ever produce a
+/// row no code is capable of recording, and a reference that could fail would let a bookkeeping
+/// problem destroy the business write it was only there to record. The lists live in `@lms/shared`,
+/// which the recorder reads before this table ever sees a value.
+///
+/// Nothing here is unique, which is the same property the queue has: the same action legitimately
+/// happens twice to one row, and a key that refused the second one would be a log saying something
+/// untrue about the first. That a replay which changed nothing records nothing is the recorder's rule
+/// about when this table is written to, not a constraint on what a row may hold.
+model ActionLog {
+  id String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+
+  /// The decision this row records. Two rows with the same code are two times it happened.
+  actionCode String @map("action_code")
+
+  /// Which part of the app the action came from — a fact about the action rather than about the
+  /// request, so a value a caller could fill in never becomes the answer to "where did this happen".
+  sectionCode String @map("section_code")
+
+  /// `user` or `system`. `system` is a scheduler's own work — today, one sweep letting an unanswered
+  /// request go — and the column exists so a reader never has to infer it from an empty actor.
+  actorKind String @map("actor_kind")
+
+  /// Who took the decision. Null exactly when `actorKind` is `system`, which is a rule the recorder
+  /// keeps rather than a CHECK, because Prisma drops a hand-written constraint the next time it
+  /// generates a migration for anything else.
+  ///
+  /// A person's id and never their email, for the reason the queue holds no address: this row outlives
+  /// the correction they make to their account, and the deletion they ask for.
+  actorUserId String? @map("actor_user_id") @db.Uuid
+
+  /// The role as it stood when the action was taken. Their current role is readable from `users`;
+  /// this answers a different question — what was this person allowed to do at the time — and a
+  /// promotion must not rewrite what they did before it.
+  actorRoleCode String? @map("actor_role_code")
+
+  /// The table the action was about, named as `@@map` names it, so a reader of a log row goes
+  /// straight to the table the words name. Paired with `targetId`, and no foreign key behind either.
+  targetTable String @map("target_table")
+
+  /// The row itself: a uuid with no promise that it still resolves, because the point of keeping the
+  /// record is that a course archived next year was published in September.
+  targetId String @map("target_id") @db.Uuid
+
+  /// The decided facts: a status from one code to another, a price before and after, which way a
+  /// switch went. Named answers, read by name — `jsonb` keeps no key order, so nothing may be read by
+  /// position.
+  ///
+  /// Not a copy of the row the action touched: a snapshot carries personal data forward past both the
+  /// correction and the deletion, and grows with every column the table gains. Nor a place for a
+  /// secret — the room name a confirming teacher mints changes a booking and must not appear here, and
+  /// that is the recorder's rule rather than a constraint this table could state, because to Postgres
+  /// a room name is a string like any other.
+  detail Json @default("{}")
+
+  /// The request that caused this, which is what links a row to the access-log line of the same name.
+  /// Null for a scheduler's write, which has no request to point back to.
+  requestId String? @map("request_id")
+
+  /// When the action happened. `now()` is a transaction's own clock rather than a statement's, so two
+  /// rows written by one transaction carry the same instant — which is the honest answer, because the
+  /// decisions behind them were taken as one.
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  actor User? @relation("action_log_actor", fields: [actorUserId], references: [id], onDelete: Restrict)
+
+  @@index([actorUserId, createdAt], map: "ix_action_log_actor")
+  @@index([targetTable, targetId, createdAt], map: "ix_action_log_target")
+  @@index([actionCode, createdAt], map: "ix_action_log_action")
+  @@index([createdAt], map: "ix_action_log_recent")
+  @@map("action_log")
 }
