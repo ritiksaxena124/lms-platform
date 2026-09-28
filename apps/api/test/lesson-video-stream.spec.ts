@@ -151,6 +151,32 @@ function refusal(address: string, lessonId: string, token?: string): request.Tes
   return token ? call.set('Authorization', `Bearer ${token}`) : call;
 }
 
+/** The page itself, read as the JSON a student's lesson screen gets before it asks for a
+ * single byte of a recording. What it needs from that first read is one fact it cannot infer:
+ * whether there is anything to play. Guessing it by trying the video route would work on a
+ * page with a file and on no other, which is the definition of a bug you ship. */
+function page(address: string, lessonId: string, token?: string): request.Test {
+  const call = request(app.getHttpServer()).get(
+    `/api/v1/catalog/courses/${address}/lessons/${lessonId}`,
+  );
+  return token ? call.set('Authorization', `Bearer ${token}`) : call;
+}
+
+/** A second take of the same lesson, which retires the first rather than overwriting it. */
+async function attach(
+  moduleId: string,
+  lessonId: string,
+  token: string,
+  filename: string,
+  bytes: Buffer,
+): Promise<void> {
+  await request(app.getHttpServer())
+    .post(`/api/v1/modules/${moduleId}/lessons/${lessonId}/asset`)
+    .set('Authorization', `Bearer ${token}`)
+    .attach('file', bytes, { filename, contentType: 'video/mp4' })
+    .expect(201);
+}
+
 /** The parts of a failure that must match between "not yours" and "never there". */
 function failureShape(body: Record<string, unknown>) {
   return { statusCode: body.statusCode, code: body.code, message: body.message };
@@ -455,5 +481,96 @@ describe('a lesson recording, streamed', () => {
 
     const next = await video(courseId, lessonId).expect(200);
     expect(next.body).toEqual(VIDEO);
+  });
+
+  it('names the recording on the page, so a player knows to exist', async () => {
+    const courseId = await createCourse(teacher);
+    const moduleId = await createModule(courseId, teacher);
+    const lessonId = await lessonWithVideo(moduleId, teacher);
+    await markFree(moduleId, lessonId, teacher);
+
+    const res = await page(courseId, lessonId).expect(200);
+
+    // Two facts a student's page can put in words — what the file is called and how big it is —
+    // and nothing else. `toEqual` is the assertion here precisely because it refuses extra keys:
+    // a length on the wire is fine, a route's private fields on it are not.
+    expect(res.body.lesson.video).toEqual({ displayName: 'the-pie.mp4', bytes: TOTAL });
+  });
+
+  it('says the same thing to a student holding a place as to a page left open', async () => {
+    const courseId = await createCourse(teacher);
+    const moduleId = await createModule(courseId, teacher);
+    const lessonId = await lessonWithVideo(moduleId, teacher);
+    await takePlace(student, courseId);
+
+    const res = await page(courseId, lessonId, student).expect(200);
+
+    // The paid case, which is the case the recording exists for. A field that only appeared on a
+    // free preview would tell the enrolled student's page there was nothing to play on the
+    // lesson they enrolled to watch.
+    expect(res.body.lesson.video).toEqual({ displayName: 'the-pie.mp4', bytes: TOTAL });
+  });
+
+  it('says there is nothing to play on a page nobody recorded', async () => {
+    const courseId = await createCourse(teacher);
+    const moduleId = await createModule(courseId, teacher);
+    const lesson = await request(app.getHttpServer())
+      .post(`/api/v1/modules/${moduleId}/lessons`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .send({ title: 'Just the words', body: 'No film for this one.' })
+      .expect(201);
+    const lessonId = lesson.body.lesson.id as string;
+    await request(app.getHttpServer())
+      .post(`/api/v1/modules/${moduleId}/lessons/${lessonId}/publish`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .expect(200);
+    await markFree(moduleId, lessonId, teacher);
+
+    const res = await page(courseId, lessonId).expect(200);
+
+    // `null` rather than a missing key: a page that cannot tell the two apart will draw a
+    // disabled player, and the whole point of the field is that absence is the common case.
+    expect(res.body.lesson.video).toBeNull();
+  });
+
+  it('names the take that stands, not the one it retired', async () => {
+    const courseId = await createCourse(teacher);
+    const moduleId = await createModule(courseId, teacher);
+    const lessonId = await lessonWithVideo(moduleId, teacher);
+    await markFree(moduleId, lessonId, teacher);
+
+    const retake = patterned(TOTAL + 400);
+    await attach(moduleId, lessonId, teacher, 'the-pie-take-two.mp4', retake);
+
+    const res = await page(courseId, lessonId).expect(200);
+    expect(res.body.lesson.video).toEqual({
+      displayName: 'the-pie-take-two.mp4',
+      bytes: TOTAL + 400,
+    });
+
+    const rows = await prisma.lessonAsset.findMany({
+      where: { lessonId },
+      select: { displayName: true, isActive: true },
+    });
+    // The page shows one recording because the lesson *has* one standing, not because the older
+    // row was thrown away — the retired take keeps its bytes and its place in the file's history.
+    expect(rows).toHaveLength(2);
+    expect(rows.filter((row) => row.isActive).map((row) => row.displayName)).toEqual([
+      'the-pie-take-two.mp4',
+    ]);
+  });
+
+  it('keeps the store key out of the page that names the recording', async () => {
+    const courseId = await createCourse(teacher);
+    const moduleId = await createModule(courseId, teacher);
+    const lessonId = await lessonWithVideo(moduleId, teacher);
+    await markFree(moduleId, lessonId, teacher);
+
+    const row = await prisma.lessonAsset.findFirstOrThrow({ where: { lessonId, isActive: true } });
+    const res = await page(courseId, lessonId).expect(200);
+
+    // Metadata is not a location. The key is the only thing that could be turned into a path,
+    // and the path a browser needs is already in the page's own route.
+    expect(JSON.stringify(res.body)).not.toContain(row.storedKey);
   });
 });

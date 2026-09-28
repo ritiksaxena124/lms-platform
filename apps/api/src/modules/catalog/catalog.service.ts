@@ -8,6 +8,7 @@ import {
   type CatalogCourseDetail,
   type CatalogLessonModule,
   type CatalogLessonPage,
+  type CatalogLessonVideo,
   type CatalogListInput,
   type CatalogModule,
   type CourseChoice,
@@ -118,7 +119,10 @@ function toDetail(course: CourseSyllabusRow, holdsPlace: boolean): CatalogCourse
  * from a link has no syllabus on screen and needs both to go back. The block is listed with
  * its position rather than its whole syllabus: enough to say where the reader is and how to
  * get back to the outline, not enough to rebuild it. */
-function toLessonPage(lesson: ReadableLessonRow): CatalogLessonPage {
+function toLessonPage(
+  lesson: ReadableLessonRow,
+  video: CatalogLessonVideo | null,
+): CatalogLessonPage {
   const module: CatalogLessonModule = {
     id: lesson.module.id,
     title: lesson.module.title,
@@ -135,6 +139,9 @@ function toLessonPage(lesson: ReadableLessonRow): CatalogLessonPage {
     // is not one the teacher marked free, and a badge that said so would be a lie about
     // which door the reader came through.
     isFreePreview: lesson.isFreePreview,
+    // The teacher's own statement about the file, and nothing about where it lives: the caller
+    // that wants the bytes asks this page's route for them, which is the only address they have.
+    video,
     updatedAt: lesson.updatedAt.toISOString(),
     module,
     course: {
@@ -233,7 +240,16 @@ export class CatalogService {
    * and says nothing about whether the page exists.
    */
   async lesson(address: string, lessonId: string, viewerId?: string): Promise<CatalogLessonPage> {
-    return toLessonPage(await this.readableLesson(address, lessonId, viewerId));
+    const lesson = await this.readableLesson(address, lessonId, viewerId);
+    const video = await this.catalog.standingVideo(lesson.id);
+
+    // Asked for after the door, by the same query the streaming route uses, so the two can never
+    // disagree about which take stands on this lesson. The name and the length are all that leave;
+    // the key stays on the row, which is where a client has never been able to reach it.
+    return toLessonPage(
+      lesson,
+      video ? { displayName: video.displayName, bytes: video.bytes } : null,
+    );
   }
 
   /**

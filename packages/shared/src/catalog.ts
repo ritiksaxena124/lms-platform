@@ -103,6 +103,15 @@ export interface CatalogLessonCourse {
   title: string;
 }
 
+/** What a page says about the file standing on it: enough for a reader to decide to draw a
+ * player, and nothing that could be turned into an address. The bytes themselves have no URL on
+ * this platform (ARCHITECTURE §6), so the two facts a screen can honestly use are what the
+ * teacher called the file and how long it is. */
+export interface CatalogLessonVideo {
+  displayName: string;
+  bytes: number;
+}
+
 /** One page of a published course, opened. Two things let that happen: the teacher marked
  * it free to read, or the caller holds a place in the course. `isFreePreview` says which —
  * and it is `false` for a page that opened because of who asked, because the flag is the
@@ -114,6 +123,11 @@ export interface CatalogLessonPage {
   estimatedMinutes: number | null;
   position: number;
   isFreePreview: boolean;
+  /** The recording, or `null` because there is none — which is the ordinary case, not an error.
+   * It is on the page rather than left to be discovered by trying the video route because a
+   * screen has to know whether to offer a player *before* it asks for a file: a student told
+   * "no recording" by a 404 cannot tell that from a door that closed on them mid-read. */
+  video: CatalogLessonVideo | null;
   updatedAt: string;
   module: CatalogLessonModule;
   course: CatalogLessonCourse;

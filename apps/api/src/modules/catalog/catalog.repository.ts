@@ -98,8 +98,11 @@ export type ReadableLessonRow = Prisma.LessonGetPayload<{
 }>;
 
 /** What the route that plays a recording needs from it: what the bytes are, how long they are,
- * and the key that stays behind the door. */
+ * and the key that stays behind the door. The name travels too, because the page that carries the
+ * file says what it is called — the two reads want the same row, and a lesson keeps exactly one
+ * standing, so the rule about which one is written once. */
 const STANDING_VIDEO_SELECT = {
+  displayName: true,
   contentType: true,
   bytes: true,
   storedKey: true,
