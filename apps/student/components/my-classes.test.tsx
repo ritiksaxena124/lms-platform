@@ -7,7 +7,11 @@ import type { AuthUser, Booking } from '@lms/shared';
 import { ApiError } from '@/lib/api';
 import { MyClasses } from './my-classes';
 
-const bookings = vi.hoisted(() => ({ myBookings: vi.fn(), leaveClass: vi.fn() }));
+const bookings = vi.hoisted(() => ({
+  myBookings: vi.fn(),
+  leaveClass: vi.fn(),
+  joinRoom: vi.fn(),
+}));
 const session = vi.hoisted(() => ({
   value: { status: 'signed-in' as string, user: null as AuthUser | null },
 }));
@@ -226,6 +230,135 @@ describe('MyClasses', () => {
     await screen.findByText(/No classes yet/);
     await user.click(screen.getByRole('button', { name: /browse the shelf/i }));
     expect(push).toHaveBeenCalledWith('/');
+  });
+
+  /**
+   * The door on a class that is happening.
+   *
+   * The list says a door exists and when it opens; only the student's own press turns that into an
+   * address. A Jitsi room's name is its whole lock, so the tests below care as much about the room
+   * never becoming a link as about it appearing at all.
+   */
+  describe('the live class door', () => {
+    const ROOM_URL = 'https://meet.jit.si/LMS-6a27-9f31';
+    /** Inside the door's hours: 09:35 on Monday 28 Sept in Kolkata. */
+    const WHILE_OPEN = '2026-09-28T04:05:00.000Z';
+
+    function row(): HTMLElement {
+      const link = screen.getByRole('link', { name: 'Fractions, the slow way' });
+      const line = link.closest('li');
+      if (!line) throw new Error('the class has no row');
+      return line as HTMLElement;
+    }
+
+    beforeEach(() => {
+      bookings.joinRoom.mockReset().mockResolvedValue(ROOM_URL);
+    });
+
+    it('says when the door opens rather than offering one that is shut', async () => {
+      // The page was opened before the window; a Join button here could only ever be refused, and
+      // the refusal would arrive as a surprise instead of as the sentence already on the row.
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Fractions, the slow way');
+      expect(screen.getByText('Door opens Mon 28 Sept, 09:25')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
+      expect(bookings.joinRoom).not.toHaveBeenCalled();
+    });
+
+    it('offers the door once it stands open', async () => {
+      vi.setSystemTime(new Date(WHILE_OPEN));
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Fractions, the slow way');
+      expect(screen.getByRole('button', { name: 'Join' })).toBeInTheDocument();
+    });
+
+    it('stops offering a door the grace has gone past', async () => {
+      // A quarter of an hour after the last minute. The class is in "Earlier" now, and the door
+      // says so too rather than offering a room nobody is in.
+      vi.setSystemTime(new Date('2026-09-28T05:30:00.000Z'));
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Fractions, the slow way');
+      expect(screen.getByText('Door closed')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: 'Join' })).toBeNull();
+    });
+
+    it('draws no door at all on a class that has none', async () => {
+      // A request the teacher has not answered has no room yet, and a called-off one never will.
+      bookings.myBookings.mockResolvedValue([booking({ status: 'pending' })]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Fractions, the slow way');
+      expect(row().textContent).not.toMatch(/door/i);
+    });
+
+    it('asks for the address when Join is pressed, and opens it in the page rather than linking to it', async () => {
+      const user = userEvent.setup();
+      vi.setSystemTime(new Date(WHILE_OPEN));
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await user.click(await screen.findByRole('button', { name: 'Join' }));
+
+      await waitFor(() => expect(bookings.joinRoom).toHaveBeenCalledWith('6a27'));
+      const room = await waitFor(() => {
+        const found = document.querySelector('iframe');
+        if (!found) throw new Error('the room did not open');
+        return found;
+      });
+      expect(room.getAttribute('src')).toBe(ROOM_URL);
+      // An anchor would leave the address in history, in a status line on hover and in whatever a
+      // prefetcher decides to fetch — three copies of a key that was meant to be used once.
+      expect(document.querySelector(`a[href="${ROOM_URL}"]`)).toBeNull();
+    });
+
+    it('takes the address back off the page when the student leaves the room', async () => {
+      const user = userEvent.setup();
+      vi.setSystemTime(new Date(WHILE_OPEN));
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await user.click(await screen.findByRole('button', { name: 'Join' }));
+      await waitFor(() => expect(document.querySelector('iframe')).not.toBeNull());
+
+      await user.click(screen.getByRole('button', { name: 'Leave the room' }));
+
+      await waitFor(() => expect(document.querySelector('iframe')).toBeNull());
+      expect(screen.queryByText(ROOM_URL)).toBeNull();
+    });
+
+    it('says the reason a door stayed shut, and puts no room on the page', async () => {
+      const user = userEvent.setup();
+      vi.setSystemTime(new Date(WHILE_OPEN));
+      bookings.joinRoom.mockRejectedValue(
+        refused('CONFLICT', 'This class is not standing, so there is no room to join.'),
+      );
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await user.click(await screen.findByRole('button', { name: 'Join' }));
+
+      // The class may have been called off while this page sat open. The API's sentence is the one
+      // worth reading, and a silent button would send the student to press it again.
+      await waitFor(() =>
+        expect(notify.error).toHaveBeenCalledWith(
+          'This class is not standing, so there is no room to join.',
+        ),
+      );
+      expect(document.querySelector('iframe')).toBeNull();
+    });
   });
 });
 

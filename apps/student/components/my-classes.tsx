@@ -23,11 +23,12 @@ import {
   CANCELLABLE_BOOKING_STATUSES,
   type Booking,
   type BookingStatusCode,
+  type LiveClassDoor,
 } from '@lms/shared';
 
 import { ApiError, describeFailure } from '@/lib/api';
-import { leaveClass, myBookings } from '@/lib/bookings';
-import { formatClassWindow } from '@/lib/dates';
+import { joinRoom, leaveClass, myBookings } from '@/lib/bookings';
+import { formatClassWindow, formatInstant } from '@/lib/dates';
 
 import { useSession } from './session-provider';
 
@@ -88,8 +89,23 @@ export function MyClasses() {
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
   const [stale, setStale] = useState<string | null>(null);
+  /**
+   * The door's clock, which moves while the page stands open.
+   *
+   * "Coming up" and "Earlier" are decided once, against the read that drew them — a class does not
+   * walk itself between the two halves while a student is looking at it. A door is the opposite
+   * question: it opens five minutes before the class and shuts a quarter of an hour after it, and
+   * a page that froze that answer when it loaded would show a student who had come to attend the
+   * lesson the very thing they cannot afford to miss.
+   */
+  const [doorTick, setDoorTick] = useState(0);
 
   const key = String(attempt);
+
+  useEffect(() => {
+    const every = setInterval(() => setDoorTick(Date.now()), 30_000);
+    return () => clearInterval(every);
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -143,7 +159,9 @@ export function MyClasses() {
   }
 
   if (failed) {
-    return <ErrorState title="Your classes did not load" message={failed.message} onRetry={reload} />;
+    return (
+      <ErrorState title="Your classes did not load" message={failed.message} onRetry={reload} />
+    );
   }
 
   if (settled === null) {
@@ -171,6 +189,7 @@ export function MyClasses() {
     );
   }
 
+  const doorClock = Math.max(settled.now, doorTick);
   const upcoming = classes.filter((booking) => isComingUp(booking, settled.now));
   const earlier = classes.filter((booking) => !isComingUp(booking, settled.now));
 
@@ -194,6 +213,7 @@ export function MyClasses() {
         heading="Coming up"
         bookings={upcoming}
         timezone={user?.timezone}
+        clock={doorClock}
         leaving={leaving}
         onLeave={leave}
         empty="Nothing is waiting to happen. A course you are inside has a calendar to book from."
@@ -203,6 +223,7 @@ export function MyClasses() {
           heading="Earlier"
           bookings={earlier}
           timezone={user?.timezone}
+          clock={doorClock}
           leaving={leaving}
           onLeave={leave}
           empty="Nothing has been and gone."
@@ -229,6 +250,7 @@ function Section({
   heading,
   bookings,
   timezone,
+  clock,
   leaving,
   onLeave,
   empty,
@@ -236,6 +258,8 @@ function Section({
   heading: string;
   bookings: Booking[];
   timezone: string | null | undefined;
+  /** The instant the doors are judged against, which moves while the page stands open. */
+  clock: number;
   leaving: string | null;
   onLeave: (booking: Booking) => Promise<void>;
   empty: string;
@@ -295,10 +319,105 @@ function Section({
                   </Button>
                 ) : null}
               </div>
+
+              {booking.live ? (
+                <ClassDoor
+                  booking={booking}
+                  door={booking.live}
+                  timezone={timezone}
+                  clock={clock}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The door on one class: when it opens, that it stands open now, and the room behind it.
+ *
+ * The window arrives with the list; the address never does. A Jitsi room has no password — its name
+ * is the whole lock — so the key is asked for at the moment of use, handed to the one student whose
+ * name is on the row, and opened inside this page rather than linked to. An `<a>` is a history
+ * entry, a hover status line and a prefetch, three copies of an address meant to be used once
+ * (ARCHITECTURE §6, §14). "Leave the room" takes it back off the page, and is worded apart from
+ * "Leave this class" above it because the two do very different things.
+ */
+function ClassDoor({
+  booking,
+  door,
+  timezone,
+  clock,
+}: {
+  booking: Booking;
+  door: LiveClassDoor;
+  timezone: string | null | undefined;
+  clock: number;
+}) {
+  const [room, setRoom] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  const opensAt = Date.parse(door.opensAt);
+  const closesAt = Date.parse(door.closesAt);
+
+  // A room belongs to the class it was asked for. A row that re-rendered onto another booking would
+  // otherwise leave that address on screen under somebody else's course.
+  useEffect(() => {
+    setRoom(null);
+  }, [booking.id]);
+
+  if (clock < opensAt) {
+    return (
+      <p className="text-[0.8125rem] text-ink-faint">
+        {`Door opens ${formatInstant(door.opensAt, timezone)}`}
+      </p>
+    );
+  }
+
+  if (clock > closesAt) {
+    return <p className="text-[0.8125rem] text-ink-faint">Door closed</p>;
+  }
+
+  async function join(): Promise<void> {
+    setAsking(true);
+    try {
+      setRoom(await joinRoom(booking.id));
+    } catch (error) {
+      // The API's reason is the sentence worth reading — the class may have been called off while
+      // this page sat open, and a generic fault would send the student back to press it again.
+      notify.error(describeFailure(error));
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <Button type="button" size="sm" loading={asking} onClick={() => void join()}>
+          Join
+        </Button>
+        {room ? (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setRoom(null)}>
+            Leave the room
+          </Button>
+        ) : null}
+      </div>
+
+      {room ? (
+        <iframe
+          src={room}
+          // No referrer: the address should not reach the video host's logs as a page URL either.
+          referrerPolicy="no-referrer"
+          allow="camera; microphone; fullscreen; display-capture; autoplay"
+          allowFullScreen
+          title={`Live class: ${booking.course.title}`}
+          className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
+        />
+      ) : null}
+    </>
   );
 }

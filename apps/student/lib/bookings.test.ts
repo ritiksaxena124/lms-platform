@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { API_ERROR_CODES, SLOT_DENIAL_CODES, SLOT_ENTITLEMENT_CODES } from '@lms/shared';
 
 import { setAccessToken } from './api';
-import { bookSlot, leaveClass, myBookings, openSlotsFor } from './bookings';
+import { bookSlot, joinRoom, leaveClass, myBookings, openSlotsFor } from './bookings';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -44,7 +44,12 @@ beforeEach(() => {
   setAccessToken(null);
   fetchMock = vi.fn().mockResolvedValue(
     jsonResponse({
-      course: { id: 'b2a1', slug: 'fractions-the-slow-way', title: 'Fractions', demoBookingsEnabled: true },
+      course: {
+        id: 'b2a1',
+        slug: 'fractions-the-slow-way',
+        title: 'Fractions',
+        demoBookingsEnabled: true,
+      },
       teacher: { id: 't1', timezone: 'Asia/Kolkata' },
       entitlement: SLOT_ENTITLEMENT_CODES.ENROLLED,
       denial: null,
@@ -195,6 +200,54 @@ describe('leaveClass', () => {
 
     await expect(leaveClass('6a27')).rejects.toMatchObject({
       code: API_ERROR_CODES.CONFLICT,
+    });
+  });
+});
+
+/**
+ * The one call on this portal that answers with an address.
+ *
+ * A Jitsi room has no password: its name is the whole lock, which is why it is asked for at the
+ * moment of use rather than carried on a list a browser caches, prefetches and keeps in history —
+ * and why nothing here logs it, stores it or builds a link out of it.
+ */
+describe('joinRoom', () => {
+  it('asks the class for its room, with the session that owns the booking', async () => {
+    setAccessToken('at-9');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ room: { url: 'https://meet.jit.si/LMS-6a27' } }),
+    );
+
+    await expect(joinRoom('6a27')).resolves.toBe('https://meet.jit.si/LMS-6a27');
+
+    expect(callAt(0).url).toBe(`${BASE_URL}/api/v1/bookings/6a27/room`);
+    expect(callAt(0).init.method).toBe('POST');
+    expect((callAt(0).init.headers as Record<string, string>).authorization).toBe('Bearer at-9');
+  });
+
+  it('keeps an id from the URL inside the path it belongs to', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ room: { url: 'https://meet.jit.si/x' } }));
+
+    await joinRoom('../../admin');
+
+    expect(callAt(0).url).toBe(`${BASE_URL}/api/v1/bookings/..%2F..%2Fadmin/room`);
+  });
+
+  it('carries back a door that is not open as the conflict the API called it', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          statusCode: 409,
+          code: API_ERROR_CODES.CONFLICT,
+          message: "This class's room is not open yet.",
+        },
+        409,
+      ),
+    );
+
+    await expect(joinRoom('6a27')).rejects.toMatchObject({
+      code: API_ERROR_CODES.CONFLICT,
+      message: "This class's room is not open yet.",
     });
   });
 });

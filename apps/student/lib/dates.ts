@@ -74,3 +74,15 @@ export function formatClassWindow(
   const zone = zoneFor(timeZone);
   return `${namedDay(startsAt, zone)}, ${clockFace(startsAt, zone)}–${clockFace(endsAt, zone)}`;
 }
+
+/**
+ * One minute, said the way a person reads an alarm: `Thu 1 Oct, 08:55`.
+ *
+ * The live class's window has two ends and this names the near one — "Door opens Thu 1 Oct,
+ * 08:55" is a sentence about when to arrive, and putting the other end in it would only invite a
+ * student to read the whole range as the time they must be present for.
+ */
+export function formatInstant(instant: string, timeZone?: string | null): string {
+  const zone = zoneFor(timeZone);
+  return `${namedDay(instant, zone)}, ${clockFace(instant, zone)}`;
+}

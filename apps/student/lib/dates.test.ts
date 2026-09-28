@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatClassWindow, formatDay } from './dates';
+import { formatClassWindow, formatDay, formatInstant } from './dates';
 
 /**
  * Days as the reader counts them.
@@ -56,5 +56,26 @@ describe('formatClassWindow', () => {
     expect(
       formatClassWindow('2026-10-01T03:30:00.000Z', '2026-10-01T04:15:00.000Z', 'Mars/Olympus'),
     ).toMatch(/^Wed|Thu 1 Oct, \d{2}:\d{2}–\d{2}:\d{2}$/);
+  });
+});
+
+/**
+ * One minute rather than a span, for the sentence "the door opens at".
+ *
+ * A live class has a window with two ends, and the thing a student needs from it is the near one:
+ * a range would say when the class stops, which is not a fact anybody sets an alarm for. Same
+ * words the teacher's list uses for the same instant, because the two ends of a lesson are looking
+ * for the same knock.
+ */
+describe('formatInstant', () => {
+  it('names the day and the face in the zone it was asked for', () => {
+    expect(formatInstant('2026-10-01T03:25:00.000Z', 'Asia/Kolkata')).toBe('Thu 1 Oct, 08:55');
+    expect(formatInstant('2026-10-01T03:25:00.000Z', 'Europe/London')).toBe('Thu 1 Oct, 04:25');
+  });
+
+  it('falls back to the readers own clock for a zone it cannot place', () => {
+    expect(formatInstant('2026-10-01T03:25:00.000Z', 'Mars/Olympus')).toMatch(
+      /^Wed|Thu 1 Oct, \d{2}:\d{2}$/,
+    );
   });
 });
