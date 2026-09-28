@@ -6,6 +6,8 @@ const BASE = {
   NODE_ENV: 'test',
   CORS_ORIGINS: 'http://teacher.localtest.me:3002',
   API_PUBLIC_URL: 'http://api.localtest.me:4000',
+  TEACHER_PORTAL_URL: 'http://teacher.localtest.me:3000',
+  STUDENT_PORTAL_URL: 'http://student.localtest.me:3001',
   DATABASE_URL: 'postgresql://lms:lms@localhost:5432/lms_test',
   JWT_SECRET: 'a'.repeat(64),
 };
@@ -41,6 +43,23 @@ describe('parseEnv', () => {
     expect(() => parseEnv({ ...BASE, CORS_ORIGINS: '  ,  ' })).toThrow(/CORS_ORIGINS/);
   });
 
+  it('takes the two portal origins a notification links back to', () => {
+    const env = parseEnv(BASE);
+    expect(env.TEACHER_PORTAL_URL).toBe('http://teacher.localtest.me:3000');
+    expect(env.STUDENT_PORTAL_URL).toBe('http://student.localtest.me:3001');
+  });
+
+  it('refuses to boot when it would have to guess where a button leads', () => {
+    // `API_PUBLIC_URL` is the API's own address, and a mail that linked to it would open a JSON
+    // error in front of a person expecting their class list. A default of `localhost` would boot
+    // happily and then send links nobody on the internet can open.
+    expect(() => parseEnv({ ...BASE, TEACHER_PORTAL_URL: '' })).toThrow(/TEACHER_PORTAL_URL/);
+    expect(() => parseEnv({ ...BASE, STUDENT_PORTAL_URL: '' })).toThrow(/STUDENT_PORTAL_URL/);
+    expect(() => parseEnv({ ...BASE, TEACHER_PORTAL_URL: 'teacher.localtest.me' })).toThrow(
+      /TEACHER_PORTAL_URL/,
+    );
+  });
+
   it('rejects a non-postgres database url with a readable message', () => {
     expect(() => parseEnv({ ...BASE, DATABASE_URL: 'mysql://x' })).toThrow(
       /DATABASE_URL must be a postgresql/,
@@ -69,6 +88,8 @@ describe('parseEnv', () => {
     expect(error).toMatch(/CORS_ORIGINS/);
     expect(error).toMatch(/API_PUBLIC_URL/);
     expect(error).toMatch(/DATABASE_URL/);
+    expect(error).toMatch(/TEACHER_PORTAL_URL/);
+    expect(error).toMatch(/STUDENT_PORTAL_URL/);
   });
 
   it('treats a blank value in an env file as unset', () => {

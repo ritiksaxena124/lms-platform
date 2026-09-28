@@ -14,6 +14,7 @@ import { BookingsModule } from './modules/bookings/bookings.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CourseModule } from './modules/course/course.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
+import { NotificationsModule } from './modules/notifications/notifications.module';
 import { TeacherModule } from './modules/teacher/teacher.module';
 import { StorageModule } from './providers/storage/storage.module';
 import { ReferenceModule } from './reference/reference.module';
@@ -31,6 +32,9 @@ import { ReferenceModule } from './reference/reference.module';
     EnrollmentsModule,
     AvailabilityModule,
     BookingsModule,
+    // The queue a send decision is filed in. Registered so the two modules above can hand their
+    // news to it; the sweep that reads it back out arrives with 6e.
+    NotificationsModule,
     // The port behind every uploaded byte, selected by `STORAGE_PROVIDER` (§6). Registered
     // before any route uses it, so the provider string is checked at boot rather than on the
     // first upload of a term.

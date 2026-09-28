@@ -22,6 +22,14 @@ const EnvSchema = z.object({
     }),
   API_PUBLIC_URL: z.url(),
 
+  /** Where a reader is sent. A notification's button is one of these origins plus a page inside it,
+   * and neither can be derived from `API_PUBLIC_URL`: the portals are served on their own hosts, and
+   * a link that opened the API would show a person a JSON error where their class list should be.
+   * Both are required rather than defaulted to `localhost`, because a box that boots with a guessed
+   * origin sends every message a link nobody can open (§6). */
+  TEACHER_PORTAL_URL: z.url(),
+  STUDENT_PORTAL_URL: z.url(),
+
   DATABASE_URL: z.string().refine((value) => value.startsWith('postgresql://'), {
     message: 'DATABASE_URL must be a postgresql:// connection string',
   }),
