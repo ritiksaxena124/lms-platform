@@ -3,6 +3,10 @@
   "compilerOptions": {
     "module": "commonjs",
     "moduleResolution": "node",
+    // The email primitives are React components server-rendered inside this process (Phase 6b),
+    // so JSX compiles the way the portals' does: no `React` import in every file, and the runtime
+    // is only ever reached during a render, never shipped to a mail client.
+    "jsx": "react-jsx",
     "outDir": "dist",
     "baseUrl": ".",
     "emitDecoratorMetadata": true,

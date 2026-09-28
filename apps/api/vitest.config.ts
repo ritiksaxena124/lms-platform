@@ -4,7 +4,7 @@ import { defineConfig } from 'vitest/config';
 export default defineConfig({
   test: {
     environment: 'node',
-    include: ['test/**/*.spec.ts', 'src/**/*.spec.ts'],
+    include: ['test/**/*.spec.ts', 'src/**/*.spec.ts', 'src/**/*.spec.tsx'],
     globalSetup: ['test/global-setup.ts'],
     testTimeout: 20_000,
     hookTimeout: 30_000,
@@ -21,7 +21,12 @@ export default defineConfig({
     swc.vite({
       jsc: {
         target: 'es2022',
-        parser: { syntax: 'typescript', decorators: true },
+        // The email primitives are `.tsx` components server-rendered in this process (Phase 6b), and
+        // specs here sit next to their sources, so both patterns have to parse. `tsx` costs one
+        // thing: a type assertion written as `<Foo>value` is no longer readable as TypeScript,
+        // because it is a JSX element. Nothing in this package is written that way, and `as` is the
+        // form the rest of the codebase already uses.
+        parser: { syntax: 'typescript', tsx: true, decorators: true },
         transform: { legacyDecorator: true, decoratorMetadata: true },
       },
       module: { type: 'es6' },
