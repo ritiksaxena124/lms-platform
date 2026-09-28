@@ -11,6 +11,7 @@ import { ACCOUNT_STATUS_CODES, API_ERROR_CODES } from '@lms/shared';
 import type { RoleCode } from '@lms/shared';
 import type { Request } from 'express';
 
+import { identifyInLogContext } from '../../common/logging/log-context';
 import { ACCESS_TOKENS, type AccessTokenPort } from './access-tokens.service';
 import { REQUIRED_ROLES } from './roles.decorator';
 import { IS_PUBLIC } from './public.decorator';
@@ -98,6 +99,11 @@ export class JwtAuthGuard implements CanActivate {
     }
 
     request.user = { id: user.id, role: user.role.code as RoleCode };
+    // The same answer, bound for everything the request goes on to do. `@CurrentUser` is how a
+    // handler learns who is asking; this is how a write several calls downstream can record it
+    // without every signature in the path being widened to carry it. Phase 7's recorder reads it,
+    // and the role it stores is this one — from the row, now — rather than the token's claim.
+    identifyInLogContext({ userId: user.id, userRole: user.role.code as RoleCode });
     return true;
   }
 }
