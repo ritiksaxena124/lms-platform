@@ -427,6 +427,43 @@ every row 6d files is due the moment it exists, and the pages are chosen oldest-
 one file each test dates its rows hours in the past and asks for a page no larger than the rows it
 filed, which is what lets the counts be exact rather than `toBeGreaterThanOrEqual`.
 
+### What a real mailbox answered (Phase 6, step 6f)
+
+The claim 6 still owed evidence for is the one a test double cannot make: that a letter this code
+writes arrives somewhere a person reads it. So the queue was run against a live SMTP endpoint — an
+Ethereal sandbox account, `smtp.ethereal.email:587` — on a dev API whose `SMTP_URL` and
+`MAIL_FROM` came in through the process environment, which is the same `parseEnv(process.env)`
+read a deployment answers through. Five rows were filed through the routes themselves rather than
+by writing to the table: two requests, a confirmation, a refusal and a place taken, the last three
+addressed to a student whose account was registered at a mailbox this side could read. The cron
+ran on its own `*/5` boundary and reported `Mail sweep: 5 sent, 0 waiting, 0 ended` with
+`reclaimed: 0, released: 0, unresolved: 0`; every row ended `sent`, `attempts = 1`, `sent_at` on
+that boundary.
+
+- **The letters were read back from the mailbox, not from the sender's log.** `api.ethereal.email`
+  has no DNS record on this network, so the vendor's own web viewer was unavailable; IMAP over
+  `imap.ethereal.email:993` returns the message the transport accepted — headers and both parts —
+  which is the stricter witness, since it is what a recipient's client sees rather than what
+  nodemailer reported about itself.
+- **Two clocks, one class instant.** One 09:30 UTC slot was `Tue, 29 Sept 2026 · 9:30 am GMT+0`
+  in the teacher's request and `Tue, 29 Sept 2026 · 3:00 pm GMT+5:30` in the same class's
+  confirmation to a student registered in `Asia/Kolkata`: 6d's `when` rule observed from outside
+  the code that wrote it.
+- **An empty scan is the finding worth recording.** Across the delivered bytes: no room address, no
+  `Authorization` value, no token, no connection string, and no host but the two portal origins the
+  deployment configured. §14's rule that a room lives on a page rather than in a message is
+  invisible when it holds and expensive when it does not, so it was checked as an absence.
+- **Ordinary punctuation costs nothing.** A subject carrying a comma arrives RFC 2047-encoded
+  (`=?UTF-8?Q?…?=`) and the body's em dash arrives as `=E2=80=94`, which is the character it names.
+  Both are the transport's encoding to get right; the copy in `EmailTemplate` keeps its commas.
+
+What the sandbox cannot prove is left unproven rather than written as verified: it accepts any
+recipient without checking a mailbox stands behind them, so a wrong `recipient_user_id` would have
+read `sent` here too; the retry curve, the reclaim and `NoMail`'s drop are shown against doubles in
+`mail-delivery.spec` and never against a host that refused twice; and one send through a vendor that
+wants nothing of a sandbox is not load evidence — §17's gate is what the code is checked against,
+and a provider's rate limits are a deployment's own first busy day to find.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API

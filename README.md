@@ -248,18 +248,18 @@ link carries an address.
 
 A release is a phase boundary, not a deploy. `main` carries work in flight; a tag says
 "this commit passed the gate", and the tag is what a demo, a hand-off or a rollback points
-at. Versions track the phase table below — Phase 4 closed at `v0.4.0` and Phase 5 at `v0.5.0`;
-`v0.6.0` will be Phase 6.
+at. Versions track the phase table below — Phase 5 closed at `v0.5.0` and Phase 6 at `v0.6.0`;
+`v0.7.0` will be Phase 7.
 
 ```
-bun run release v0.6.0 --title="Phase 6: email behind the SMTP port"
-bun run release v0.6.0 --notes="What a person gets at this tag."   # instead of generated notes
-bun run release v0.6.0 --dry-run
+bun run release v0.7.0 --title="Phase 7: the action log"
+bun run release v0.7.0 --notes="What a person gets at this tag."   # instead of generated notes
+bun run release v0.7.0 --dry-run
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main` and a tag that
 already exists on origin; runs `bun run verify` and stops if it is not green; then writes an
-**annotated** tag (the message is the title, so `git show v0.6.0` explains the decision),
+**annotated** tag (the message is the title, so `git show v0.7.0` explains the decision),
 pushes `main` and the tag, and opens the GitHub release with `gh`. Nothing is pushed unless
 the gate passed first, and `--skip-verify` exists only for a tag that is being moved after a
 mistake — a tag with no gate behind it is a label rather than a release.
@@ -340,7 +340,7 @@ decision was made, and what was deliberately left out.
 | 3     | Courses, lessons, enrollment                                              | **Done**    |
 | 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
 | 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | **Done**    |
-| 6     | Email notifications behind the SMTP port — queue sent, live inbox left    | In progress |
+| 6     | Email notifications behind the SMTP port — the queue reached an inbox     | **Done**    |
 | 7     | Action log — who did what, to what, in which part of the app              | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above             | Not started |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
@@ -350,8 +350,8 @@ decision was made, and what was deliberately left out.
 
 ### All twelve, in order
 
-The table is the index; this is what each one is for. Phases 0–5 are shipped, Phase 6 is under way
-with its transport, its renderer, its queue and the sweep that drains them, and 7–12 are the ordered
+The table is the index; this is what each one is for. Phases 0–6 are shipped, the last of them with
+its letters read back out of a mailbox that is not a test double, and 7–12 are the ordered
 backlog — each one sits where it does because of what it needs to exist before its shape stops
 moving.
 
@@ -377,8 +377,8 @@ moving.
   confirmed class and handed out only inside its window, and one recording per lesson that streams
   through the same gate as the page's text. Detailed below.
 - **Phase 6 — the news.** Email behind the SMTP port: the lifecycle of Phase 4's bookings said out
-  loud to the person it happened to. Transport, renderer, queue, send decisions and the sweep are in;
-  a real inbox is what is left.
+  loud to the person it happened to. Transport, renderer, queue, send decisions, the sweep and a
+  mailbox that received them are all in.
 - **Phase 7 — the action log.** Who did what, to what, and in which part of the app — an
   append-only record the API writes beside its own business writes. It waits until every kind of
   write exists, because a record's shape is only worth fixing once.
@@ -397,9 +397,9 @@ moving.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
   published from what the code already says rather than restated into a second copy that drifts.
 
-**Phases 0 through 5 are closed.** The first four are the ground the product stands on —
-ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 is the one that changed most
-recently, and it went one brick at a time:
+**Phases 0 through 6 are closed.** The first four are the ground the product stands on —
+ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 went one brick at a time, and so
+did the news phase after it:
 
 - **Storage.** Bytes are filed with no URL of their own; a lesson names the recording that stands
   behind it, and a replacement retires the previous row rather than deleting it
@@ -423,7 +423,7 @@ recently, and it went one brick at a time:
 
 Neither portal puts a room address in a link, in a list, or anywhere a browser keeps it.
 
-**Phase 6 has started.** It carries the lifecycle notifications and nothing else: the
+**Phase 6 is closed.** It carries the lifecycle notifications and nothing else: the
 teacher is told a minute has been asked for, both sides are told how it was answered, and a place
 taken or left is said out loud. Money stays where it is. Two decisions shape it. **The layout lives
 in code and the copy lives in the database** — a small set of email-safe React primitives renders
@@ -480,8 +480,8 @@ one reader.
 **Step 6d, the seven send decisions, is in.** A student asking for a minute, a teacher confirming or
 refusing it, a request left to expire, a class the student gave back, and a place in a course taken or
 left now each file one outbox row while the write that decided them is still open. The repository
-calls the queue and the service names the event, because *when* the news is filed is a fact about a
-transaction and only that transaction knows it, while *which* event a write is stays where the
+calls the queue and the service names the event, because _when_ the news is filed is a fact about a
+transaction and only that transaction knows it, while _which_ event a write is stays where the
 vocabulary lives. A replay files nothing — the second press of either button, the loser of a race, a
 refused conflict and a leave on a place already closed all answer with the row as it stands and say
 nothing new to anybody, and that rule is the reason the notifier is a parameter inside the write
@@ -518,6 +518,22 @@ delivery and never logged — a log line carries an event code and a row id — 
 live in one spec file, because a sweep is global and two files sweeping one queue take each other's
 rows (§6).
 
+**Step 6f, the live inbox, is in.** Five rows were filed through the routes themselves — two requests,
+a confirmation, a refusal and a place taken — against a dev API whose `SMTP_URL` named an Ethereal
+sandbox endpoint, and the cron ran on its own boundary rather than on a test's clock: `Mail sweep: 5
+sent, 0 waiting, 0 ended`, with every row `sent` and `attempts = 1`. The letters were then read back
+over IMAP, because `api.ethereal.email` has no DNS record on this network and the vendor's own viewer
+was unavailable — which turned out to be the stricter witness, since a mailbox returns what a
+recipient's client sees rather than what the sender said about itself. Two things about what arrived
+are worth writing down. The same class instant read `9:30 am GMT+0` in the teacher's copy and `3:00 pm
+GMT+5:30` in the student's, which is 6d's `when` rule observed from outside the code that formatted
+it; and a scan of the delivered bytes for a room address, an `Authorization` value, a token or a
+connection string finds none, with the only hosts named being the two portal origins the deployment
+configured. What a sandbox cannot prove stays unproven: it accepts any recipient whether or not a
+mailbox stands behind them, so a wrong address would have read `sent` here too, and the retry curve,
+the reclaim and `NoMail`'s drop are shown against doubles in a spec rather than against a host that
+refused twice.
+
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to
 exist before it fixes what a record looks like. Coupons land last among the things a student
@@ -536,7 +552,7 @@ what the website will point at.
 
 ## Environment variables
 
-`apps/api/.env.example` documents every variable. Five are worth knowing early:
+`apps/api/.env.example` documents every variable. Six are worth knowing early:
 
 - `JWT_SECRET` has **no default and no fallback** — sign-in is impossible without it, and a
   per-process random one would boot cleanly then log everyone out on the next restart.
@@ -548,6 +564,11 @@ what the website will point at.
   sends a message has no request, and a host header is a value somebody else chose. On a laptop,
   `http://teacher.localtest.me:3000` and `http://student.localtest.me:3001` are the honest answers;
   `localhost` in one of them produces mail whose links work only on the machine that sent it.
+- `SMTP_URL` is the whole of the mail switch, and `MAIL_FROM` is required beside it. Unset, the box has
+  no transport and the queue's rows end `dropped` with nothing asked; set to something that is not an
+  `smtp://` or `smtps://` endpoint, the boot stops rather than finding out at the first confirmation.
+  A sandbox endpoint is the honest way to watch a letter arrive on a laptop — Phase 6's step 6f read
+  its own mail back over IMAP for exactly that reason.
 - `PAYMENT_PROVIDER` defaults to `none` and is still unset work: money — with the coupon codes a
   teacher issues per course — is Phase 9, and the port exists so it costs no refactor when it
   lands. `VIDEO_PROVIDER` defaults to `none` too, and is a real configuration rather than a
