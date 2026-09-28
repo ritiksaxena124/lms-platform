@@ -2,16 +2,35 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { CatalogLessonPage } from '@lms/shared';
+import type { AuthUser, CatalogLessonPage } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { CourseLesson } from './course-lesson';
 
 const api = vi.hoisted(() => ({
   readLessonPage: vi.fn(),
+  lessonVideoBytes: vi.fn(),
+}));
+const session = vi.hoisted(() => ({
+  value: { status: 'signed-in' as string, user: null as AuthUser | null },
 }));
 
 vi.mock('@/lib/catalog', () => api);
+vi.mock('./session-provider', () => ({ useSession: () => session.value }));
+
+/** Whose page this is being read as. The catalog answers a different question to a member than to
+ * a stranger, so the screen has to know which one it is asking. */
+const ROHAN: AuthUser = {
+  id: 'u1',
+  email: 'student@example.test',
+  fullName: 'Rohan Mehta',
+  role: 'student',
+  status: 'active',
+  timezone: 'Asia/Kolkata',
+  emailVerifiedAt: null,
+  lastLoginAt: null,
+  createdAt: '2026-09-25T00:00:00.000Z',
+};
 
 function page(overrides: Partial<CatalogLessonPage> = {}): CatalogLessonPage {
   return {
@@ -21,6 +40,8 @@ function page(overrides: Partial<CatalogLessonPage> = {}): CatalogLessonPage {
     estimatedMinutes: 12,
     position: 2,
     isFreePreview: true,
+    // The ordinary case: most pages of a course are written rather than filmed.
+    video: null,
     updatedAt: '2026-09-25T00:00:00.000Z',
     module: { id: 'm1', title: 'Arithmetic progressions', position: 1 },
     course: {
@@ -38,7 +59,9 @@ const unreadable = () =>
   new ApiError({ statusCode: 404, code: 'NOT_FOUND', message: 'We cannot find that page.' });
 
 beforeEach(() => {
+  session.value = { status: 'signed-in', user: ROHAN };
   api.readLessonPage.mockReset().mockResolvedValue(page());
+  api.lessonVideoBytes.mockReset().mockResolvedValue(new Blob(['frame'], { type: 'video/mp4' }));
 });
 
 describe('CourseLesson', () => {
@@ -48,6 +71,44 @@ describe('CourseLesson', () => {
     await screen.findByRole('heading', { name: 'Sum of n terms' });
     expect(screen.getByText(/watch the middle vanish/i)).toBeInTheDocument();
     expect(screen.getByText('Free to read')).toBeInTheDocument();
+  });
+
+  it('offers the recording the page said it carries, and asks for no bytes yet', async () => {
+    api.readLessonPage.mockResolvedValue(
+      page({ video: { displayName: 'adding-halves.mp4', bytes: 1_048_576 } }),
+    );
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+    expect(await screen.findByRole('button', { name: 'Play' })).toBeInTheDocument();
+    expect(screen.getByText('adding-halves.mp4')).toBeInTheDocument();
+    expect(screen.getByText('1.0 MB')).toBeInTheDocument();
+    // The whole point of the page naming its own file: a student on a phone connection does not
+    // download a lesson to find out whether the lesson is there.
+    expect(api.lessonVideoBytes).not.toHaveBeenCalled();
+  });
+
+  it('puts the recording above the writing it belongs to', async () => {
+    api.readLessonPage.mockResolvedValue(
+      page({ video: { displayName: 'adding-halves.mp4', bytes: 1_048_576 } }),
+    );
+    const { container } = render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+    await screen.findByRole('button', { name: 'Play' });
+
+    const block = screen.getByRole('button', { name: 'Play' }).closest('section');
+    const prose = container.querySelector('[data-lesson-body]');
+    expect(block).not.toBeNull();
+    expect(prose).not.toBeNull();
+    // The video is the class and the text is what the teacher wrote around it. A page that put
+    // the recording under the prose would be a page nobody finds.
+    expect(block!.compareDocumentPosition(prose!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('draws no player for a page that carries no recording', async () => {
+    render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+    await screen.findByRole('heading', { name: 'Sum of n terms' });
+    expect(screen.queryByRole('button', { name: 'Play' })).not.toBeInTheDocument();
+    expect(screen.getByText(/watch the middle vanish/i)).toBeInTheDocument();
   });
 
   it('says nothing about enrolling to somebody reading as a member', async () => {
@@ -147,5 +208,42 @@ describe('CourseLesson', () => {
     render(<CourseLesson courseId="b2a1" lessonId="l2" />);
 
     expect(await screen.findByText(/loading this page/i)).toBeInTheDocument();
+  });
+
+  it('waits for the session before it asks who may open the page', async () => {
+    // The catalog answers this request differently depending on who sends it, and the browser
+    // sends the refresh cookie whether or not this portal has worked out who is logged in yet.
+    // So the answer the screen paints is only trustworthy once the boot read has landed.
+    session.value = { status: 'bootstrapping', user: null };
+    const { rerender } = render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+    expect(api.readLessonPage).not.toHaveBeenCalled();
+    expect(screen.getByText(/loading this page/i)).toBeInTheDocument();
+
+    session.value = { status: 'signed-in', user: ROHAN };
+    rerender(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+    await screen.findByRole('heading', { name: 'Sum of n terms' });
+    // One read, not one for the stranger and a second under it.
+    expect(api.readLessonPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not keep a stranger’s refusal under a student who has just signed in', async () => {
+    // The shared link that 404s for a visitor is the page a member was invited to read. A key
+    // that left the reader out would hold onto the first answer for the rest of the visit.
+    session.value = { status: 'signed-out', user: null };
+    api.readLessonPage.mockRejectedValueOnce(unreadable());
+    const { rerender } = render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+    await screen.findByText(/not here/i);
+    expect(api.readLessonPage).toHaveBeenCalledTimes(1);
+
+    session.value = { status: 'signed-in', user: ROHAN };
+    api.readLessonPage.mockResolvedValueOnce(page({ isFreePreview: false }));
+    rerender(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+    await screen.findByRole('heading', { name: 'Sum of n terms' });
+    expect(api.readLessonPage).toHaveBeenCalledTimes(2);
+    expect(screen.getByText(/you hold a place in this course/i)).toBeInTheDocument();
   });
 });

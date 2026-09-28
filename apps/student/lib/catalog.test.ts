@@ -2,7 +2,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { API_ERROR_CODES } from '@lms/shared';
 
-import { browseCatalog, catalogLevels, readCatalogCourse, readLessonPage } from './catalog';
+import {
+  browseCatalog,
+  catalogLevels,
+  lessonVideoBytes,
+  readCatalogCourse,
+  readLessonPage,
+} from './catalog';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -154,6 +160,49 @@ describe('readLessonPage', () => {
     await expect(readLessonPage('b2a1', 'l9')).rejects.toMatchObject({
       code: API_ERROR_CODES.NOT_FOUND,
     });
+  });
+});
+
+describe('lessonVideoBytes', () => {
+  /** A recording answers as a file; a refusal answers as the API's envelope. Both come from one
+   * route, which is why the mock carries both halves. */
+  function blobResponse(body: Uint8Array<ArrayBuffer>, status = 200) {
+    const blob = new Blob([body]);
+    return {
+      status,
+      ok: status < 400,
+      text: async () => '',
+      blob: async () => blob,
+    };
+  }
+
+  it('asks this page’s own route for its bytes, and hands back the file', async () => {
+    fetchMock.mockResolvedValueOnce(blobResponse(new Uint8Array([1, 2, 3])));
+
+    const bytes = await lessonVideoBytes('b2a1', 'l9');
+
+    // The address is built from the page's two ids, never from anything the recording says about
+    // itself: the API has no URL for a file, and this route is the only way to it.
+    expect(urlAt(0)).toBe(`${BASE_URL}/api/v1/catalog/courses/b2a1/lessons/l9/video`);
+    expect(bytes.size).toBe(3);
+  });
+
+  it('encodes both halves of the address, as the page read does', async () => {
+    fetchMock.mockResolvedValueOnce(blobResponse(new Uint8Array()));
+
+    await lessonVideoBytes('c 1', 'l/2');
+
+    expect(urlAt(0)).toBe(`${BASE_URL}/api/v1/catalog/courses/c%201/lessons/l%2F2/video`);
+  });
+
+  it('sends the session, because a page’s door is the recording’s door', async () => {
+    fetchMock.mockResolvedValueOnce(blobResponse(new Uint8Array()));
+
+    await lessonVideoBytes('b2a1', 'l9');
+
+    const call = fetchMock.mock.calls[0];
+    const init = (call?.[1] ?? {}) as RequestInit;
+    expect(init.credentials).toBe('include');
   });
 });
 

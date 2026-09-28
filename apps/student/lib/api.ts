@@ -97,11 +97,6 @@ function announceSessionLost(): void {
   for (const listener of [...sessionLostListeners]) listener();
 }
 
-interface RawResponse {
-  status: number;
-  payload: unknown;
-}
-
 interface SendOptions {
   /** The bearer token to offer, or `null` for none. */
   token: string | null;
@@ -116,8 +111,9 @@ async function send(
   method: string,
   body: unknown,
   options: SendOptions,
-): Promise<RawResponse> {
-  const headers: Record<string, string> = { accept: 'application/json' };
+  accept = 'application/json',
+): Promise<Response> {
+  const headers: Record<string, string> = { accept };
   if (body !== undefined) headers['content-type'] = 'application/json';
   // Absent rather than `Bearer null`: a call with no token is a stranger's call, and the
   // routes that read one treat a broken header as a refusal rather than an absence.
@@ -126,9 +122,8 @@ async function send(
   // Outside the `try` below: a missing configuration must not be reported as a network fault.
   const url = `${baseUrl()}${API_PREFIX}${path}`;
 
-  let response: Response;
   try {
-    response = await fetch(url, {
+    return await fetch(url, {
       method,
       headers,
       // Only a call that asked for the session sends cookies, so a shelf request cannot
@@ -143,8 +138,6 @@ async function send(
       message: 'The API is unreachable. Check your connection and try again.',
     });
   }
-
-  return { status: response.status, payload: await parseBody(response) };
 }
 
 /** A proxy page, an empty 204 and a truncated body all arrive here as `undefined`. */
@@ -166,13 +159,16 @@ function isEnvelope(payload: unknown): payload is ApiErrorBody {
   );
 }
 
-function toApiError(status: number, payload: unknown): ApiError {
+async function toApiError(response: Response): Promise<ApiError> {
+  const payload = await parseBody(response);
   const envelope = isEnvelope(payload) ? payload : undefined;
   return new ApiError({
-    statusCode: envelope?.statusCode ?? status,
+    statusCode: envelope?.statusCode ?? response.status,
     code: envelope?.code ?? 'UNEXPECTED_RESPONSE',
-    // Never the raw text: a gateway HTML page would become a wall of markup on screen.
-    message: envelope?.message ?? `The request did not succeed (${status}).`,
+    // Never the raw body: a gateway HTML page would become a wall of markup on screen. The byte
+    // routes answer a refusal with this same envelope, so reading it is what lets a player tell
+    // "no recording" from "not your page".
+    message: envelope?.message ?? `The request did not succeed (${response.status}).`,
     details: envelope?.details,
     requestId: envelope?.requestId ?? null,
   });
@@ -196,17 +192,27 @@ export interface ApiRequestOptions {
   reviveSession?: boolean;
 }
 
-async function requestJson<T>(
+/**
+ * Send, and if the answer is a dead session send once more with a revived one.
+ *
+ * `read` is the only thing that differs between the shapes a call can come back in, which is why
+ * it is a parameter rather than a second function: a JSON reply, a blob of a recording and a
+ * thrown envelope all need the same replay, and a second copy of this loop is how a refresh ends
+ * up half-implemented for the requests nobody thought about twice.
+ */
+async function request<T>(
   path: string,
   options: ApiRequestOptions,
   method: string,
+  read: (response: Response) => Promise<T>,
+  accept = 'application/json',
 ): Promise<T> {
   const withSession = options.withSession === true;
   const session: SendOptions = { token: withSession ? accessToken : null, cookies: withSession };
-  const first = await send(path, method, options.body, session);
-  if (first.status < 400) return first.payload as T;
+  const first = await send(path, method, options.body, session, accept);
+  if (first.status < 400) return read(first);
 
-  const error = toApiError(first.status, first.payload);
+  const error = await toApiError(first);
   if (
     !withSession ||
     first.status !== 401 ||
@@ -222,17 +228,22 @@ async function requestJson<T>(
     throw error;
   }
 
-  const retry = await send(path, method, options.body, {
-    token: accessToken,
-    cookies: true,
-  });
-  if (retry.status >= 400) throw toApiError(retry.status, retry.payload);
-  return retry.payload as T;
+  const retry = await send(
+    path,
+    method,
+    options.body,
+    { token: accessToken, cookies: true },
+    accept,
+  );
+  if (retry.status >= 400) throw await toApiError(retry);
+  return read(retry);
 }
+
+const asJson = async <T>(response: Response): Promise<T> => (await parseBody(response)) as T;
 
 /** A call that names its own method and body. */
 export function apiJson<T>(path: string, options: ApiRequestOptions = {}): Promise<T> {
-  return requestJson<T>(path, options, options.method ?? 'GET');
+  return request<T>(path, options, options.method ?? 'GET', asJson<T>);
 }
 
 /**
@@ -244,7 +255,24 @@ export function apiGet<T>(
   query = '',
   options: Omit<ApiRequestOptions, 'method' | 'body'> = {},
 ): Promise<T> {
-  return requestJson<T>(`${path}${query}`, options, 'GET');
+  return request<T>(`${path}${query}`, options, 'GET', asJson<T>);
+}
+
+/**
+ * Bytes from a gated route, as a Blob — the shape a lesson's recording arrives in.
+ *
+ * There is no link to these bytes anywhere on this platform: a page says a recording exists and
+ * says how big it is, and this is the only way to get the file. That is deliberate (a URL would
+ * work without a session and stand as a second door around the first), but it means the player
+ * cannot be handed an address — so the portal reads the whole thing here, holds it as an object
+ * URL, and gives `<video>` that instead. The file lives in memory rather than being proxied,
+ * which is also what lets a student scrub through a lesson without another request.
+ *
+ * The session is always sent, because a recording is either a page's free preview or the part
+ * somebody enrolled for, and a token never hurts the first.
+ */
+export function apiBytes(path: string): Promise<Blob> {
+  return request<Blob>(path, { withSession: true }, 'GET', (response) => response.blob(), '*/*');
 }
 
 let refreshCall: Promise<AuthSessionResponse | null> | null = null;
@@ -270,7 +298,7 @@ async function performRefresh(): Promise<AuthSessionResponse | null> {
     cookies: true,
   });
   if (response.status >= 400) return null;
-  const session = response.payload as AuthSessionResponse | undefined;
+  const session = (await parseBody(response)) as AuthSessionResponse | undefined;
   if (!session?.accessToken) return null;
   accessToken = session.accessToken;
   return session;

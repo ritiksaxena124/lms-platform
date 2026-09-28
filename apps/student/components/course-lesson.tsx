@@ -7,6 +7,8 @@ import type { CatalogLessonPage } from '@lms/shared';
 
 import { describeFailure, isNotFound } from '@/lib/api';
 import { readLessonPage } from '@/lib/catalog';
+import { LessonPlayer } from './lesson-player';
+import { useSession } from './session-provider';
 
 /**
  * One page of a course, read by whoever the catalog agreed to hand it to — a visitor through a
@@ -25,6 +27,11 @@ import { readLessonPage } from '@/lib/catalog';
  * The body is markdown and is shown as written — line breaks kept, no renderer. Teaching text
  * survives that honestly; inventing a parser here would be a decision about the editor, which
  * is a later step's business.
+ *
+ * A recording is offered by the page itself, because the response that carried the text also
+ * named the file and said how long it is. That is what lets this screen decide whether to draw a
+ * player without asking a second question of the API — and a student who cannot be told whether a
+ * lesson was filmed is a student who has to press a button to find out.
  */
 
 const UPDATED = new Intl.DateTimeFormat('en-GB', {
@@ -40,11 +47,18 @@ type PageState =
   | { status: 'failed'; message: string };
 
 export function CourseLesson({ courseId, lessonId }: { courseId: string; lessonId: string }) {
+  const { status } = useSession();
   const [settled, setSettled] = useState<{ key: string; state: PageState } | null>(null);
   const [attempt, setAttempt] = useState(0);
-  const key = `${courseId}:${lessonId}:${attempt}`;
+  // Two readers, two answers: the catalog opens a page by the session cookie, which the browser
+  // sends whether or not this portal has worked out who is here yet. A key that left the reader
+  // out would keep a stranger's refusal up under the student who signed in after it.
+  const key = `${courseId}:${lessonId}:${attempt}:${status === 'signed-in' ? 'member' : 'visitor'}`;
 
   useEffect(() => {
+    // Asking before the boot read lands is a question put to nobody.
+    if (status === 'bootstrapping') return;
+
     let alive = true;
 
     readLessonPage(courseId, lessonId)
@@ -60,7 +74,7 @@ export function CourseLesson({ courseId, lessonId }: { courseId: string; lessonI
     return () => {
       alive = false;
     };
-  }, [key, courseId, lessonId]);
+  }, [key, courseId, lessonId, status]);
 
   const state: PageState = settled && settled.key === key ? settled.state : { status: 'loading' };
 
@@ -137,6 +151,10 @@ export function CourseLesson({ courseId, lessonId }: { courseId: string; lessonI
           <span>updated {UPDATED.format(new Date(lesson.updatedAt))}</span>
         </p>
       </header>
+
+      {lesson.video ? (
+        <LessonPlayer courseId={lesson.course.id} lessonId={lesson.id} video={lesson.video} />
+      ) : null}
 
       {lesson.body === null ? (
         <p className="mt-8 max-w-[68ch] text-[0.9375rem] text-ink-muted">

@@ -6,10 +6,10 @@ import type {
   CourseChoice,
 } from '@lms/shared';
 
-import { apiGet } from './api';
+import { apiBytes, apiGet } from './api';
 
 /**
- * The four catalog calls — one per route the API opens to a reader.
+ * The five catalog calls — one per route the API opens to a reader.
  *
  * Nothing here decides what a course is: the types come from `@lms/shared`, so a field the
  * API renames is a compile error in this portal rather than a card that quietly stops
@@ -82,4 +82,23 @@ export async function readLessonPage(
     { withSession: true },
   );
   return lesson;
+}
+
+/**
+ * The recording on a page, as bytes.
+ *
+ * The address is built here from the page's two ids and never from anything the file says about
+ * itself, because there is nothing to build it from: a recording on this platform has no URL. The
+ * page names the file and its length, and this route is the only way to its bytes — which is what
+ * keeps one door in front of both the text and the video, so a link cannot be shared, bookmarked
+ * or cached past the enrollment that opened it.
+ *
+ * The whole file arrives in one Blob rather than as a stream. A player that is handed an object
+ * URL can seek anywhere in the recording without another request, and the alternative — proxying
+ * each range the scrubber asks for through a sessioned call — is a second transport to get wrong.
+ */
+export async function lessonVideoBytes(courseId: string, lessonId: string): Promise<Blob> {
+  return apiBytes(
+    `/catalog/courses/${encodeURIComponent(courseId)}/lessons/${encodeURIComponent(lessonId)}/video`,
+  );
 }

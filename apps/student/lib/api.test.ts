@@ -4,6 +4,7 @@ import { API_ERROR_CODES } from '@lms/shared';
 
 import {
   ApiError,
+  apiBytes,
   apiGet,
   apiJson,
   describeFailure,
@@ -18,6 +19,19 @@ const BASE_URL = 'http://api.localtest.me:4000';
 function jsonResponse(body: unknown, status = 200) {
   const text = typeof body === 'string' ? body : JSON.stringify(body);
   return { status, ok: status >= 200 && status < 300, text: async () => text };
+}
+
+/** A recording, answered as bytes. The same route answers a refusal with a JSON envelope, so
+ * this mock carries both halves — which is exactly the thing a caller has to tell apart.
+ * `size` is what the tests read back: this environment's Blob cannot hand out its buffer. */
+function bytesResponse(body: Uint8Array<ArrayBuffer>, status = 200) {
+  const blob = new Blob([body], { type: 'video/mp4' });
+  return {
+    status,
+    ok: status >= 200 && status < 300,
+    text: async () => '',
+    blob: async () => blob,
+  };
 }
 
 function requestAt(index: number): { url: string; init: RequestInit } {
@@ -212,6 +226,65 @@ describe('a call that asks who is asking', () => {
   });
 });
 
+describe('apiBytes', () => {
+  const FILE = new Uint8Array([1, 2, 3, 4, 5]);
+
+  it('reads a recording as bytes, with the session that opens the door', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValueOnce(bytesResponse(FILE));
+
+    const blob = await apiBytes('/catalog/courses/c1/lessons/l1/video');
+
+    expect(blob.size).toBe(FILE.length);
+    expect(blob.type).toBe('video/mp4');
+    expect(requestAt(0).url).toBe(`${BASE_URL}/api/v1/catalog/courses/c1/lessons/l1/video`);
+    // A recording is the part a student enrolled for, so the byte read is a sessioned call by
+    // construction — there is no version of it that gets to look like a shelf request.
+    expect(authHeaderOf(0)).toBe('Bearer token-abc');
+    expect(requestAt(0).init.credentials).toBe('include');
+    // Asking only for JSON would be asking a file route to refuse: the accept header is the
+    // client saying what it can read, and a player can read anything the server sends.
+    expect(headerNames(0)['accept']).toBe('*/*');
+  });
+
+  it('replays a byte read the stale token lost, once, with a fresh one', async () => {
+    setAccessToken('stale');
+    fetchMock
+      .mockResolvedValueOnce(expired())
+      .mockResolvedValueOnce(jsonResponse(sessionBody('fresh')))
+      .mockResolvedValueOnce(bytesResponse(FILE));
+
+    const blob = await apiBytes('/catalog/courses/c1/lessons/l1/video');
+
+    expect(blob.size).toBe(FILE.length);
+    expect(requestAt(1).url).toBe(`${BASE_URL}/api/v1/auth/refresh`);
+    expect(authHeaderOf(2)).toBe('Bearer fresh');
+  });
+
+  it('hands back a refusal as the envelope the API wrote, not as an empty file', async () => {
+    setAccessToken('token-abc');
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          statusCode: 404,
+          code: API_ERROR_CODES.NOT_FOUND,
+          message: 'We cannot find that recording.',
+        },
+        404,
+      ),
+    );
+
+    const error = await apiBytes('/catalog/courses/c1/lessons/l1/video').catch(
+      (thrown: unknown) => thrown,
+    );
+
+    // "No recording" and "not your page" both leave here, and a screen handed a Blob of zero
+    // bytes could tell the student nothing about which happened.
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).message).toBe('We cannot find that recording.');
+  });
+});
+
 describe('token refresh', () => {
   const read = () => ({ id: 'c1', title: 'Algebra slowly' });
 
@@ -375,9 +448,8 @@ describe('fieldErrors', () => {
 });
 
 describe('describeFailure', () => {
-
   it('has something to show for a failure with no message', () => {
-    expect(describeFailure(new ApiError({ statusCode: 500, code: 'X', message: '   '}))).toBe(
+    expect(describeFailure(new ApiError({ statusCode: 500, code: 'X', message: '   ' }))).toBe(
       'Something went wrong. Please try again.',
     );
   });
