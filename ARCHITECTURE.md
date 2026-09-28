@@ -326,6 +326,55 @@ which 6a's adapter guarantees is short and sterile — a CHECK on its shape woul
 copy of that guarantee in the wrong place. And nothing is unique here: the same news legitimately
 happens twice to one reader, and a queue with a unique key is a ledger that refuses to say anything.
 
+### Filing the news where it happens (Phase 6, step 6d)
+
+Seven writes now say what they decided: a student asking for a minute, a teacher confirming or
+refusing it, a request left to expire, a student giving a class back, and a place in a course taken
+or left. Each files exactly one `mail_outbox` row, and it files it *inside the transaction that
+moved the row* — the outbox rule, which is worth more than the pattern's usual justification. A
+letter queued after a commit is a letter about a class that a rollback may never have allowed.
+
+- **The repository calls the queue; the service names the event.** Each write takes a `notify`
+  callback that receives the caller's `Prisma.TransactionClient` and the row as its own statement
+  just read it. `when` the news is filed is a fact about the transaction, and only the transaction
+  knows it; `which` event a write is belongs to the service, which owns the vocabulary. Passing a
+  queue dependency into the repository and letting it guess the event would put a second copy of
+  "what just happened" in the wrong file.
+- **A replay files nothing.** This is the whole reason the callback is a parameter rather than a
+  line after the write. The second press of a book button, the second press of a confirm, the loser
+  of a race, a refused conflict, a `404` gate and a leave on a place that is already closed all
+  reach no notifier, because none of them made news. Reopening a place a student left *is* news on
+  an old row: they really are back in the course. A person told twice about one decision stops
+  believing the queue, and the queue is the only thing that will tell them about the next one.
+- **The expiry sweep moves row by row.** A bulk update reports a count, and a count cannot be
+  addressed — an expiration letter has to reach the student who asked for *that* minute, so the
+  sweep asks for each row's own after-image inside the transaction that files the news about it.
+  What made it safe to run twice is unchanged and is not the callback: the pending status is in
+  every `where`, so a second pass matches nothing.
+- **A class message is written in its reader's clock and names the other person.** A class instant is
+  one row and two different times on two screens, so `when` is formatted from the *recipient's*
+  `User.timezone` (§5), never the class's or the sender's. And the copy addresses the reader by
+  naming the person they are waiting on: a teacher is told who is asking, a student who answered. A
+  place carries no instant at all — taking a place is a decision, not an appointment, and the copy
+  asks for the course and the teacher's name.
+- **A join is news to the student alone.** Both enrollment events point into the student's own
+  portal; a teacher who wants to know who joined reads their roster, which is a page with a count on
+  it rather than a letter that has to be sent. The five booking events divide the same way: the ask
+  and the cancellation are calendar news for the teacher, and the three answers are news for the
+  student.
+- **An href is built from an origin the deployment configured.** `TEACHER_PORTAL_URL` and
+  `STUDENT_PORTAL_URL` are required absolute URLs, and the path is a string written in this file
+  with every segment percent-encoded. The origin is not taken from the request: a notification sent
+  by a scheduler has no request, and a link assembled from a `Host` header is a link an attacker
+  chooses. The encoding is what makes "the path is ours" true for the part that is interpolated — a
+  course id shaped like `../../evil.example` still lands on the portal, and a room address has no
+  parameter it could arrive through (§10).
+
+What the queue refuses to hold is inherited rather than restated: no address, no rendered letter,
+and no claim that anything was sent. `status`, `attempts` and `next_attempt_at` stay at 6c's column
+defaults, so a row written here says only that something happened and somebody should hear about it.
+Whether it hears is 6e's sweep.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API

@@ -340,7 +340,7 @@ decision was made, and what was deliberately left out.
 | 3     | Courses, lessons, enrollment                                              | **Done**    |
 | 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
 | 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | **Done**    |
-| 6     | Email notifications behind the SMTP port                                  | Not started |
+| 6     | Email notifications behind the SMTP port — queue filled, sweep to send    | In progress |
 | 7     | Action log — who did what, to what, in which part of the app              | Not started |
 | 8     | Ops portal — moderation and the read-side of everything above             | Not started |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
@@ -473,7 +473,24 @@ a state whose only writer is a scheduler is a step in a program, not reference d
 maintains. `nextAttemptAt` is not-null-by-default rather than nullable, since `null` would have to
 mean both "never scheduled" and "never again"; `sentAt` is its own column so a retry cannot move the
 date a person asks about; and nothing is unique, because the same news legitimately happens twice to
-one reader. The seven send decisions and the sweep are the steps after it.
+one reader.
+
+**Step 6d, the seven send decisions, is in.** A student asking for a minute, a teacher confirming or
+refusing it, a request left to expire, a class the student gave back, and a place in a course taken or
+left now each file one outbox row while the write that decided them is still open. The repository
+calls the queue and the service names the event, because *when* the news is filed is a fact about a
+transaction and only that transaction knows it, while *which* event a write is stays where the
+vocabulary lives. A replay files nothing — the second press of either button, the loser of a race, a
+refused conflict and a leave on a place already closed all answer with the row as it stands and say
+nothing new to anybody, and that rule is the reason the notifier is a parameter inside the write
+rather than a line after it. The expiry sweep moved to per-row transactions for the same reason: a
+bulk update reports a count, and a count cannot be addressed. Every class message is written in its
+reader's clock and names the other person, so `when` comes from the recipient's own timezone, and a
+join is news to the student alone — a teacher who wants to know who joined reads their roster. The
+links those messages carry are built from two new required absolute origins, `TEACHER_PORTAL_URL`
+and `STUDENT_PORTAL_URL`, with every interpolated segment encoded, so a notification queued by a
+scheduler points at a page on a host the deployment named rather than at a request it has no part in
+(§6).
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to
@@ -493,13 +510,18 @@ what the website will point at.
 
 ## Environment variables
 
-`apps/api/.env.example` documents every variable. Four are worth knowing early:
+`apps/api/.env.example` documents every variable. Five are worth knowing early:
 
 - `JWT_SECRET` has **no default and no fallback** — sign-in is impossible without it, and a
   per-process random one would boot cleanly then log everyone out on the next restart.
   Generate with `openssl rand -hex 32`.
 - `COOKIE_DOMAIN=localtest.me` is what lets one login cover all three portals. Left unset
   the session cookie belongs to the API host alone.
+- `TEACHER_PORTAL_URL` and `STUDENT_PORTAL_URL` are the two origins a notification's link is built
+  from, and both are required absolute URLs. They are not derived from the request: the sweep that
+  sends a message has no request, and a host header is a value somebody else chose. On a laptop,
+  `http://teacher.localtest.me:3000` and `http://student.localtest.me:3001` are the honest answers;
+  `localhost` in one of them produces mail whose links work only on the machine that sent it.
 - `PAYMENT_PROVIDER` defaults to `none` and is still unset work: money — with the coupon codes a
   teacher issues per course — is Phase 9, and the port exists so it costs no refactor when it
   lands. `VIDEO_PROVIDER` defaults to `none` too, and is a real configuration rather than a
