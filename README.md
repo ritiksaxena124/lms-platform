@@ -421,7 +421,7 @@ recently, and it went one brick at a time:
 
 Neither portal puts a room address in a link, in a list, or anywhere a browser keeps it.
 
-**Phase 6 is scoped, not started.** It carries the lifecycle notifications and nothing else: the
+**Phase 6 has started.** It carries the lifecycle notifications and nothing else: the
 teacher is told a minute has been asked for, both sides are told how it was answered, and a place
 taken or left is said out loud. Money stays where it is. Two decisions shape it. **The layout lives
 in code and the copy lives in the database** — a small set of email-safe React primitives renders
@@ -434,7 +434,16 @@ boundary in a portal is a preview surface for later rather than the mechanism no
 never contain: a room address, a stored key, a token, or an image that needs a public URL — links
 go to a portal page that then asks who is calling. Delivery runs off an outbox table and a sweep
 rather than inside the request, so a mail vendor being unreachable cannot slow a booking or lose
-the news of it.
+the news of it. **Step 6a, the transport, is in** (`ARCHITECTURE` §6):
+`apps/api/src/providers/mail` answers one question — hand this finished message to a transport —
+with `SMTP_URL` as the switch rather than a provider string, because there is one kind of mail
+transport to configure. `nodemailer` lives in exactly one file behind a two-word transport the
+specs can double; `SMTP_URL` without `MAIL_FROM`, or a URL that is not `smtp://`/`smtps://`, stops
+the boot instead of guessing; `NoMail` resolves and says `delivers: false`, so a box with no mail
+drops notifications instead of failing requests, and never records a drop as a send; and what a
+failure leaves behind is the transport's error code (`EAUTH`, `smtp 550`) rather than its error
+text, which names the host and the login. The primitives, the `EmailTemplate` rows, the outbox, the
+seven send decisions and the sweep are the steps after it.
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to

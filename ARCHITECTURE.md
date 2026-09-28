@@ -217,6 +217,40 @@ wrapped in a `Promise`, and the provider that does need one — signed URLs, a J
 changes the shape of the answer, not merely its asynchrony. That is a phase-5-and-later decision,
 not a reason to write the signature twice now.
 
+Email is the second of these to be real (Phase 6, step 6a). `apps/api/src/providers/mail` answers
+one question — hand this finished message to a transport — and `SMTP_URL` rather than a
+`MAIL_PROVIDER` string is the switch, because there is one kind of mail transport to name: a box
+either points at an endpoint or has not decided yet. Four things follow from that shape.
+
+- **nodemailer appears in one file.** The adapter declares the two words of a transport it uses
+  (`sendMail` with a from, a to, a subject and two bodies) and takes one as a constructor argument,
+  so the specs send through a double and a caller never sees `SentMessageInfo`. §6's reason for
+  ports is exactly this: a route that can name a vendor's type is a route that cannot change vendor
+  without an edit.
+- **`none` is an adapter here too, and it says what it is.** `NoMail` resolves instead of throwing
+  — a notification is not the reason a request happened, and a school with no mail should still be
+  able to book a class — while `delivers` on the port tells the truth about it. The outbox (§6,
+  step 6c) asks before it records anything, because a dropped message marked as sent is the one
+  claim nobody can check afterwards.
+- **It is async because it waits on somebody else's server.** Which is why `send` belongs to the
+  delivery sweep rather than to the request that made the news: a mail host being unreachable
+  cannot slow a booking down, and cannot lose it either, because the decision to notify is written
+  in the same transaction as the change it reports.
+- **A mail is a leak risk, so the port refuses three things.** A line break in a recipient or a
+  subject would write more headers than this platform intends, and a comma in a recipient turns one
+  address into a list, so both are refused before the transport is reached — bodies may span lines,
+  headers may not. `failureReason` is the transport's error code (`EAUTH`, `smtp 550`) and never its
+  message, because nodemailer puts the host, the port and on an auth failure the login it was given
+  into that text. A log line may name the event, never the recipient: an address in a log is a copy
+  of personal data in a file that gets rotated, shipped and grepped. And no mail carries a room
+  address, a stored key or a token (§10, §14, §7) — a message sits in a provider's storage and on
+  whichever device reads it, none of which this platform controls, so links point at a portal page
+  that then asks who is calling.
+
+An unusable mail config stops the boot rather than the send: `SMTP_URL` without `MAIL_FROM` is
+refused instead of letting the vendor answer with the login's own address in the `From` header, and
+a URL that is not `smtp://` or `smtps://` is refused where the port is built, naming the key.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API
