@@ -374,6 +374,21 @@ recently, and it went one brick at a time:
 
 Neither portal puts a room address in a link, in a list, or anywhere a browser keeps it.
 
+**Phase 6 is scoped, not started.** It carries the lifecycle notifications and nothing else: the
+teacher is told a minute has been asked for, both sides are told how it was answered, and a place
+taken or left is said out loud. Money stays where it is. Two decisions shape it. **The layout lives
+in code and the copy lives in the database** — a small set of email-safe React primitives renders
+each message, while an `EmailTemplate` row keyed by event code holds the subject and the sentences
+an operator may want to change without a deploy. A finished HTML document in a row would be markup
+no test and no review had ever seen, and one bad edit would break Outlook for every recipient.
+**And those components are server-rendered inside the API, not as React Server Components** — the
+API is the only writer and the only place a send decision can honestly live, so a React server
+boundary in a portal is a preview surface for later rather than the mechanism now. What a mail can
+never contain: a room address, a stored key, a token, or an image that needs a public URL — links
+go to a portal page that then asks who is calling. Delivery runs off an outbox table and a sweep
+rather than inside the request, so a mail vendor being unreachable cannot slow a booking or lose
+the news of it.
+
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to
 exist before it fixes what a record looks like. Coupons land last among the things a student
