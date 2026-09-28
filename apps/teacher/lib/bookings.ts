@@ -1,4 +1,4 @@
-import type { Booking, BookingRequest } from '@lms/shared';
+import type { Booking, BookingRequest, BookingRoomResponse } from '@lms/shared';
 
 import { apiJson } from './api';
 
@@ -48,4 +48,17 @@ export async function refuseRequest(id: string): Promise<Booking> {
     method: 'POST',
   });
   return booking;
+}
+
+/**
+ * Ask for the room of a live class, and get its address.
+ *
+ * A post, not a read: the address is a key whose only lock is being hard to guess, so it is
+ * handed to the API one checked person at a time rather than sitting on a list a browser caches,
+ * prefetches and writes into history (ARCHITECTURE §6). It is returned as a bare string for the
+ * same reason — a response object that outlives the room it names is another copy of the secret.
+ */
+export async function joinRoom(id: string): Promise<string> {
+  const { room } = await apiJson<BookingRoomResponse>(`${path(id)}/room`, { method: 'POST' });
+  return room.url;
 }

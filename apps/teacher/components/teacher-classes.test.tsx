@@ -1,4 +1,5 @@
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BookingRequest } from '@lms/shared';
@@ -14,9 +15,16 @@ vi.mock('./session-provider', () => ({
 
 vi.mock('@/lib/bookings', () => ({
   listClasses: vi.fn(),
+  joinRoom: vi.fn(),
 }));
 
-import { listClasses } from '@/lib/bookings';
+const { notify } = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@lms/ui', async (importOriginal) => {
+  const actual = (await importOriginal()) as Record<string, unknown>;
+  return { ...actual, notify };
+});
+
+import { joinRoom, listClasses } from '@/lib/bookings';
 
 /** The teacher's own schedule, read at a moment when nothing booked below has gone by yet. */
 const NOW = new Date('2026-10-03T06:00:00.000Z');
@@ -57,10 +65,17 @@ const WAS = {
 
 const queue = () => vi.mocked(listClasses);
 
+/** The address the join endpoint hands out for `CLASS_ONE`. It exists only in the answer. */
+const ROOM_URL = 'https://meet.localtest.me/veena-0f2c9a';
+
+/** Inside the door's hours: 09:25–10:30 on 5 Oct, and the class itself is 09:30–10:15. */
+const WHILE_OPEN = new Date('2026-10-05T09:40:00.000Z');
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(NOW);
   queue().mockReset().mockResolvedValue([]);
+  vi.mocked(joinRoom).mockReset().mockResolvedValue(ROOM_URL);
 });
 
 afterEach(() => {
@@ -181,5 +196,105 @@ describe('TeacherClasses', () => {
       'href',
       '/requests',
     );
+  });
+
+  it('says when the door opens, rather than offering one that is shut', async () => {
+    // The screen was opened two days early. A Join button here would only ever be refused, and
+    // the API's reason would arrive as a surprise rather than as the sentence on the row.
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    expect(
+      within(rowOf('Aria Kapoor')).getByText('Door opens Mon 5 Oct, 09:25'),
+    ).toBeInTheDocument();
+    expect(within(rowOf('Aria Kapoor')).queryByRole('button', { name: 'Join' })).toBeNull();
+  });
+
+  it('offers the door once it stands open', async () => {
+    vi.setSystemTime(WHILE_OPEN);
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    expect(within(rowOf('Aria Kapoor')).getByRole('button', { name: 'Join' })).toBeInTheDocument();
+  });
+
+  it('stops offering a door the grace has gone past', async () => {
+    vi.setSystemTime(new Date('2026-10-05T11:00:00.000Z'));
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    const row = rowOf('Aria Kapoor');
+    expect(within(row).getByText('Door closed')).toBeInTheDocument();
+    expect(within(row).queryByRole('button', { name: 'Join' })).toBeNull();
+  });
+
+  it('draws no door at all on a class that has none', async () => {
+    // A pending request has no room yet, and a declined one never will. The list carries `live:
+    // null` for exactly that, and the row has nothing to say about a door that does not exist.
+    queue().mockResolvedValue([booked({ status: BOOKING_STATUS_CODES.PENDING })]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    expect(within(rowOf('Aria Kapoor')).queryByText(/door/i)).toBeNull();
+  });
+
+  it('asks for the address when Join is pressed, and opens it in the page rather than linking to it', async () => {
+    vi.setSystemTime(WHILE_OPEN);
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }));
+
+    await waitFor(() => expect(joinRoom).toHaveBeenCalledWith('class-1'));
+    const room = await waitFor(() => {
+      const found = document.querySelector('iframe');
+      if (!found) throw new Error('the room did not open');
+      return found;
+    });
+    expect(room.getAttribute('src')).toBe(ROOM_URL);
+    // Not a link, not an anchor a browser can keep in history or hand to a prefetch.
+    expect(document.querySelector(`a[href="${ROOM_URL}"]`)).toBeNull();
+  });
+
+  it('takes the address back off the page when the teacher leaves the room', async () => {
+    vi.setSystemTime(WHILE_OPEN);
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }));
+    await waitFor(() => expect(document.querySelector('iframe')).not.toBeNull());
+
+    await userEvent.click(screen.getByRole('button', { name: 'Leave' }));
+
+    await waitFor(() => expect(document.querySelector('iframe')).toBeNull());
+    expect(screen.queryByText(ROOM_URL)).toBeNull();
+  });
+
+  it('says the reason a door stayed shut, and puts no room on the page', async () => {
+    vi.setSystemTime(WHILE_OPEN);
+    vi.mocked(joinRoom).mockRejectedValue(
+      new ApiError({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'This class is not standing, so there is no room to join.',
+      }),
+    );
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Join' }));
+
+    await waitFor(() =>
+      expect(notify.error).toHaveBeenCalledWith(
+        'This class is not standing, so there is no room to join.',
+      ),
+    );
+    expect(document.querySelector('iframe')).toBeNull();
   });
 });

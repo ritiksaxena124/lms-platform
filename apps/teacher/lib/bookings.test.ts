@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BookingRequest } from '@lms/shared';
 
-import { confirmRequest, listClasses, listRequests, refuseRequest } from './bookings';
+import { confirmRequest, joinRoom, listClasses, listRequests, refuseRequest } from './bookings';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -129,6 +129,55 @@ describe('booking request client', () => {
     await expect(confirmRequest('b1')).rejects.toMatchObject({
       code: 'CONFLICT',
       message: 'This class changed while you were deciding. Refresh to see it.',
+    });
+  });
+});
+
+/**
+ * The room is asked for, never carried.
+ *
+ * A Jitsi room has no password — its address is the whole key — so the class list deliberately
+ * leaves it off and this call hands it out to one person who has just been checked (ARCHITECTURE
+ * §6). A client that could `GET` it would be a client a browser could prefetch.
+ */
+describe('joinRoom', () => {
+  it('posts for the address and takes the address back', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse({ room: { url: 'https://meet.localtest.me/veena-0f2c' } }),
+    );
+
+    await expect(joinRoom('b1')).resolves.toBe('https://meet.localtest.me/veena-0f2c');
+    expect(requestAt(0)).toMatchObject({
+      url: `${BASE_URL}/api/v1/bookings/b1/room`,
+      method: 'POST',
+    });
+    expect(requestAt(0).body).toBeUndefined();
+  });
+
+  it('escapes the class it asks about, like every other booking route', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ room: { url: 'https://meet.localtest.me/x' } }));
+
+    await joinRoom('b1/room');
+
+    expect(requestAt(0).url).toBe(`${BASE_URL}/api/v1/bookings/b1%2Froom/room`);
+  });
+
+  it('hands back the reason a door stayed shut, so the row can say it out loud', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          statusCode: 409,
+          code: 'CONFLICT',
+          message: "This class's room is not open yet.",
+          details: { opensAt: '2026-10-01T08:55:00.000Z' },
+        },
+        409,
+      ),
+    );
+
+    await expect(joinRoom('b1')).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: "This class's room is not open yet.",
     });
   });
 });

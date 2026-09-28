@@ -75,3 +75,14 @@ export function formatClassWindow(
   const zone = zoneFor(timeZone);
   return `${namedDay(startsAt, zone)}, ${clockFace(startsAt, zone)}–${clockFace(endsAt, zone)}`;
 }
+
+/**
+ * One instant, in the same dialect as the window a class is written in: `Mon 5 Oct, 09:25`.
+ *
+ * The live class door opens before the first minute, and a row that said "09:25" beside a window
+ * reading `09:30–10:15` would be two formats for the one clock the teacher wrote both from.
+ */
+export function formatInstant(instant: string, timeZone?: string | null): string {
+  const zone = zoneFor(timeZone);
+  return `${namedDay(instant, zone)}, ${clockFace(instant, zone)}`;
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { formatClassWindow, formatDay } from './dates';
+import { formatClassWindow, formatDay, formatInstant } from './dates';
 
 /**
  * The teacher's own copy of the one date format a portal shows a person.
@@ -54,5 +54,28 @@ describe('formatClassWindow', () => {
     expect(
       formatClassWindow('2026-10-01T03:30:00.000Z', '2026-10-01T04:15:00.000Z', 'Mars/Olympus'),
     ).toMatch(/^Wed|Thu 1 Oct, \d{2}:\d{2}–\d{2}:\d{2}$/);
+  });
+});
+
+/**
+ * One instant, written the way the window beside it is written.
+ *
+ * The live class door opens a few minutes before the class does, and a screen that says "09:25"
+ * under a row reading "Mon 5 Oct, 09:30–10:15" is two formats for one clock again.
+ */
+describe('formatInstant', () => {
+  it('names the day and the face, in the zone it was asked for', () => {
+    expect(formatInstant('2026-10-05T03:55:00.000Z', 'Asia/Kolkata')).toBe('Mon 5 Oct, 09:25');
+  });
+
+  it('moves the day with the zone, not only the hour', () => {
+    expect(formatInstant('2026-09-20T20:00:00.000Z', 'Asia/Kolkata')).toBe('Mon 21 Sept, 01:30');
+    expect(formatInstant('2026-09-20T20:00:00.000Z', 'Europe/London')).toBe('Sun 20 Sept, 21:00');
+  });
+
+  it('falls back to the readers own clock for a zone it cannot place', () => {
+    expect(formatInstant('2026-10-01T03:30:00.000Z', 'Mars/Olympus')).toMatch(
+      /^Wed|Thu 1 Oct, \d{2}:\d{2}$/,
+    );
   });
 });

@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import {
+  Button,
   EmptyState,
   ErrorState,
   Icon,
@@ -11,6 +12,7 @@ import {
   StatusPill,
   buttonClass,
   cn,
+  notify,
   type StatusTone,
 } from '@lms/ui';
 import {
@@ -18,11 +20,12 @@ import {
   BOOKING_STATUS_LABELS,
   type BookingRequest,
   type BookingStatusCode,
+  type LiveClassDoor,
 } from '@lms/shared';
 
 import { describeFailure } from '@/lib/api';
-import { listClasses } from '@/lib/bookings';
-import { formatClassWindow } from '@/lib/dates';
+import { joinRoom, listClasses } from '@/lib/bookings';
+import { formatClassWindow, formatInstant } from '@/lib/dates';
 
 import { useSession } from './session-provider';
 
@@ -78,6 +81,15 @@ export function TeacherClasses() {
     now: number;
   } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+  /**
+   * The door's clock, which moves while the page is open.
+   *
+   * `settled.now` stays the instant the list arrived, because which half of the schedule a class
+   * belongs to was decided against the read that drew it. A door is a different question: it opens
+   * while a teacher is looking for it, and a row that froze its verdict at page-load would tell
+   * them to arrive five minutes late to a class they could have joined.
+   */
+  const [doorTick, setDoorTick] = useState(0);
 
   const key = String(attempt);
 
@@ -96,6 +108,13 @@ export function TeacherClasses() {
       alive = false;
     };
   }, [key]);
+
+  useEffect(() => {
+    const every = setInterval(() => setDoorTick(Date.now()), 30_000);
+    return () => {
+      clearInterval(every);
+    };
+  }, []);
 
   const failed = settled?.key !== key && failure?.key === key ? failure : null;
   const zone = user?.timezone ?? 'your own clock';
@@ -122,6 +141,7 @@ export function TeacherClasses() {
   }
 
   const { classes, now } = settled;
+  const doorClock = Math.max(now, doorTick);
 
   if (classes.length === 0) {
     return (
@@ -150,6 +170,7 @@ export function TeacherClasses() {
         heading="Coming up"
         bookings={upcoming}
         timezone={user?.timezone}
+        clock={doorClock}
         empty="Nothing is waiting to happen yet."
       />
       {earlier.length > 0 ? (
@@ -157,6 +178,7 @@ export function TeacherClasses() {
           heading="Earlier"
           bookings={earlier}
           timezone={user?.timezone}
+          clock={doorClock}
           empty="Nothing has been and gone."
         />
       ) : null}
@@ -192,11 +214,14 @@ function Section({
   heading,
   bookings,
   timezone,
+  clock,
   empty,
 }: {
   heading: string;
   bookings: BookingRequest[];
   timezone: string | null | undefined;
+  /** The instant the doors are judged against, which moves while the page stands open. */
+  clock: number;
   empty: string;
 }) {
   return (
@@ -213,33 +238,131 @@ function Section({
             <li
               key={booking.id}
               data-icon-zone
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-card border border-line bg-surface p-4 sm:p-5"
+              className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4 sm:p-5"
             >
-              <div className="min-w-0">
-                <h3 className="text-h3 text-ink-strong">{booking.student.displayName}</h3>
-                <p className="mt-0.5 truncate text-[0.8125rem] text-ink-muted">
-                  {booking.course.title}
-                </p>
-              </div>
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+                <div className="min-w-0">
+                  <h3 className="text-h3 text-ink-strong">{booking.student.displayName}</h3>
+                  <p className="mt-0.5 truncate text-[0.8125rem] text-ink-muted">
+                    {booking.course.title}
+                  </p>
+                </div>
 
-              <div className="flex min-w-0 flex-col items-start gap-1.5">
-                <p className="tabular text-[0.8125rem] text-ink">
-                  <Icon name="clock" size="sm" />
-                  <span className="ml-1.5">
-                    {formatClassWindow(booking.startsAt, booking.endsAt, timezone)}
-                  </span>
-                </p>
-                <div className="flex items-center gap-1.5">
-                  <StatusPill tone={TONES[booking.status] ?? 'neutral'}>
-                    {BOOKING_STATUS_LABELS[booking.status] ?? booking.status}
-                  </StatusPill>
-                  {booking.type === 'demo' ? <StatusPill tone="warning">Trial call</StatusPill> : null}
+                <div className="flex min-w-0 flex-col items-start gap-1.5">
+                  <p className="tabular text-[0.8125rem] text-ink">
+                    <Icon name="clock" size="sm" />
+                    <span className="ml-1.5">
+                      {formatClassWindow(booking.startsAt, booking.endsAt, timezone)}
+                    </span>
+                  </p>
+                  <div className="flex items-center gap-1.5">
+                    <StatusPill tone={TONES[booking.status] ?? 'neutral'}>
+                      {BOOKING_STATUS_LABELS[booking.status] ?? booking.status}
+                    </StatusPill>
+                    {booking.type === 'demo' ? (
+                      <StatusPill tone="warning">Trial call</StatusPill>
+                    ) : null}
+                  </div>
                 </div>
               </div>
+
+              {booking.live ? (
+                <ClassDoor
+                  booking={booking}
+                  door={booking.live}
+                  timezone={timezone}
+                  clock={clock}
+                />
+              ) : null}
             </li>
           ))}
         </ul>
       )}
     </section>
+  );
+}
+
+/**
+ * The door on one class: when it opens, that it stands open now, and the room behind it.
+ *
+ * The window arrives with the list; the address never does. A Jitsi room has no password — its
+ * name is the whole lock — so the key is asked for at the moment of use, handed to one checked
+ * person, and opened in this page rather than linked to: an `<a>` is a history entry, a prefetch
+ * and a status line, all of which keep an address that was only ever meant to be used once
+ * (ARCHITECTURE §6, §14). Leaving takes it back off the page.
+ */
+function ClassDoor({
+  booking,
+  door,
+  timezone,
+  clock,
+}: {
+  booking: BookingRequest;
+  door: LiveClassDoor;
+  timezone: string | null | undefined;
+  clock: number;
+}) {
+  const [room, setRoom] = useState<string | null>(null);
+  const [asking, setAsking] = useState(false);
+
+  const opensAt = Date.parse(door.opensAt);
+  const closesAt = Date.parse(door.closesAt);
+
+  // A room belongs to the class it was asked for. A row that re-rendered onto another booking
+  // would otherwise leave that address on screen under somebody else's name.
+  useEffect(() => {
+    setRoom(null);
+  }, [booking.id]);
+
+  if (clock < opensAt) {
+    return (
+      <p className="text-[0.8125rem] text-ink-faint">
+        {`Door opens ${formatInstant(door.opensAt, timezone)}`}
+      </p>
+    );
+  }
+
+  if (clock > closesAt) {
+    return <p className="text-[0.8125rem] text-ink-faint">Door closed</p>;
+  }
+
+  async function join(): Promise<void> {
+    setAsking(true);
+    try {
+      setRoom(await joinRoom(booking.id));
+    } catch (error) {
+      // The API's reason is the sentence worth reading — the class may have been cancelled while
+      // this page sat open, and a generic fault would send the teacher back to press again.
+      notify.error(describeFailure(error));
+    } finally {
+      setAsking(false);
+    }
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-1.5">
+        <Button type="button" size="sm" loading={asking} onClick={() => void join()}>
+          Join
+        </Button>
+        {room ? (
+          <Button type="button" size="sm" variant="ghost" onClick={() => setRoom(null)}>
+            Leave
+          </Button>
+        ) : null}
+      </div>
+
+      {room ? (
+        <iframe
+          src={room}
+          // No referrer: the address should not reach the video host's logs as a page URL either.
+          referrerPolicy="no-referrer"
+          allow="camera; microphone; fullscreen; display-capture; autoplay"
+          allowFullScreen
+          title={`Live class with ${booking.student.displayName}`}
+          className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
+        />
+      ) : null}
+    </>
   );
 }
