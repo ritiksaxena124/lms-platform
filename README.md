@@ -350,9 +350,9 @@ decision was made, and what was deliberately left out.
 
 ### All twelve, in order
 
-The table is the index; this is what each one is for. Phases 0–5 are shipped, Phase 6 is scoped,
-and 7–12 are the ordered backlog — each one sits where it does because of what it needs to exist
-before its shape stops moving.
+The table is the index; this is what each one is for. Phases 0–5 are shipped, Phase 6 is under way
+with its transport and its renderer, and 7–12 are the ordered backlog — each one sits where it does
+because of what it needs to exist before its shape stops moving.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -442,8 +442,23 @@ specs can double; `SMTP_URL` without `MAIL_FROM`, or a URL that is not `smtp://`
 the boot instead of guessing; `NoMail` resolves and says `delivers: false`, so a box with no mail
 drops notifications instead of failing requests, and never records a drop as a send; and what a
 failure leaves behind is the transport's error code (`EAUTH`, `smtp 550`) rather than its error
-text, which names the host and the login. The primitives, the `EmailTemplate` rows, the outbox, the
-seven send decisions and the sweep are the steps after it.
+text, which names the host and the login.
+
+**Step 6b, the message and the row, is in** (`apps/api/src/modules/notifications`).
+`email-primitives.tsx` builds a message out of tables marked `role="presentation"`, a 600px column
+whose width is written as an attribute as well as a style because Outlook reads the attribute and
+everyone else the style, inline styles only, a button that is a table cell because Word's engine
+ignores padding on an anchor, and no image at all — the app's palette reappears here as literals,
+and Inter does not, because it is self-hosted in the portals and exists on no reader's machine.
+`render-email.tsx` fills one row's `{slot}` names from the payload and writes both bodies from the
+same filled strings; the text version is not the HTML with its tags cut out, because that loses the
+address behind a button whose label is a sentence. An unfilled slot, a label with no destination, a
+destination with no label and an href that is not absolute http(s) are all refused while the message
+is being built rather than at the transport, and the refusal names the problem without repeating the
+address. `email_template` holds the half an operator edits — subject, heading, a sentence per line,
+an optional button label — and `event_code` is unique across every row rather than the standing
+ones, so a reword is an update in place and what a message once said is Phase 7's log to hold. The
+outbox, the seven send decisions and the sweep are the steps after it.
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wants every kind of write to

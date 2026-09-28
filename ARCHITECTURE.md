@@ -251,6 +251,46 @@ An unusable mail config stops the boot rather than the send: `SMTP_URL` without 
 refused instead of letting the vendor answer with the login's own address in the `From` header, and
 a URL that is not `smtp://` or `smtps://` is refused where the port is built, naming the key.
 
+### Rendering a message (Phase 6, step 6b)
+
+The port takes a finished message, so something has to finish it. That something is
+`apps/api/src/modules/notifications`: `email-primitives.tsx` owns the document and
+`render-email.tsx` fills one `email_template` row's copy into it, in both shapes, from one call.
+
+- **Layout in code, copy in the database.** A row holds a subject, a heading, a list of sentences
+  and an optional button label — the words an operator rewords. It does not hold HTML: a document in
+  a row is markup nobody reviewed, and Outlook renders it with Word's engine, which ignores flexbox,
+  grid and padding on an anchor, while Gmail clips a `<style>` block it does not recognise. So the
+  primitives are tables with `role="presentation"`, a width written as an attribute *and* a style,
+  inline styles only, a button built from a table cell, and no image at all — an SVG renders badly
+  and a hosted PNG needs a public URL, which §6 refuses for gated bytes and which would tell whoever
+  served the file that this particular person read this particular message.
+- **React, server-rendered inside the API.** §15 keeps React in the portals, and the API is the only
+  writer, so there is no server boundary to render in and React Server Components is not the
+  mechanism; `@react-email/*` is ESM-only and this package is `"type": "commonjs"`, so it cannot be
+  required here. `renderToStaticMarkup` is a synchronous call in a plain module, and the specs plus a
+  `nest build` → `require()` pass are the evidence the primitives were adopted on rather than the
+  assumption they would work. The cost is recorded where it is paid: `apps/api` now compiles `.tsx`,
+  which retires the `<Foo>value` assertion form in that package (the house form is `as`), and Inter is
+  absent from the font stack for the same reason the portals' stylesheet is — it is self-hosted and
+  exists on no reader's machine.
+- **One tree, two shapes, written from the same filled strings.** The text body is not the HTML with
+  its tags cut out — that loses the address behind a button whose label is a sentence, which is the
+  one thing a reader needs in order to act.
+- **`{slot}` is the whole contract.** A name, not an expression: no filter, no branch, nothing a row
+  could be coaxed into. A slot the payload cannot answer is refused rather than printed, because
+  "Your class is on {when}" is a message with the useful part missing and a broken row that would
+  keep producing one.
+- **The href comes from code, and a refusal does not repeat it.** The caller that owns the thing the
+  message is about names the destination; `assertPortalHref` accepts only absolute http(s). The
+  thrown message deliberately leaves the value out — an href is where a room address would arrive if
+  a caller ever passed one by mistake, and this error outlives the request in a log line (§10).
+
+`email_template.event_code` is unique across every row rather than across the standing ones, the
+identity half of the split §2 uses elsewhere: a code names a send decision in the code, and two rows
+answering to one would leave a caller unable to say which a reader got. A reword is an update in
+place; what a message once said is Phase 7's action log to hold.
+
 The choice has now been made, which is why these are phases rather than open questions:
 
 - **Video is Jitsi** (`VIDEO_PROVIDER=jitsi`, Phase 5). A live class is a Jitsi room the API
