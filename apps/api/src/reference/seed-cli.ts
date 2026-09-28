@@ -3,7 +3,9 @@ import 'reflect-metadata';
 import { PrismaClient } from '@prisma/client';
 
 import { ScryptPasswordHasher } from '../modules/auth/password-hasher.service';
+import { EMAIL_TEMPLATE_SEEDS } from './email-template-data';
 import { REQUIRED_LKP_TYPES } from './reference-data';
+import { seedEmailTemplates } from './seed-email-templates';
 import { assertSeedTargetAllowed, seedLookups } from './seed-lookups';
 import { DEMO_PASSWORD, seedDemoAccounts } from './seed-demo-accounts';
 
@@ -20,6 +22,13 @@ async function main(): Promise<void> {
   try {
     await seedLookups(prisma);
     console.log(`Seeded reference data: ${REQUIRED_LKP_TYPES.join(', ')}`);
+
+    // The other half of what a notification needs: an event with no row here is a letter the sweep
+    // can queue and cannot write.
+    await seedEmailTemplates(prisma);
+    console.log(
+      `Seeded email copy for ${Object.keys(EMAIL_TEMPLATE_SEEDS).length} send decision(s)`,
+    );
 
     // Skipped rather than failed on a server, because the reference rows above are exactly
     // what production needs from this command. `seedDemoAccounts` still refuses.
