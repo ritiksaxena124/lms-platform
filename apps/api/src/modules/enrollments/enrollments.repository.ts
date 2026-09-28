@@ -10,6 +10,41 @@ const WITH_COURSE = {
 
 export type EnrollmentRow = Prisma.EnrollmentGetPayload<{ include: typeof WITH_COURSE }>;
 
+/** The same row with the teacher on it, which is the only thing the news about a place needs that
+ * a screen never shows.
+ *
+ * The two writes below answer with this rather than with `WITH_COURSE` because a joining message
+ * names the person the student is about to learn with, and the name has to be read in the same
+ * statement that decided the news — not looked up afterwards, when the course could answer
+ * differently than it did while the write was open. */
+const PLACE_NEWS_SELECT = {
+  id: true,
+  studentUserId: true,
+  courseId: true,
+  isActive: true,
+  createdAt: true,
+  updatedAt: true,
+  course: {
+    select: {
+      id: true,
+      slug: true,
+      title: true,
+      teacher: { select: { id: true, fullName: true } },
+    },
+  },
+} as const satisfies Prisma.EnrollmentSelect;
+
+export type PlaceNewsRow = Prisma.EnrollmentGetPayload<{ select: typeof PLACE_NEWS_SELECT }>;
+
+/** The seam the bookings repository opened in the previous step, arriving on this side of the
+ * relationship: *when* a place's news is filed belongs here, inside the transaction that moved the
+ * row, while *which event* the write is belongs to the service, which owns the vocabulary.
+ *
+ * Called only on the road where the row changed. A student who takes a place they already hold is
+ * the same press replayed, and a second letter telling them they are in a course they are already
+ * in is the day they stop believing the queue. */
+export type PlaceNotifier = (tx: Prisma.TransactionClient, row: PlaceNewsRow) => Promise<unknown>;
+
 /** The student a place belongs to, as little of them as a class list has to say. */
 const WITH_STUDENT = {
   student: { select: { id: true, fullName: true } },
@@ -24,6 +59,10 @@ export type RosterRow = Prisma.EnrollmentGetPayload<{ include: typeof WITH_STUDE
  * afterwards — the same rule the teacher's repositories run on, arriving on the other side of
  * the relationship. A place in somebody else's name and a place that was never taken answer
  * the same way, so no call can probe which enrollments exist.
+ *
+ * The two writes each take a `notify` and call it inside their own transaction, which is the outbox
+ * rule (ARCHITECTURE §6) in one sentence: the news is filed by the write that made it, so a place
+ * whose row rolled back cannot have a letter about it waiting to send.
  */
 @Injectable()
 export class EnrollmentsRepository {
@@ -38,28 +77,73 @@ export class EnrollmentsRepository {
     });
   }
 
-  async openPlace(studentUserId: string, courseId: string) {
-    return this.prisma.enrollment.create({
-      data: { studentUserId, courseId },
-      include: WITH_COURSE,
+  /**
+   * Take a place, and say so once.
+   *
+   * Three roads, and only two of them are news. The student already holds it — the press is a
+   * replay, and the row that answers is the one with the original `createdAt` on it. The row is
+   * there and closed — reopened rather than replaced, because the pair is unique and the day the
+   * place was *first* taken is a fact the student did not move by going away and coming back.
+   * Neither row is there — the place is opened.
+   *
+   * The read and the write are one transaction so that the news filed at the end describes the row
+   * as it was written, and so a `notify` that throws takes the row back with it.
+   */
+  async takePlace(
+    studentUserId: string,
+    courseId: string,
+    notify?: PlaceNotifier,
+  ): Promise<PlaceNewsRow> {
+    return this.prisma.$transaction(async (tx) => {
+      const standing = await tx.enrollment.findUnique({
+        where: { courseId_studentUserId: { courseId, studentUserId } },
+        select: PLACE_NEWS_SELECT,
+      });
+      if (standing?.isActive) return standing;
+
+      const place = standing
+        ? await tx.enrollment.update({
+            where: { id: standing.id },
+            data: { isActive: true },
+            select: PLACE_NEWS_SELECT,
+          })
+        : await tx.enrollment.create({
+            data: { studentUserId, courseId },
+            select: PLACE_NEWS_SELECT,
+          });
+
+      await notify?.(tx, place);
+      return place;
     });
   }
 
-  /** Reopening the row rather than writing a second one: one place per student per course,
-   * and the day it was first taken stays in `createdAt`. */
-  async reactivate(id: string) {
-    return this.prisma.enrollment.update({
-      where: { id },
-      data: { isActive: true },
-      include: WITH_COURSE,
-    });
-  }
+  /**
+   * Leave a place, and say so only if it was still held.
+   *
+   * `isActive: true` is part of the update's own `where` rather than a thing checked after it, which
+   * is what makes `null` mean "nothing moved" instead of "something moved and I could not tell". The
+   * caller already has the row from its own read, so `null` is a second press of the leave button and
+   * answers with the closed row; the notifier is reached by the road that closed a place, so a double
+   * press files one letter rather than two.
+   *
+   * Nothing is deleted. The row is the record of an access that happened, and the pages read under it
+   * were opened by it.
+   */
+  async closePlace(
+    studentUserId: string,
+    id: string,
+    notify?: PlaceNotifier,
+  ): Promise<PlaceNewsRow | null> {
+    return this.prisma.$transaction(async (tx) => {
+      const [closed] = await tx.enrollment.updateManyAndReturn({
+        where: { id, studentUserId, isActive: true },
+        data: { isActive: false },
+        select: PLACE_NEWS_SELECT,
+      });
+      if (!closed) return null;
 
-  async close(id: string) {
-    return this.prisma.enrollment.update({
-      where: { id },
-      data: { isActive: false },
-      include: WITH_COURSE,
+      await notify?.(tx, closed);
+      return closed;
     });
   }
 

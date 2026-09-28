@@ -3,6 +3,7 @@ import {
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
+  MAIL_EVENT_CODES,
   type CourseRosterEntry,
   type CourseRosterResponse,
   type CreateEnrollmentInput,
@@ -10,7 +11,9 @@ import {
 } from '@lms/shared';
 
 import { ReferenceService } from '../../reference/reference.service';
-import type { EnrollmentRow, RosterRow } from './enrollments.repository';
+import { MailQueue } from '../notifications/mail-queue.service';
+import type { EnrollmentNews } from '../notifications/mail-queue.service';
+import type { EnrollmentRow, PlaceNewsRow, RosterRow } from './enrollments.repository';
 import { EnrollmentsRepository } from './enrollments.repository';
 
 /** A course is addressed by the id the catalog sent. A shape that cannot be one is refused
@@ -45,16 +48,33 @@ function toEnrollment(row: EnrollmentRow): Enrollment {
   };
 }
 
+/** The written row as a news story, which is a narrower thing than the row.
+ *
+ * The teacher's name is in it because the joining copy says who the student is now learning with,
+ * and the student's id is in it because that is who has to be told. Their address is not: 6a's port
+ * reads the address book at delivery time, so a person who changes it does not change a letter that
+ * is already queued. */
+function toNews(row: PlaceNewsRow): EnrollmentNews {
+  return {
+    course: {
+      id: row.course.id,
+      title: row.course.title,
+      teacherName: row.course.teacher.fullName,
+    },
+    student: { id: row.studentUserId },
+  };
+}
+
 /**
  * A student's place in a course, and the only place in this app that writes one.
  *
  * Three rules decide everything below.
  *
- * Taking a place is idempotent. Pressing the button twice is one event: the second call
- * finds the row that already exists — open, or left behind when the student went away — and
- * answers with it rather than with a conflict or a duplicate. That is also why the route
- * replies `200` on a first enrollment instead of `201`: two status codes for one button
- * would ask the portal whether it had been clicked before.
+ * Taking a place is idempotent. Pressing the button twice is one event: the write below finds the
+ * row that already exists — open, or left behind when the student went away — and answers with it
+ * rather than with a conflict or a duplicate. That is also why the route replies `200` on a first
+ * enrollment instead of `201`: two status codes for one button would ask the portal whether it had
+ * been clicked before. It is the same reason a replay files no news at the bottom of this file.
  *
  * What a place is worth is decided by the catalog, not here. This service never lists a
  * lesson or opens a page; it writes the row that §11's query reads. The two published gates
@@ -70,8 +90,17 @@ export class EnrollmentsService {
   constructor(
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
+    private readonly mail: MailQueue,
   ) {}
 
+  /**
+   * Take a place, and queue the news if taking it was news.
+   *
+   * The event is named here and filed by the repository: which of joining and reopening a write is
+   * is vocabulary, and the queue only accepts a code, while *whether anything happened at all* is
+   * settled by the statement that wrote the row. The two halves meet in a callback that runs inside
+   * that statement's transaction (ARCHITECTURE §6).
+   */
   async enroll(studentUserId: string, input: CreateEnrollmentInput): Promise<Enrollment> {
     const published = await this.reference.valueId(
       LKP_TYPE_CODES.COURSE_STATUS,
@@ -88,14 +117,10 @@ export class EnrollmentsService {
       });
     }
 
-    const place = await this.enrollments.findPlace(studentUserId, courseId.id);
-    // Reopening beats reinserting: the pair is unique, and the row that was already there
-    // carries the day the student first arrived.
-    return toEnrollment(
-      place
-        ? await this.enrollments.reactivate(place.id)
-        : await this.enrollments.openPlace(studentUserId, courseId.id),
+    const place = await this.enrollments.takePlace(studentUserId, courseId.id, (tx, row) =>
+      this.mail.aboutEnrollment(tx, MAIL_EVENT_CODES.ENROLLMENT_JOINED, toNews(row)),
     );
+    return toEnrollment(place);
   }
 
   /** The caller's own open places, newest first, and only in courses still on the shelf. */
@@ -146,9 +171,11 @@ export class EnrollmentsService {
   /**
    * Leave a place, or note that it is already left.
    *
-   * A second cancel is not an error the portal has to explain, so an already-closed row is
-   * returned as it is rather than refused. The row itself stays: it is the record of an
-   * access that happened, and the pages read under it were opened by this enrollment.
+   * A second cancel is not an error the portal has to explain, so a place that is already closed is
+   * returned as it is rather than refused. It is the same clause that files no news for it: the
+   * write below only matches a row that is still open, so leaving twice tells the student they left
+   * once. The row itself stays: it is the record of an access that happened, and the pages read
+   * under it were opened by this enrollment.
    */
   async cancel(studentUserId: string, id: string): Promise<Enrollment> {
     const place = UUID.test(id) ? await this.enrollments.findOwnPlace(studentUserId, id) : null;
@@ -162,6 +189,9 @@ export class EnrollmentsService {
       });
     }
 
-    return toEnrollment(place.isActive ? await this.enrollments.close(place.id) : place);
+    const closed = await this.enrollments.closePlace(studentUserId, id, (tx, row) =>
+      this.mail.aboutEnrollment(tx, MAIL_EVENT_CODES.ENROLLMENT_LEFT, toNews(row)),
+    );
+    return toEnrollment(closed ?? place);
   }
 }

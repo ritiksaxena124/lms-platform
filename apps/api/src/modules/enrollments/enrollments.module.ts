@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { NotificationsModule } from '../notifications/notifications.module';
 import { CourseRosterController } from './course-roster.controller';
 import { EnrollmentsController } from './enrollments.controller';
 import { EnrollmentsRepository } from './enrollments.repository';
@@ -21,8 +22,15 @@ import { EnrollmentsService } from './enrollments.service';
  * already has the two published gates and now gains the enrollment; duplicating that here
  * would be two places where the rules about readable pages are kept, and one of them would
  * eventually disagree.
+ *
+ * It does write to the mail queue: taking a place and leaving one are both news the student has to
+ * be told, and the two events are filed inside the transactions that write the rows. That is the
+ * only reason this module reaches outside itself — the queue has no opinion about places, and a
+ * service that owned its own outbox insert would be a second place where "what just happened" is
+ * decided twice, once by the write and once afterwards.
  */
 @Module({
+  imports: [NotificationsModule],
   controllers: [EnrollmentsController, CourseRosterController],
   providers: [EnrollmentsService, EnrollmentsRepository],
   // "Does this student hold a place" is the first question a booking calendar asks, and the row it
