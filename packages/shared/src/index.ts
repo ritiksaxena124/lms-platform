@@ -9,6 +9,7 @@ export * from './error-codes';
 export * from './lookup-codes';
 export * from './lesson-assets';
 export * from './lessons';
+export * from './mail-outbox';
 export * from './money';
 export * from './schedule';
 export * from './timezone';
