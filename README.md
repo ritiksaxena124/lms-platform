@@ -4,11 +4,12 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 5 done** — a teacher writes a course and opens a week in it, a learner reads enough
-of that course to want a place, asks for a minute of the teacher's time, and is let into a room for
-it when the teacher says yes. Everything listed under [What each portal
-does](#what-each-portal-does) is shipped, tested and clickable; the action log, the ops portal,
-email and money are still ahead, and [Phases](#phases) keeps the ordered record of why.
+**Status: Phase 7 done** — a teacher writes a course and opens a week in it, a learner reads enough
+of that course to want a place, asks for a minute of the teacher's time, is let into a room for it when
+the teacher says yes, is told about all of it by email, and every one of those decisions leaves a
+record the platform can be asked about. Everything listed under [What each portal
+does](#what-each-portal-does) is shipped, tested and clickable; the ops portal, money and the two
+apps outside the product are still ahead, and [Phases](#phases) keeps the ordered record of why.
 
 ## Contents
 
@@ -84,8 +85,9 @@ email and money are still ahead, and [Phases](#phases) keeps the ordered record 
   shows the same class in the student's own timezone, _Leave this class_ gives the minute back
   while it still stands, and Join opens the room for the class happening now.
 
-The action log, the ops portal, email and coupons are still ahead — [Phases](#phases) says in which
-order they arrive.
+The ops portal, money and the two apps outside the product are still ahead —
+[Phases](#phases) says in which order they arrive. What has no screen yet is the action log: it has an
+endpoint (`/api/v1/actions`) and no door to stand in, which is Phase 8's first page.
 
 ---
 
@@ -248,18 +250,18 @@ link carries an address.
 
 A release is a phase boundary, not a deploy. `main` carries work in flight; a tag says
 "this commit passed the gate", and the tag is what a demo, a hand-off or a rollback points
-at. Versions track the phase table below — Phase 5 closed at `v0.5.0` and Phase 6 at `v0.6.0`;
-`v0.7.0` will be Phase 7.
+at. Versions track the phase table below — Phase 6 closed at `v0.6.0` and Phase 7 at `v0.7.0`;
+`v0.8.0` will be Phase 8.
 
 ```
-bun run release v0.7.0 --title="Phase 7: the action log"
-bun run release v0.7.0 --notes="What a person gets at this tag."   # instead of generated notes
-bun run release v0.7.0 --dry-run
+bun run release v0.8.0 --title="Phase 8: the ops portal"
+bun run release v0.8.0 --notes="What a person gets at this tag."   # instead of generated notes
+bun run release v0.8.0 --dry-run
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main` and a tag that
 already exists on origin; runs `bun run verify` and stops if it is not green; then writes an
-**annotated** tag (the message is the title, so `git show v0.7.0` explains the decision),
+**annotated** tag (the message is the title, so `git show v0.8.0` explains the decision),
 pushes `main` and the tag, and opens the GitHub release with `gh`. Nothing is pushed unless
 the gate passed first, and `--skip-verify` exists only for a tag that is being moved after a
 mistake — a tag with no gate behind it is a label rather than a release.
@@ -397,7 +399,7 @@ moving.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
   published from what the code already says rather than restated into a second copy that drifts.
 
-**Phases 0 through 6 are closed.** The first four are the ground the product stands on —
+**Phases 0 through 7 are closed.** The first four are the ground the product stands on —
 ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 went one brick at a time, and so
 did the news phase after it:
 
@@ -534,32 +536,52 @@ mailbox stands behind them, so a wrong address would have read `sent` here too, 
 the reclaim and `NoMail`'s drop are shown against doubles in a spec rather than against a host that
 refused twice.
 
-**Phase 7 is scoped, not started.** An append-only `action_log` — who did what, to which row, and in
-which part of the app — because nothing in this API is audited today: no service logs its own writes,
-and the outbox has a recipient but no column for who caused the news. Four decisions give it a shape.
-**What earns a row is a write that changed something**, plus the three account events a person later
-asks about: signed in, signed out, and the replayed token that ends every session an account has
-(ARCHITECTURE §7). The mail sweep's status churn is left out because `mail_outbox` already _is_ that
-record, and the token rotation on every portal load is left out because a log a machine floods is a
-log nobody reads. **Which part of the app is named by the action rather than by the caller** — a table
-in `@lms/shared` gives every action code one section code, so the answer lives with the vocabulary and
-never arrives in a header a client could fill in. **A row
-remembers the decided facts**: a status from one code to another, a price before and after, a switch
-going on. Never a copy of the row it touched, because a snapshot carries personal data forward past
-both the correction and the deletion, and grows with every column the table gains — and the room name
-a confirming teacher mints is precisely the value that changes a booking and may not change a log
-(§14). **The record is written inside the transaction that owns the change**, for the reason Phase 6's
-notifier is a parameter rather than a line after the write: a write that rolled back leaves nothing
-behind, and a replay that changed nothing records nothing. The actor reaches the write from the request
-context the middleware already builds, as an id plus the role as it stood; the target is a table-and-id
-pair with no foreign key, because an FK would let a missing row fail the very write it was reporting.
-The table has `created_at` and neither `updated_at` nor `isActive` — a mutable column on an append-only
-ledger is an invitation to edit history. Phase 7 ends at an ops-gated read endpoint: a log that cannot
-be asked a question is not yet a feature, and the screen that draws it is Phase 8's.
+**Phase 7 is closed.** Before it, nothing in this API was audited: no service logged its own writes, and
+the outbox had a recipient but no column for who caused the news. Now every standing-row write files a
+record beside itself, in the transaction that owns the change, and one guarded endpoint reads them back.
+ARCHITECTURE §18 holds the rules — what earns a row, why the action rather than the caller decides its
+shape, why `detail` holds decided facts and never a snapshot. What follows is the order they arrived in.
+
+**Step 7a, the vocabulary and the table, is in** (`packages/shared/src/action-log.ts`, `action_log`).
+Every action code names its own section, target table and actor kind, so "which part of the app" is a
+fact about the decision rather than a value somebody supplies — which is also why these lists live in
+code and not in `Lkp*`: nobody can add an action without writing the code that files it. The table has
+`created_at` and neither `updated_at` nor `isActive`, because a mutable column on an append-only ledger
+is an invitation to edit history, and its `target_id` carries no foreign key on purpose, so a record
+outlives the row it is about.
+
+**Step 7b, the recorder, is in** (`action-recorder.ts`). One method, handed the caller's transaction
+client, reading the actor out of the request context the auth guard already filled — so a client cannot
+name the person a row credits, and the role stored is the role as it stood that minute. `recordAs`
+exists for the four account events and for nothing else: every `/auth/*` route is public, so
+registration and sign-in are the writes where nobody has been resolved yet.
+
+**Step 7c, the wiring, is in** — the authoring writes first (course, module, lesson, media, the
+teacher's profile, availability rules), then the class and place decisions, then the account events.
+What that step settled is the property the phase is judged on: a row is earned by a change, so a second
+press of either button files nothing, and the session revokes became conditional updates inside
+`$transaction` for exactly that reason. The expiry sweep moved from a bulk update to per-row
+transactions, because a bulk update reports a count and a count cannot be addressed. Every suite that
+deletes an account learned one more teardown line, since the actor key is `Restrict` and the log is
+allowed to outlive the account it describes.
+
+**Step 7d, the read side, is in** (`GET /api/v1/actions`). Ops-only, five filters, each riding an index
+the table already carried or the one this step added. An unknown filter value is a 400 rather than an
+empty page an operator would read as "nothing happened", half a target pair is refused for the same
+reason, and the actor comes back as a name plus the role the row stored — never an address, in either
+direction. The screen that draws it is Phase 8's first page.
+
+**Verified, live.** On a dev API running the shipped routes, a teacher created, published and archived a
+course, and the log answered with exactly those three rows about that one row — newest first, each
+carrying its `{from, to}` and no copy of the course. The same endpoint refused the teacher 403 and an
+anonymous caller 401, refused a lone `targetId` with a 400 keyed by `targetTable`, and a hundred-row
+answer scanned clean of any `@` and of any password. The suites carry what a live box cannot: the shape of
+every code, the four account events, the scheduler's rows with nobody credited, and a pagination that
+never hands the same row to two pages.
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
-to attach to, which is why booking came before video. The action log wants every kind of write to
-exist before it fixes what a record looks like. Coupons land last among the things a student
+to attach to, which is why booking came before video. The action log wanted every kind of write to
+exist before it fixed what a record looks like. Coupons land last among the things a student
 touches, because a discount only means something next to a price that is charged — the same reason
 they sit after the portals are complete. The calendar work is after all of it: a teacher marking a
 course's classes to repeat weekly, and marking the days they are on holiday so no minute is offered

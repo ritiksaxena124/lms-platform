@@ -43,8 +43,8 @@ was ready to run.
   `users.email` is unique forever — reusing a deleted account's address would resurrect
   history. A `(teacher_id, title)` style key gets a partial unique index
   `WHERE is_active`, so an archived row cannot block a new one.
-- Append-only ledgers (payments, moderation decisions, status transitions, the Phase 7 action
-  log) never update in place; a correction is a new row pointing at the old one.
+- Append-only ledgers (payments, moderation decisions, status transitions, the action log §18)
+  never update in place; a correction is a new row pointing at the old one.
 - A join row follows the same rule: removing a subject from a teacher's profile deactivates
   the row, and adding it back revives that same row. That is what makes
   `@@unique([profile_id, subject_value_id])` safe — an unconditional delete-then-insert
@@ -289,7 +289,7 @@ The port takes a finished message, so something has to finish it. That something
 `email_template.event_code` is unique across every row rather than across the standing ones, the
 identity half of the split §2 uses elsewhere: a code names a send decision in the code, and two rows
 answering to one would leave a caller unable to say which a reader got. A reword is an update in
-place; what a message once said is Phase 7's action log to hold.
+place; what a message once said is §18's action log to hold.
 
 ### Queueing the news (Phase 6, step 6c)
 
@@ -479,9 +479,9 @@ The choice has now been made, which is why these are phases rather than open que
   of the month" are data), and a student redeems one on the way to a place. Because
   redemption is a decision about money, it belongs after every portal exists — a code entered
   in one app and honoured in another is exactly the drift this system keeps to one API.
-- **Every entity's writes will be recorded** (Phase 7): an append-only `ActionLog` of who did
-  what, to which row, and in which part of the app. It is a phase rather than a column added
-  now because a record's shape is only worth fixing once every kind of write exists — and
+- **Every entity's write is recorded** (§18): an append-only `action_log` of who did what, to
+  which row, and in which part of the app. It was a phase rather than a column added earlier
+  because a record's shape is only worth fixing once every kind of write exists — and
   because the part of the app an action came from is a name over the whole write surface, not a
   field one table can hold.
 
@@ -1279,3 +1279,74 @@ stopped being wrong, not by a theory about core counts.
 
 A phase is not "done" when the code compiles. It is done when the tests pass, the browser
 behaviour has been checked by hand, and the next phase has been approved.
+
+## 18. The action log
+
+Who did what, to which row, and in which part of the app. `action_log` is the append-only ledger §2
+promised, and the API writes it beside the write that earned it: no client files a row, no route takes
+a header naming the actor, and no read of any kind is recorded.
+
+**What earns a row is a write that changed something**, plus exactly four account events — registered,
+signed in, signed out, and the replayed token that ends every session an account has. The absences are
+as deliberate as the list, and each has a reason that outlives the phase:
+
+- a token rotation, because every portal load does one and `refresh_token` already holds that record;
+- the mail sweep's status churn, because `mail_outbox` _is_ that record;
+- a refused sign-in — unknown address, wrong password, disabled account — because a log of refusals is
+  a directory of who has an account plus a guess at their password, and the access log has the request;
+- any replay that changed nothing: a second logout of a retired token, the loser of a race, a refused
+  conflict. "Earned by a change" is what keeps a ledger small enough to read, and it is why the
+  conditional revokes are `updateMany` with the live status in their `where` rather than an update that
+  assumes it.
+
+**The action decides its own shape; the caller never does.** `ACTION_SHAPES` in `@lms/shared` gives
+every code its section — which part of the app — its target table, and whether a person or the
+scheduler can write it. A caller hands over three things (the action, the row it is about, the facts it
+settled) and cannot name the rest, so no route can file an authoring decision under `account` to make a
+screen look tidier. `actionShapeFor` throws for a code nobody declared, which is why this vocabulary
+lives in code rather than in `Lkp*` (§3): nobody can add an action without writing the code that files
+it and the test that reads it back.
+
+**`detail` holds decided facts, never a snapshot** — `{from, to}` for a status switch, a count of the
+sessions a replay ended. Flat strings, numbers and booleans, typed as `ActionDetail` in the shared
+vocabulary so an object does not compile. A copy of the row would carry personal data forward past both
+the correction and the deletion, would grow with every column the table gains, and would put a room name
+in a log for the reason §14 keeps it out of mail.
+
+**The row is written inside the transaction that owns the change.** The recorder is handed the caller's
+`Prisma.TransactionClient` and holds no connection of its own, so a write that rolled back leaves no
+record and a record cannot exist without its write. Same reasoning as §6's notifier being a parameter
+rather than a line after the write.
+
+**The actor is the one the request already knew.** `JwtAuthGuard` puts the account's id and role into
+the request context after re-reading the row (§7), and the recorder reads them there — so the role on a
+row is the role as it stood when the action happened, and a promotion does not rewrite what somebody did
+before it. `/auth/*` routes are `@Public()`, so nobody has been resolved when registration and sign-in
+are recorded: those four events are the only ones that name their own actor, and the recorder accepts
+that only for the `account` section. `actor_user_id` is a `Restrict` foreign key — a log that outlives
+the account it describes is the point of keeping one — which is why a spec that deletes an account has
+to retire its rows first.
+
+**`target_id` is a table-and-id pair with no foreign key**, so a record survives the row it is about: a
+course archived next year was still published in September. Nothing resolves it on the way back out.
+
+**Reading it is ops-only, and the five filters are the five indexes.** `GET /api/v1/actions` is guarded
+by role rather than by relationship, because one page of this table holds an account's sign-ins next to
+another teacher's decisions and no filter makes a stranger's history readable by narrowing it. An
+account reading its own record is a real question and a different permission, so it is not smuggled in
+as a special case of this route. Each accepted filter rides an index — `actor`, `targetTable` +
+`targetId`, `action`, `section`, and `created_at` between two instants with both ends inclusive — so the
+questions a log is kept for are also the ones that stay cheap as it grows. Code filters are checked
+against the closed shared lists, because an empty page is a plausible-looking answer to a nonsense
+question and an operator would read it as "nothing happened"; half a target pair is refused for the same
+reason. Ordering is `created_at desc, id desc`: two rows filed by one transaction carry the same instant
+by design, and an order that is not total can hand one row to two pages. `total` is counted in the same
+transaction as the page, so "of 412 sign-ins, these 25" is one answer rather than two that disagree.
+
+**No address in it, in either direction.** The actor comes back as `{id, fullName}` joined live plus the
+role the row stored, and the repository's `include` selects exactly those two columns — `users` holds an
+email, the include graph is the only way the account is reached, and a ledger is not where an address
+should age. The reader keeps its own file so the writer still holds no connection, and a repository with
+a `find` on it is one somebody will start reading through.
+
+What Phase 8 draws on top of this is a screen. The answers above are what it is allowed to ask.
