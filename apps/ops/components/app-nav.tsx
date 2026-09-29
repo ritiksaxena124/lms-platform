@@ -1,9 +1,19 @@
 'use client';
 
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { buttonClass, cn, notify, Skeleton } from '@lms/ui';
 
 import { useSession } from './session-provider';
+
+/**
+ * The screens that exist. An item is added with its page, never before it, because a desk an operator
+ * opens during an incident cannot afford a link that turns out to be a promise.
+ */
+const ITEMS = [
+  { href: '/', label: 'Desk' },
+  { href: '/activity', label: 'Activity log' },
+] as const;
 
 /**
  * The one element that never animates: content slides, the chrome stays put, so a navigation always
@@ -14,6 +24,8 @@ import { useSession } from './session-provider';
  * every row they read is somebody else's history, and every write is made in their own name.
  */
 export function AppNav() {
+  const pathname = usePathname();
+
   return (
     <aside
       style={{ viewTransitionName: 'app-chrome' }}
@@ -27,6 +39,40 @@ export function AppNav() {
         <span aria-hidden="true" className="inline-block size-2 rounded-pill bg-ember" />
         Ops desk
       </Link>
+
+      <nav aria-label="Portal" className="mt-5 lg:mt-8">
+        <ul className="flex gap-1 rounded-card bg-paper-sunk p-1 lg:flex-col lg:gap-0.5 lg:bg-transparent lg:p-0">
+          {ITEMS.map((item) => {
+            const active = item.href === '/' ? pathname === '/' : pathname.startsWith(item.href);
+
+            return (
+              <li key={item.href} className="flex-1 lg:flex-none">
+                <Link
+                  href={item.href}
+                  transitionTypes={['nav-forward']}
+                  aria-current={active ? 'page' : undefined}
+                  className={cn(
+                    'relative flex items-center gap-2 rounded-field px-3 py-2 text-label',
+                    'transition-[background-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
+                    active
+                      ? 'bg-brand-soft font-semibold text-brand-deep'
+                      : 'text-ink-muted hover:bg-paper-sunk hover:text-ink',
+                  )}
+                >
+                  <span
+                    aria-hidden="true"
+                    className={cn(
+                      'absolute -left-2 hidden h-4 w-[3px] rounded-pill bg-brand lg:block',
+                      !active && 'lg:hidden',
+                    )}
+                  />
+                  {item.label}
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
 
       <AccountSlot />
     </aside>

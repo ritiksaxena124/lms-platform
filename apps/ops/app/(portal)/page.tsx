@@ -1,12 +1,23 @@
-import { Card, CardHeader, Illo, PageHeader, RouteTransition, Stagger, StatusPill } from '@lms/ui';
+import Link from 'next/link';
+import {
+  buttonClass,
+  Card,
+  CardHeader,
+  cn,
+  Illo,
+  PageHeader,
+  RouteTransition,
+  Stagger,
+  StatusPill,
+} from '@lms/ui';
 
 /**
- * The desk before its screens.
+ * The desk and the three questions it is for.
  *
- * Three cards, no links: the read routes behind them already answer on the API (7d's ledger, 8a's
- * accounts, 8b's queue) and the portals that show them arrive next. A link that goes to a page this
- * repo has not written yet is worse than a card that says so, because an operator would click it in
- * good faith and land on a 404 in a tool meant for incidents.
+ * A card links only when its screen exists. The accounts and the queue are answered by the API
+ * (8a, 8b) and their screens arrive beside them, and a link to a page this repo has not written is
+ * worse than a card that says so: an operator clicks it in good faith and lands on a 404 in a tool
+ * meant for incidents.
  */
 export default function OpsDeskPage() {
   return (
@@ -14,7 +25,7 @@ export default function OpsDeskPage() {
       <PageHeader
         title="Ops desk"
         description="Everything this platform recorded about itself, in one read-only place."
-        meta="Phase 8 · the accounts and the queue are answered by the API; the screens are next"
+        meta="Phase 8 · the ledger is open; the accounts and the queue screens follow it"
         actions={
           <StatusPill tone="ember" pulse>
             Being built
@@ -29,6 +40,13 @@ export default function OpsDeskPage() {
             title="Activity log"
             description="Who wrote what, when, and in whose name — every standing-row change since Phase 7."
           />
+          <Link
+            href="/activity"
+            transitionTypes={['nav-forward']}
+            className={cn(buttonClass({ variant: 'secondary', size: 'sm' }), 'mt-4')}
+          >
+            Read the log
+          </Link>
         </Card>
         <Card>
           <CardHeader
