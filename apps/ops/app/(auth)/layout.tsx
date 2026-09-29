@@ -1,0 +1,39 @@
+import { Illo } from '@lms/ui';
+
+/**
+ * The two-column shell for the one screen that has no session yet: the desk on the left, the form on
+ * the right, and no navigation to click while you are still outside.
+ *
+ * The pitch names what this portal reads rather than what it sells, because the audience is one or two
+ * people who already know the platform — and the useful reassurance is that nothing here changes a
+ * course, a class or a payout.
+ */
+export default function AuthLayout({ children }: { children: React.ReactNode }) {
+  return (
+    <main
+      id="main"
+      className="mx-auto grid min-h-dvh w-full max-w-page content-center gap-10 px-5 py-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,26rem)] lg:gap-16 lg:px-6 xl:px-10"
+    >
+      <section className="hidden lg:block">
+        <p className="eyebrow text-brand-deep">Ops desk</p>
+        {/* The page owns the `h1`; this is the pitch beside it, not another heading. */}
+        <p className="mt-2 block max-w-[20ch] text-h1 text-ink-strong">
+          Who changed what, and what is still queued.
+        </p>
+        <p className="mt-3 max-w-[48ch] text-[0.9375rem] leading-relaxed text-ink-muted">
+          The action log, the accounts, and the notification queue — three reads and two writes, in
+          your own name.
+        </p>
+        <Illo src="/illustrations/peep-sitting-06.svg" size="lg" className="mt-6 justify-start" />
+      </section>
+
+      <section className="w-full self-center rounded-sheet border border-line bg-surface p-6">
+        <p className="mb-6 flex items-baseline gap-2 text-h2 text-ink-strong">
+          <span aria-hidden="true" className="inline-block size-2 rounded-pill bg-ember" />
+          Ops
+        </p>
+        {children}
+      </section>
+    </main>
+  );
+}
