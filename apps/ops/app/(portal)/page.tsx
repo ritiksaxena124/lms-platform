@@ -54,6 +54,13 @@ export default function OpsDeskPage() {
             title="Accounts"
             description="Find an account by name or role, disable it, and issue or revoke the ops role."
           />
+          <Link
+            href="/accounts"
+            transitionTypes={['nav-forward']}
+            className={cn(buttonClass({ variant: 'secondary', size: 'sm' }), 'mt-4')}
+          >
+            Read the accounts
+          </Link>
         </Card>
         <Card>
           <CardHeader

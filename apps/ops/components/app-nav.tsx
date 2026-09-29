@@ -13,6 +13,7 @@ import { useSession } from './session-provider';
 const ITEMS = [
   { href: '/', label: 'Desk' },
   { href: '/activity', label: 'Activity log' },
+  { href: '/accounts', label: 'Accounts' },
 ] as const;
 
 /**
