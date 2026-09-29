@@ -19,6 +19,12 @@
   },
   {
     "group": "How it works",
+    "slug": "data-model",
+    "title": "The data model",
+    "summary": "Every table and column, under both names, with the keys and pointers the database keeps."
+  },
+  {
+    "group": "How it works",
     "slug": "conventions",
     "title": "Rules the code enforces",
     "summary": "The handful of constraints the rest of the design relies on, and what checks them."

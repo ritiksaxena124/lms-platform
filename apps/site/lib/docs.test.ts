@@ -3,7 +3,14 @@ import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { docGroups, docRoutes, docSlugs, readDoc, type EndpointsFile } from './docs';
+import {
+  docGroups,
+  docRoutes,
+  docSlugs,
+  readDoc,
+  type DataModelFile,
+  type EndpointsFile,
+} from './docs';
 
 const CONTENT_DIR = resolve(import.meta.dirname, '../content');
 
@@ -133,10 +140,9 @@ describe('the route table the API exports', () => {
     // Each route by name, rather than a row count: a page of prose beside the table has its own
     // code cells, and arithmetic that happens to close proves nothing about which route is missing.
     for (const endpoint of exported) {
-      expect(
-        page.html,
-        `${endpoint.method} ${endpoint.path} is not on the page`,
-      ).toContain(`<td><code>${endpoint.path}</code></td>`);
+      expect(page.html, `${endpoint.method} ${endpoint.path} is not on the page`).toContain(
+        `<td><code>${endpoint.path}</code></td>`,
+      );
     }
   });
 
@@ -162,8 +168,88 @@ describe('the route table the API exports', () => {
     // A fence the renderer does not know becomes a code block that prints its own name — the worst
     // kind of stale docs, because they look like a placeholder somebody will get to.
     for (const slug of docSlugs()) {
-      expect(readDoc(slug).html).not.toMatch(/language-endpoints|```/);
+      expect(readDoc(slug).html).not.toMatch(/language-(?:endpoints|data-model)|```/);
     }
+  });
+});
+
+describe('the data model the API exports', () => {
+  // Read from the file rather than from `lib/docs`, because a renderer that dropped four of the
+  // sixteen tables would still print a page that looks like a schema.
+  const file = JSON.parse(
+    readFileSync(resolve(CONTENT_DIR, 'data-model.json'), 'utf8'),
+  ) as unknown as DataModelFile;
+
+  const page = readDoc('data-model');
+
+  it('gives every table its own section', () => {
+    expect(file.models.length).toBeGreaterThan(12);
+
+    for (const model of file.models) {
+      expect(page.html, `${model.name} has no section`).toContain(
+        `<h3 id="${model.name.toLowerCase()}">${model.name}</h3>`,
+      );
+    }
+  });
+
+  it('names every column twice, as the code calls it and as the database calls it', () => {
+    // The pair is the point: `teacherUserId` is what a Prisma call writes and `teacher_user_id` is
+    // what a raw query and a log row carry, and a reader holding either should find the other here.
+    for (const model of file.models) {
+      for (const column of model.columns) {
+        expect(page.html, `${model.name}.${column.name} is not on the page`).toContain(
+          `<code>${column.name}</code>`,
+        );
+        expect(page.html, `${model.name}.${column.column} is not on the page`).toContain(
+          `<code>${column.column}</code>`,
+        );
+      }
+    }
+  });
+
+  it('marks the columns that may hold nothing', () => {
+    // A nullable column is a promise about a business rule — `slotHeldAt` is null exactly when the
+    // row keeps no minute — so the page has to show which ones are optional at all.
+    expect(page.html).toContain('<code>DateTime?</code>');
+    expect(page.html).toContain('<code>String[]</code>');
+  });
+
+  it('states the two conventions on every table, and the exception in words', () => {
+    const retireable = page.html.match(/retireable/g) ?? [];
+    const unretired = page.html.match(/no retirement flag, no update stamp/g) ?? [];
+
+    expect(retireable.length).toBe(file.models.length - 1);
+    expect(unretired).toHaveLength(1);
+  });
+
+  it('lists each pointer with the row it leads to and the action behind it', () => {
+    // A booking points at `users` twice, so naming the target alone would leave the reader guessing
+    // which half is the student. The physical column is the answer: it is what the two rows differ in.
+    expect(page.html).toContain('<code>student</code> → <code>users</code>');
+    expect(page.html).toContain('from <code>student_user_id</code>');
+    expect(page.html).toContain('from <code>teacher_user_id</code>');
+    expect(page.html).toContain('Restrict');
+  });
+
+  it('inverts the pointers so a hub table shows who holds it', () => {
+    // The schema writes each pair once, on the side that holds the key, and a reader of `users` has
+    // to be shown the far halves or the busiest table on the page looks like nothing depends on it.
+    expect(page.html).toContain('<code>booking</code> holds it as <code>student</code>');
+  });
+
+  it('records the keys that cannot repeat', () => {
+    // The pair that keeps two learners off one minute of one teacher's calendar, and the pair that
+    // makes a code mean one thing per lookup type. Neither string exists anywhere else on the page,
+    // so finding them is the same as finding the key list.
+    expect(page.html).toContain('<code>teacher_user_id</code> + <code>slot_held_at</code>');
+    expect(page.html).toContain('<code>type_id</code> + <code>code</code>');
+  });
+
+  it('puts each table in the page contents as a word, not as markup', () => {
+    const sections = page.headings.map((heading) => heading.text);
+
+    expect(sections).toContain('Booking');
+    expect(sections.join(' ')).not.toContain('`');
   });
 });
 
