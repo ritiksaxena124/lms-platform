@@ -161,7 +161,9 @@ export function OutboxTable() {
     <div className="flex flex-col gap-4">
       {filters}
 
-      <p className="text-label text-ink">{`${result.total} letters`}</p>
+      <p className="text-label text-ink">
+        {`${result.total} ${result.total === 1 ? 'letter' : 'letters'}`}
+      </p>
 
       {result.items.length === 0 ? (
         <EmptyState

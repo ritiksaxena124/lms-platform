@@ -205,7 +205,7 @@ export function AccountTable() {
       {controls}
 
       <p className="text-label text-ink">
-        {`${result.total} accounts`}
+        {`${result.total} ${result.total === 1 ? 'account' : 'accounts'}`}
         {result.items.length > 0 ? <span className="text-ink-faint"> · newest first</span> : null}
       </p>
 
@@ -238,6 +238,7 @@ export function AccountTable() {
                     {entry.fullName}
                     {isSelf ? (
                       <span className="ml-2 text-[0.8125rem] text-ink-faint">
+                        {' '}
                         This is your account
                       </span>
                     ) : null}

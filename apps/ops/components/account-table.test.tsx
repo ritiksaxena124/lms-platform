@@ -136,6 +136,14 @@ describe('AccountTable', () => {
     expect(await screen.findByText('Nab Ahuja')).toBeInTheDocument();
   });
 
+  it('counts one account in the singular', async () => {
+    api.listAccounts.mockResolvedValue(page([account()], { total: 1 }));
+
+    render(<AccountTable />);
+
+    expect(await screen.findByText('1 account')).toBeInTheDocument();
+  });
+
   it('disables an account and reads the row back from the answer, not from a guess', async () => {
     render(<AccountTable />);
     const [row] = await screen.findAllByRole('listitem');

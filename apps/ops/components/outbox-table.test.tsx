@@ -93,6 +93,14 @@ describe('OutboxTable', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
   });
 
+  it('counts one letter in the singular', async () => {
+    api.listOutbox.mockResolvedValue(page([entry()]));
+
+    render(<OutboxTable />);
+
+    expect(await screen.findByText('1 letter')).toBeInTheDocument();
+  });
+
   it('filters by the state an operator picks, from the first page', async () => {
     render(<OutboxTable />);
     await screen.findAllByRole('listitem');

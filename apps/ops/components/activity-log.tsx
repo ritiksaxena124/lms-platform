@@ -42,10 +42,12 @@ const SECTION_OPTIONS: SelectOption[] = [
  * label usefully is that action's problem to solve here, not a reason to blank out every row.
  */
 function detailOf(entry: ActionLogEntry): string[] {
-  return Object.entries(entry.detail ?? {}).map(
-    ([key, value]) =>
-      `${key}: ${typeof value === 'boolean' ? (value ? 'yes' : 'no') : String(value)}`,
-  );
+  return Object.entries(entry.detail ?? {})
+    .sort(([first], [second]) => first.localeCompare(second))
+    .map(
+      ([key, value]) =>
+        `${key}: ${typeof value === 'boolean' ? (value ? 'yes' : 'no') : String(value)}`,
+    );
 }
 
 type Settled = { key: string; page: ActionListResponse };
@@ -144,7 +146,7 @@ export function ActivityLog() {
       {filters}
 
       <p className="text-label text-ink">
-        {`${result.total} logged actions`}
+        {`${result.total} ${result.total === 1 ? 'logged action' : 'logged actions'}`}
         {result.items.length > 0 ? <span className="text-ink-faint"> · newest first</span> : null}
       </p>
 

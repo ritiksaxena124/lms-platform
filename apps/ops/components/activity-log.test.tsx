@@ -99,6 +99,23 @@ describe('ActivityLog', () => {
     expect(within(row as HTMLElement).getByText('status_to: confirmed')).toBeInTheDocument();
   });
 
+  it('prints the facts a row carries in an order that reads as a sentence', async () => {
+    api.listActions.mockResolvedValue(
+      page([entry({ detail: { to: 'disabled', from: 'active', actor_note: 'at the desk' } })]),
+    );
+
+    render(<ActivityLog />);
+    const [row] = await screen.findAllByRole('listitem');
+    const chips = within(row as HTMLElement)
+      .getAllByText(/: /)
+      .map((chip) => chip.textContent);
+
+    // The detail object is keyed by whatever the writer decided, so its own order is a JSON
+    // artefact. A reader asks "what did it move from, and to" — the words answer that best in
+    // alphabetical order, which is also the only order two runs of the same row can agree on.
+    expect(chips).toEqual(['actor_note: at the desk', 'from: active', 'to: disabled']);
+  });
+
   it('counts the whole log rather than the rows on this page', async () => {
     api.listActions.mockResolvedValue(page([entry()], { total: 412 }));
 
@@ -106,6 +123,14 @@ describe('ActivityLog', () => {
 
     expect(await screen.findByText('412 logged actions')).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(1);
+  });
+
+  it('counts one logged action in the singular', async () => {
+    api.listActions.mockResolvedValue(page([entry()], { total: 1 }));
+
+    render(<ActivityLog />);
+
+    expect(await screen.findByText('1 logged action')).toBeInTheDocument();
   });
 
   it('asks the ledger for the section an operator picks, from the first page again', async () => {
