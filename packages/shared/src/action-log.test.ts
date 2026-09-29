@@ -8,6 +8,9 @@ import {
   ACTION_SECTION_CODES,
   ACTION_TARGET_TABLE_CODES,
   SYSTEM_ACTION_CODES,
+  actionActorKindLabel,
+  actionLabel,
+  actionSectionLabel,
   actionShapeFor,
 } from './action-log';
 
@@ -153,5 +156,59 @@ describe('the action vocabulary', () => {
     // names the code, which is our own vocabulary and never a value somebody typed in.
     expect(() => actionShapeFor('invented_by_a_test')).toThrow(/invented_by_a_test/);
     expect(() => actionShapeFor('')).toThrow();
+  });
+});
+
+/**
+ * The words a screen puts beside a code.
+ *
+ * `action_log` stores codes and nothing else, so the ledger's reader has to translate them
+ * somewhere, and this is the one place it happens for all three vocabularies at once. The alternative
+ * — a label per portal — is how the teacher's desk and the ops desk end up calling `booking_expired`
+ * "Expired" and "Missed" in two screenshots of the same row.
+ */
+describe('the words the ledger reads back', () => {
+  it('gives every action a sentence an operator can read', () => {
+    const missing = Object.values(ACTION_CODES).filter(
+      (code) => actionLabel(code) === code || actionLabel(code) === '',
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('gives every section a name, and does not just capitalise the code', () => {
+    // `course_authoring` has an underscore in it because it is a column value. A label that returned
+    // 'Course_authoring' would be a formatting function rather than a piece of writing, and an
+    // operator would read the schema off the screen.
+    expect(actionSectionLabel(ACTION_SECTION_CODES.COURSE_AUTHORING)).toBe('Course authoring');
+    const missing = Object.values(ACTION_SECTION_CODES).filter(
+      (code) => actionSectionLabel(code) === code || actionSectionLabel(code).includes('_'),
+    );
+    expect(missing).toEqual([]);
+  });
+
+  it('keeps the two halves of one decision distinguishable in words', () => {
+    // A teacher saying no and a clock running out are different answers, and the ledger is the only
+    // place a person finds out which one happened. If the labels collapsed them the row would still
+    // be right and the screen would still be useless.
+    expect(actionLabel(ACTION_CODES.BOOKING_REFUSED)).not.toBe(
+      actionLabel(ACTION_CODES.BOOKING_EXPIRED),
+    );
+    expect(actionLabel(ACTION_CODES.COURSE_PUBLISHED)).not.toBe(
+      actionLabel(ACTION_CODES.LESSON_PUBLISHED),
+    );
+    expect(actionLabel(ACTION_CODES.ACCOUNT_STATUS_CHANGED)).not.toBe(
+      actionLabel(ACTION_CODES.ACCOUNT_ROLE_CHANGED),
+    );
+  });
+
+  it('answers an unknown code with the code rather than an empty label', () => {
+    // The columns are text and the schema tests prove a hand-written row can hold anything
+    // (Phase 7's 7a), so the read side will meet a code this list has never heard of. `null` there
+    // would mean a page that cannot be drawn; the raw string is the honest version of the same fact,
+    // and it is the one answer that tells an operator which code is missing a label.
+    expect(actionLabel('invented_by_a_migration')).toBe('invented_by_a_migration');
+    expect(actionSectionLabel('invented_by_a_migration')).toBe('invented_by_a_migration');
+    expect(actionActorKindLabel('system')).toBe('The scheduler');
+    expect(actionActorKindLabel('invented_by_a_migration')).toBe('invented_by_a_migration');
   });
 });

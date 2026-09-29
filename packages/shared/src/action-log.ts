@@ -428,3 +428,97 @@ export interface ActionListResponse {
   pageSize: number;
   total: number;
 }
+
+/**
+ * The words a screen puts beside a code.
+ *
+ * The ledger stores codes and nothing else, so somebody has to translate them, and doing it here is
+ * what keeps the ops desk and a future export saying "Request expired" about the same row in the same
+ * breath. The seven class and place labels are the strings `MAIL_EVENT_LABELS` already uses, on the
+ * same one-decision-one-name rule that made the codes match: a person comparing a letter with the
+ * record that caused it should not be reconciling two dialects.
+ */
+export const ACTION_LABELS: Record<ActionCode, string> = {
+  [ACTION_CODES.ACCOUNT_REGISTERED]: 'Account registered',
+  [ACTION_CODES.SIGNED_IN]: 'Signed in',
+  [ACTION_CODES.SIGNED_OUT]: 'Signed out',
+  [ACTION_CODES.SESSION_REPLAY_DETECTED]: 'All sessions ended',
+
+  [ACTION_CODES.ACCOUNT_STATUS_CHANGED]: 'Account status changed',
+  [ACTION_CODES.ACCOUNT_ROLE_CHANGED]: 'Account role changed',
+
+  [ACTION_CODES.TEACHER_PROFILE_SAVED]: 'Teacher profile saved',
+
+  [ACTION_CODES.COURSE_CREATED]: 'Course created',
+  [ACTION_CODES.COURSE_UPDATED]: 'Course updated',
+  [ACTION_CODES.COURSE_PUBLISHED]: 'Course published',
+  [ACTION_CODES.COURSE_ARCHIVED]: 'Course archived',
+  [ACTION_CODES.COURSE_DEMO_BOOKINGS_CHANGED]: 'Demo bookings changed',
+  [ACTION_CODES.COURSE_MODULE_CREATED]: 'Module created',
+  [ACTION_CODES.COURSE_MODULE_UPDATED]: 'Module updated',
+  [ACTION_CODES.COURSE_MODULE_DEACTIVATED]: 'Module retired',
+  [ACTION_CODES.COURSE_MODULES_REORDERED]: 'Modules reordered',
+  [ACTION_CODES.LESSON_CREATED]: 'Lesson created',
+  [ACTION_CODES.LESSON_UPDATED]: 'Lesson updated',
+  [ACTION_CODES.LESSON_PUBLISHED]: 'Lesson published',
+  [ACTION_CODES.LESSON_UNPUBLISHED]: 'Lesson unpublished',
+  [ACTION_CODES.LESSON_DEACTIVATED]: 'Lesson retired',
+  [ACTION_CODES.LESSONS_REORDERED]: 'Lessons reordered',
+
+  [ACTION_CODES.LESSON_ASSET_ATTACHED]: 'Recording attached',
+
+  [ACTION_CODES.AVAILABILITY_RULE_CREATED]: 'Availability window added',
+  [ACTION_CODES.AVAILABILITY_RULE_UPDATED]: 'Availability window changed',
+  [ACTION_CODES.AVAILABILITY_RULE_RETIRED]: 'Availability window retired',
+
+  [ACTION_CODES.ENROLLMENT_JOINED]: 'Enrolled',
+  [ACTION_CODES.ENROLLMENT_LEFT]: 'Left a course',
+
+  [ACTION_CODES.BOOKING_REQUESTED]: 'Class requested',
+  [ACTION_CODES.BOOKING_CONFIRMED]: 'Class confirmed',
+  [ACTION_CODES.BOOKING_REFUSED]: 'Class refused',
+  [ACTION_CODES.BOOKING_CANCELLED]: 'Class cancelled',
+  [ACTION_CODES.BOOKING_EXPIRED]: 'Request expired',
+};
+
+/** What the sections are called to a person who has never read a column name.
+ *
+ * `course_authoring` covers the course, its modules and its lessons because that is one screen a
+ * teacher stands on, and "Courses" is the word they would use for it. `booking` becomes "Classes"
+ * for the same reason: nobody in this product thinks of themselves as holding a booking.
+ */
+export const ACTION_SECTION_LABELS: Record<ActionSectionCode, string> = {
+  [ACTION_SECTION_CODES.ACCOUNT]: 'Accounts and sessions',
+  [ACTION_SECTION_CODES.TEACHER_PROFILE]: 'Teacher profile',
+  [ACTION_SECTION_CODES.COURSE_AUTHORING]: 'Course authoring',
+  [ACTION_SECTION_CODES.LESSON_MEDIA]: 'Lesson media',
+  [ACTION_SECTION_CODES.AVAILABILITY]: 'Availability',
+  [ACTION_SECTION_CODES.ENROLLMENT]: 'Enrollments',
+  [ACTION_SECTION_CODES.BOOKING]: 'Classes',
+};
+
+/** Who did it, in the one column an operator reads that question out of. */
+export const ACTION_ACTOR_KIND_LABELS: Record<ActionActorKindCode, string> = {
+  [ACTION_ACTOR_KIND_CODES.USER]: 'A person',
+  [ACTION_ACTOR_KIND_CODES.SYSTEM]: 'The scheduler',
+};
+
+/**
+ * The phrase for a code, or the code itself when there is none.
+ *
+ * Three columns of text and no database constraint behind any of them (7a's choice, proved by 7a's
+ * schema test filing a row under an invented code), so a real page will one day contain a row this
+ * list has never heard of. Refusing it would throw away the twenty-four readable rows beside it;
+ * answering with the raw string keeps the sentence honest about which one is unwritten.
+ */
+export function actionLabel(code: string): string {
+  return ACTION_LABELS[code as ActionCode] ?? code;
+}
+
+export function actionSectionLabel(code: string): string {
+  return ACTION_SECTION_LABELS[code as ActionSectionCode] ?? code;
+}
+
+export function actionActorKindLabel(code: string): string {
+  return ACTION_ACTOR_KIND_LABELS[code as ActionActorKindCode] ?? code;
+}
