@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import type { WriteRecorder } from '../action-log/action-recorder';
 
 /** The course a place is in, enough of it to name the thing and link to it. */
 const WITH_COURSE = {
@@ -45,6 +46,15 @@ export type PlaceNewsRow = Prisma.EnrollmentGetPayload<{ select: typeof PLACE_NE
  * in is the day they stop believing the queue. */
 export type PlaceNotifier = (tx: Prisma.TransactionClient, row: PlaceNewsRow) => Promise<unknown>;
 
+/** A place that just opened, and whether it had been closed.
+ *
+ * The record of a join is asked this and cannot answer it from the row: a reopened place keeps the
+ * `createdAt` of the day the student first took it — which is the fact the response is built on — so
+ * after the write there is nothing on the row to tell a new student apart from a returning one. The
+ * read that decides which of the two writes to make already knows, so the answer travels to the
+ * recorder rather than being guessed at by whoever reads the log later. */
+export type PlaceRecord = { place: PlaceNewsRow; reopened: boolean };
+
 /** The student a place belongs to, as little of them as a class list has to say. */
 const WITH_STUDENT = {
   student: { select: { id: true, fullName: true } },
@@ -62,7 +72,9 @@ export type RosterRow = Prisma.EnrollmentGetPayload<{ include: typeof WITH_STUDE
  *
  * The two writes each take a `notify` and call it inside their own transaction, which is the outbox
  * rule (ARCHITECTURE §6) in one sentence: the news is filed by the write that made it, so a place
- * whose row rolled back cannot have a letter about it waiting to send.
+ * whose row rolled back cannot have a letter about it waiting to send. Each takes a `record` for the
+ * same moment and the same reason: Phase 7's log is the account of what the platform did, and an
+ * account of a change that never committed is worse than no account at all.
  */
 @Injectable()
 export class EnrollmentsRepository {
@@ -87,12 +99,13 @@ export class EnrollmentsRepository {
    * Neither row is there — the place is opened.
    *
    * The read and the write are one transaction so that the news filed at the end describes the row
-   * as it was written, and so a `notify` that throws takes the row back with it.
+   * as it was written, and so a callback that throws takes the row back with it.
    */
   async takePlace(
     studentUserId: string,
     courseId: string,
     notify?: PlaceNotifier,
+    record?: WriteRecorder<PlaceRecord>,
   ): Promise<PlaceNewsRow> {
     return this.prisma.$transaction(async (tx) => {
       const standing = await tx.enrollment.findUnique({
@@ -113,6 +126,7 @@ export class EnrollmentsRepository {
           });
 
       await notify?.(tx, place);
+      await record?.(tx, { place, reopened: standing !== null });
       return place;
     });
   }
@@ -123,8 +137,8 @@ export class EnrollmentsRepository {
    * `isActive: true` is part of the update's own `where` rather than a thing checked after it, which
    * is what makes `null` mean "nothing moved" instead of "something moved and I could not tell". The
    * caller already has the row from its own read, so `null` is a second press of the leave button and
-   * answers with the closed row; the notifier is reached by the road that closed a place, so a double
-   * press files one letter rather than two.
+   * answers with the closed row; the notifier and the recorder are reached by the road that closed a
+   * place, so a double press files one letter and one record rather than two.
    *
    * Nothing is deleted. The row is the record of an access that happened, and the pages read under it
    * were opened by it.
@@ -133,6 +147,7 @@ export class EnrollmentsRepository {
     studentUserId: string,
     id: string,
     notify?: PlaceNotifier,
+    record?: WriteRecorder<PlaceNewsRow>,
   ): Promise<PlaceNewsRow | null> {
     return this.prisma.$transaction(async (tx) => {
       const [closed] = await tx.enrollment.updateManyAndReturn({
@@ -143,6 +158,7 @@ export class EnrollmentsRepository {
       if (!closed) return null;
 
       await notify?.(tx, closed);
+      await record?.(tx, closed);
       return closed;
     });
   }

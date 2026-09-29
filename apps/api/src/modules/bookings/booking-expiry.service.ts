@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
+  ACTION_CODES,
   BOOKING_STATUS_CODES,
   LKP_TYPE_CODES,
   MAIL_EVENT_CODES,
@@ -9,6 +10,7 @@ import {
 
 import { AppLogger } from '../../common/logging/app-logger.service';
 import { ReferenceService } from '../../reference/reference.service';
+import { ActionRecorder } from '../action-log/action-recorder';
 import { MailQueue } from '../notifications/mail-queue.service';
 import { BookingsRepository } from './bookings.repository';
 
@@ -44,6 +46,7 @@ export class BookingExpiryService {
     private readonly bookings: BookingsRepository,
     private readonly reference: ReferenceService,
     private readonly mail: MailQueue,
+    private readonly actions: ActionRecorder,
   ) {}
 
   /**
@@ -92,6 +95,20 @@ export class BookingExpiryService {
       // one: a student who was promised an answer has to be told the answer was silence. Filed per
       // row the sweep actually ended — see `BookingsRepository.expirePending`.
       notify: (tx, row) => this.mail.aboutBooking(tx, MAIL_EVENT_CODES.BOOKING_EXPIRED, row),
+      // The one record in this platform with nobody behind it. `booking_expired` is shaped as a
+      // system action in the shared vocabulary, so the row is filed without an actor or a request id
+      // even when a person's own call is what the scheduler happened to land on — and the state it
+      // left is named rather than read, because the sweep only ever matches pending rows, which is
+      // the repository's own `where` clause promising that.
+      record: (tx, row) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.BOOKING_EXPIRED,
+          targetId: row.id,
+          detail: {
+            from: BOOKING_STATUS_CODES.PENDING,
+            to: BOOKING_STATUS_CODES.EXPIRED,
+          },
+        }),
     });
   }
 }

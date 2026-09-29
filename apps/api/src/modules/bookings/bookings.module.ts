@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { ActionLogModule } from '../action-log/action-log.module';
 import { AvailabilityModule } from '../availability/availability.module';
 import { EnrollmentsModule } from '../enrollments/enrollments.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -32,9 +33,20 @@ import { BookingsService } from './bookings.service';
  * confirmed, refused, left to expire, and given back by the student. The repository calls the queue
  * inside the same transaction as the write, so this module owns the decision that a thing happened
  * and the queue owns who hears about it (§6).
+ *
+ * `ActionLogModule` is where the same five outcomes are filed as records. The two seams are
+ * deliberately alike and separate: the queue answers who is to be told about a class, the log that
+ * the class happened and who made it happen, and both are written by the statement that moved the
+ * row (§7).
  */
 @Module({
-  imports: [AvailabilityModule, EnrollmentsModule, NotificationsModule, VideoModule],
+  imports: [
+    ActionLogModule,
+    AvailabilityModule,
+    EnrollmentsModule,
+    NotificationsModule,
+    VideoModule,
+  ],
   controllers: [BookingsController],
   providers: [BookingsService, BookingsRepository, BookingExpiryService],
 })

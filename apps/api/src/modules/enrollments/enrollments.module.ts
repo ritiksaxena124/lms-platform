@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 
+import { ActionLogModule } from '../action-log/action-log.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CourseRosterController } from './course-roster.controller';
 import { EnrollmentsController } from './enrollments.controller';
@@ -24,13 +25,15 @@ import { EnrollmentsService } from './enrollments.service';
  * eventually disagree.
  *
  * It does write to the mail queue: taking a place and leaving one are both news the student has to
- * be told, and the two events are filed inside the transactions that write the rows. That is the
- * only reason this module reaches outside itself — the queue has no opinion about places, and a
- * service that owned its own outbox insert would be a second place where "what just happened" is
- * decided twice, once by the write and once afterwards.
+ * be told, and the two events are filed inside the transactions that write the rows. It writes the
+ * same two decisions to the action log, on the same instant and through the same seam, because the
+ * queue answers who hears about a place while the log answers that it was taken and by whom (§7).
+ * Those are the reasons this module reaches outside itself — neither table has an opinion about
+ * places, and a service that owned its own outbox insert would be a second place where "what just
+ * happened" is decided twice, once by the write and once afterwards.
  */
 @Module({
-  imports: [NotificationsModule],
+  imports: [ActionLogModule, NotificationsModule],
   controllers: [EnrollmentsController, CourseRosterController],
   providers: [EnrollmentsService, EnrollmentsRepository],
   // "Does this student hold a place" is the first question a booking calendar asks, and the row it

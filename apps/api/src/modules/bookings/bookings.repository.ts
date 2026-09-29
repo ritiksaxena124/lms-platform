@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
+import type { WriteRecorder } from '../action-log/action-recorder';
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 24 * 60 * 60 * MS_PER_MINUTE;
@@ -73,7 +74,7 @@ const BOOKING_WRITE_SELECT = {
 
 export type BookingNewsRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_WRITE_SELECT }>;
 
-/** The one seam a write hands its news through, and the reason it is a parameter rather than a
+/** The seam a write hands its news through, and the reason it is a parameter rather than a
  * dependency of this class: which event a row *is* is a decision about vocabulary and belongs to the
  * service, while *when* it is filed belongs here, next to the statement that moved the row.
  *
@@ -85,6 +86,16 @@ export type BookingNotifier = (
   tx: Prisma.TransactionClient,
   row: BookingNewsRow,
 ) => Promise<unknown>;
+
+/** A class that just moved status, and the state it moved from.
+ *
+ * The after-image carries everything the letter about a change needs, and one thing the record of it
+ * cannot be built without: what the class was before this write. A student's cancel is two different
+ * decisions wearing one action code — taking back an ask, or walking out of a class the teacher had
+ * said yes to — and the state that distinguishes them is gone from the table the moment the swap
+ * lands. So the row the swap's own `where` clause was built from travels to the recorder as well,
+ * which costs no read because it is the read the race clause already needed. */
+export type BookingTransition = { booking: BookingNewsRow; from: string };
 
 /** The four facts the join gate needs, and the one column no list of this table ever carries.
  *
@@ -111,7 +122,7 @@ export type BookingRoomRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_R
  *
  * Which of the two `requested` roads a caller arrived on is deliberately invisible here, and it is
  * also the one thing a notification cannot be blind to — so the split is settled where it is made,
- * at the insert, and the notifier is never reached by a replay.
+ * at the insert, and neither the notifier nor the recorder is reached by a replay.
  */
 export type SlotRequestResult = { outcome: 'requested'; booking: BookingRow } | { outcome: 'held' };
 
@@ -122,8 +133,8 @@ export type SlotRequestResult = { outcome: 'requested'; booking: BookingRow } | 
  * `done` is written for two roads that arrive at the same place: the row this write just changed,
  * and the row that already said what the caller wanted it to say. Both answer with the class as it
  * now reads, which is the whole difference between a retry and an error. Only the first of them
- * files news — the second is the same answer given twice, and a person told twice about one
- * confirmation starts wondering which of the two was real.
+ * files news, or a record — the second is the same answer given twice, and a person told twice about
+ * one confirmation starts wondering which of the two was real.
  *
  * `not-standing` is a class whose state has moved past the one the caller could act on — taught,
  * missed, refused, left to expire, or answered the other way already; `changed` is the rarer
@@ -153,6 +164,13 @@ export type AnswerOutcome =
  * `notify` and call it inside their own transaction. That is the outbox rule (ARCHITECTURE §6) in
  * one sentence: the news is filed by the write that made it, so a class that rolled back cannot have
  * a letter about it waiting to send.
+ *
+ * Each takes a `record` too, called on the same road a line later for the reason Phase 7 gives for
+ * the same choice everywhere: the log is the account of what the platform did, and an account of a
+ * change that never committed is worse than no account at all. Two callbacks rather than one folded
+ * together because they file into two tables that answer two different questions — who hears about
+ * this class, and who can read later that it happened — and it is the service that owns both answers,
+ * while this class owns only the moment.
  */
 @Injectable()
 export class BookingsRepository {
@@ -235,6 +253,7 @@ export class BookingsRepository {
     pendingStatusValueId: string;
     blockingStatusValueIds: string[];
     notify?: BookingNotifier;
+    record?: WriteRecorder<BookingNewsRow>;
   }): Promise<SlotRequestResult> {
     const endsAt = new Date(args.startsAt.getTime() + args.durationMinutes * MS_PER_MINUTE);
 
@@ -271,6 +290,7 @@ export class BookingsRepository {
           select: BOOKING_WRITE_SELECT,
         });
         await args.notify?.(tx, created);
+        await args.record?.(tx, created);
         return { outcome: 'requested', booking: created };
       } catch (error) {
         // Somebody took the minute in the gap this transaction could not cover — an older row
@@ -420,7 +440,8 @@ export class BookingsRepository {
    * with a count, and a count cannot be addressed. A letter has to go to the student who asked for
    * *that* minute, so the sweep has to learn which rows it moved, not merely how many — and it can
    * only learn that by asking for each row's own after-image inside the transaction that files the
-   * news about it.
+   * news about it. The record of the expiry is filed in the same transaction for the same reason: a
+   * row that matched nothing belongs to no decision, and no sweep may claim it ended one.
    *
    * What makes it safe to run twice, and in two places at once, is unchanged: the pending status is
    * in every row's own `where`, so an expired row matches nothing on a second pass, and a minute a
@@ -433,6 +454,7 @@ export class BookingsRepository {
     olderThan: Date;
     at: Date;
     notify?: BookingNotifier;
+    record?: WriteRecorder<BookingNewsRow>;
   }): Promise<number> {
     const standing = await this.prisma.booking.findMany({
       where: {
@@ -453,6 +475,7 @@ export class BookingsRepository {
         });
         if (!after) return false;
         await args.notify?.(tx, after);
+        await args.record?.(tx, after);
         return true;
       });
       if (moved) expired += 1;
@@ -479,6 +502,7 @@ export class BookingsRepository {
     cancellableStatusValueIds: string[];
     cancelledStatusValueId: string;
     notify?: BookingNotifier;
+    record?: WriteRecorder<BookingTransition>;
   }): Promise<AnswerOutcome> {
     return this.swapOwnedStatus({
       bookingId: args.bookingId,
@@ -487,6 +511,7 @@ export class BookingsRepository {
       toStatusValueId: args.cancelledStatusValueId,
       releaseHold: true,
       notify: args.notify,
+      record: args.record,
     });
   }
 
@@ -508,6 +533,7 @@ export class BookingsRepository {
      * write is a class with a missing half whenever that second write fails. */
     mintRoomName?: string;
     notify?: BookingNotifier;
+    record?: WriteRecorder<BookingTransition>;
   }): Promise<AnswerOutcome> {
     return this.swapOwnedStatus({
       bookingId: args.bookingId,
@@ -517,6 +543,7 @@ export class BookingsRepository {
       releaseHold: args.releaseHold,
       mintRoomName: args.mintRoomName,
       notify: args.notify,
+      record: args.record,
     });
   }
 
@@ -533,8 +560,13 @@ export class BookingsRepository {
    * says cancelled while still holding a minute keeps a class off a calendar nobody is using.
    *
    * The read and the swap run in one transaction, which is not needed for the swap's honesty and is
-   * entirely needed for the notifier's: the news about a change has to be filed while the change is
-   * still uncommitted, so a write that rolls back cannot leave a letter about it behind.
+   * entirely needed for the notifier's and the recorder's: what a change is said to have done has to
+   * be filed while the change is still uncommitted, so a write that rolls back cannot leave a letter
+   * about it — or a record of it — behind.
+   *
+   * The record is handed the state the row was read in as well as the row after the swap, because
+   * that is the one fact about the change the table stops holding once the change lands, and it is
+   * the read the race clause already had to make.
    */
   private async swapOwnedStatus(args: {
     bookingId: string;
@@ -544,6 +576,7 @@ export class BookingsRepository {
     releaseHold: boolean;
     mintRoomName?: string;
     notify?: BookingNotifier;
+    record?: WriteRecorder<BookingTransition>;
   }): Promise<AnswerOutcome> {
     return this.prisma.$transaction(async (tx) => {
       const row = await tx.booking.findFirst({
@@ -570,9 +603,10 @@ export class BookingsRepository {
       });
 
       // `changed` is the loser of the race, and a message about a class this write did not change is
-      // exactly the lie the outcome exists to prevent. So the notifier is reached by one road only.
+      // exactly the lie the outcome exists to prevent. So both callbacks are reached by one road only.
       if (!after) return { outcome: 'changed' };
       await args.notify?.(tx, after);
+      await args.record?.(tx, { booking: after, from: row.status.code });
       return { outcome: 'done', booking: after };
     });
   }

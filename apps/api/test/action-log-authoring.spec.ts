@@ -67,9 +67,9 @@ async function press(
   body?: object,
 ): Promise<{ res: request.Response; rows: ActionLog[] }> {
   const token = await bearer('tessa');
-  const call = request(app.getHttpServer())
-    [method](`/api/v1${path}`)
-    .set('Authorization', `Bearer ${token}`);
+  const server = app.getHttpServer();
+  const url = `/api/v1${path}`;
+  const call = request(server)[method](url).set('Authorization', `Bearer ${token}`);
   // `expect(fn)` hands the callback the whole Response, not the status, and fails only if the
   // callback throws — so the assertion has to be written as one.
   const res = await (body === undefined ? call : call.send(body)).expect((response) => {

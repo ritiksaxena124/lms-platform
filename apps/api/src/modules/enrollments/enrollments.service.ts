@@ -1,5 +1,6 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import {
+  ACTION_CODES,
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
   LKP_TYPE_CODES,
@@ -10,6 +11,7 @@ import {
   type Enrollment,
 } from '@lms/shared';
 
+import { ActionRecorder } from '../action-log/action-recorder';
 import { ReferenceService } from '../../reference/reference.service';
 import { MailQueue } from '../notifications/mail-queue.service';
 import type { EnrollmentNews } from '../notifications/mail-queue.service';
@@ -91,6 +93,7 @@ export class EnrollmentsService {
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
     private readonly mail: MailQueue,
+    private readonly actions: ActionRecorder,
   ) {}
 
   /**
@@ -100,6 +103,10 @@ export class EnrollmentsService {
    * is vocabulary, and the queue only accepts a code, while *whether anything happened at all* is
    * settled by the statement that wrote the row. The two halves meet in a callback that runs inside
    * that statement's transaction (ARCHITECTURE §6).
+   *
+   * The record of the decision goes down the same road for the same reason, and reaches the same
+   * places: a join that turns out to be a replay of a press leaves neither a letter nor a record
+   * behind, because nothing happened that anybody was told about or needs to be able to read later.
    */
   async enroll(studentUserId: string, input: CreateEnrollmentInput): Promise<Enrollment> {
     const published = await this.reference.valueId(
@@ -117,8 +124,20 @@ export class EnrollmentsService {
       });
     }
 
-    const place = await this.enrollments.takePlace(studentUserId, courseId.id, (tx, row) =>
-      this.mail.aboutEnrollment(tx, MAIL_EVENT_CODES.ENROLLMENT_JOINED, toNews(row)),
+    const place = await this.enrollments.takePlace(
+      studentUserId,
+      courseId.id,
+      (tx, row) => this.mail.aboutEnrollment(tx, MAIL_EVENT_CODES.ENROLLMENT_JOINED, toNews(row)),
+      (tx, written) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.ENROLLMENT_JOINED,
+          targetId: written.place.id,
+          // Whose place this is, in which course, and since when are all columns of the row the
+          // write moved. The one thing those do not say is whether this press opened a place or
+          // reopened the one the student had left — which is the difference between a new face and a
+          // returning one, and it stops being readable the moment the row says `isActive: true`.
+          detail: { reopened: written.reopened },
+        }),
     );
     return toEnrollment(place);
   }
@@ -172,10 +191,10 @@ export class EnrollmentsService {
    * Leave a place, or note that it is already left.
    *
    * A second cancel is not an error the portal has to explain, so a place that is already closed is
-   * returned as it is rather than refused. It is the same clause that files no news for it: the
-   * write below only matches a row that is still open, so leaving twice tells the student they left
-   * once. The row itself stays: it is the record of an access that happened, and the pages read
-   * under it were opened by this enrollment.
+   * returned as it is rather than refused. It is the same clause that files no news, and no record,
+   * for it: the write below only matches a row that is still open, so leaving twice tells the student
+   * they left once. The row itself stays: it is the record of an access that happened, and the pages
+   * read under it were opened by this enrollment.
    */
   async cancel(studentUserId: string, id: string): Promise<Enrollment> {
     const place = UUID.test(id) ? await this.enrollments.findOwnPlace(studentUserId, id) : null;
@@ -189,8 +208,17 @@ export class EnrollmentsService {
       });
     }
 
-    const closed = await this.enrollments.closePlace(studentUserId, id, (tx, row) =>
-      this.mail.aboutEnrollment(tx, MAIL_EVENT_CODES.ENROLLMENT_LEFT, toNews(row)),
+    const closed = await this.enrollments.closePlace(
+      studentUserId,
+      id,
+      (tx, row) => this.mail.aboutEnrollment(tx, MAIL_EVENT_CODES.ENROLLMENT_LEFT, toNews(row)),
+      // Nothing is named in `detail` because nothing was decided beyond the leaving: which place,
+      // whose, and when it stopped being open are all on the row the write closed.
+      (tx, row) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.ENROLLMENT_LEFT,
+          targetId: row.id,
+        }),
     );
     return toEnrollment(closed ?? place);
   }

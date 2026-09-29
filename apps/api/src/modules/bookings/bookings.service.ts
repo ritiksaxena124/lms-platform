@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import {
+  ACTION_CODES,
   API_ERROR_CODES,
   BLOCKING_BOOKING_STATUSES,
   BOOKING_HORIZON_DAYS,
@@ -32,6 +33,7 @@ import {
   type SlotEntitlementCode,
 } from '@lms/shared';
 
+import { ActionRecorder } from '../action-log/action-recorder';
 import { AvailabilityRepository } from '../availability/availability.repository';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
 import { MailQueue } from '../notifications/mail-queue.service';
@@ -243,6 +245,7 @@ export class BookingsService {
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
     private readonly mail: MailQueue,
+    private readonly actions: ActionRecorder,
     @Inject(VIDEO) private readonly video: Video,
   ) {}
 
@@ -354,6 +357,15 @@ export class BookingsService {
       // must not have a teacher told about it. Which of the two `requested` roads this was — a new
       // ask or a replay of the same one — is settled down there, and only the new one reaches this.
       notify: (tx, row) => this.mail.aboutBooking(tx, MAIL_EVENT_CODES.BOOKING_REQUESTED, row),
+      // Filed on the same road the letter goes down, for the same reason: the record is of the ask
+      // that was written, not of a button pressed twice. It names nothing the row does not already
+      // hold — the minute, the length and whether this was a demo or a class the student had a place
+      // in are all columns of the booking the insert just wrote.
+      record: (tx, row) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.BOOKING_REQUESTED,
+          targetId: row.id,
+        }),
     });
 
     if (result.outcome === 'held') throw takenMinute();
@@ -404,6 +416,16 @@ export class BookingsService {
           // The teacher is the one who has to know: the minute they were holding is free again, and
           // the queue decides who reads a `booking_cancelled` rather than this caller.
           notify: (tx, row) => this.mail.aboutBooking(tx, MAIL_EVENT_CODES.BOOKING_CANCELLED, row),
+          // Which state the class was standing in when the student gave it up is read inside the
+          // write rather than assumed here: taking back an ask and walking out of a class somebody
+          // said yes to are two different decisions wearing one action code, and the row after the
+          // swap says only the second half of either.
+          record: (tx, change) =>
+            this.actions.record(tx, {
+              action: ACTION_CODES.BOOKING_CANCELLED,
+              targetId: change.booking.id,
+              detail: { from: change.from, to: BOOKING_STATUS_CODES.CANCELLED },
+            }),
         })
       : ({ outcome: 'missing' } as const);
 
@@ -498,6 +520,24 @@ export class BookingsService {
                 : MAIL_EVENT_CODES.BOOKING_REFUSED,
               row,
             ),
+          // The record of the answer is chosen by the same `answer` that chose the status and the
+          // room, for the reason the note above gives about the letter: a confirm recorded as a
+          // refusal is not a fault in the log but in this line.
+          record: (tx, change) =>
+            this.actions.record(tx, {
+              action:
+                answer === 'confirm'
+                  ? ACTION_CODES.BOOKING_CONFIRMED
+                  : ACTION_CODES.BOOKING_REFUSED,
+              targetId: change.booking.id,
+              detail: {
+                from: change.from,
+                to:
+                  answer === 'confirm'
+                    ? BOOKING_STATUS_CODES.CONFIRMED
+                    : BOOKING_STATUS_CODES.REJECTED,
+              },
+            }),
         })
       : ({ outcome: 'missing' } as const);
 
