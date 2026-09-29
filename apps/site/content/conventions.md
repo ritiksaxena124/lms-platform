@@ -34,16 +34,18 @@ safe to run while other processes are running it too.
 ```json
 {
   "statusCode": 409,
-  "code": "COURSE_NOT_PUBLISHABLE",
-  "message": "A course needs at least one module before it can go live.",
+  "code": "CONFLICT",
+  "message": "Only a draft can be published.",
   "requestId": "6f1c…",
   "timestamp": "2026-09-29T11:04:22.181Z"
 }
 ```
 
-`code` is for machines and is stable; `message` is for a person and may be reworded whenever someone
-reads it carefully. A validation failure adds `details`, which is how a form knows which field to
-turn red. `requestId` is the same value that appears in the log line and in the `x-request-id`
+`code` is one of a closed list that lives in `@lms/shared`, and it is what a client switches on;
+which particular thing went wrong is a sentence in `message`, and that may be reworded whenever
+somebody reads it carefully. So a refusal is a status and a code together — `409 CONFLICT` — and both
+of those are stable while the words beside them are not. A validation failure adds
+`details.validation`, keyed by field, which is how a form knows which input to turn red. `requestId` is the same value that appears in the log line and in the `x-request-id`
 response header, so a report that says one identifier is enough to find the event.
 
 Error bodies never carry a stack trace, a connection string, or an internal hostname.
