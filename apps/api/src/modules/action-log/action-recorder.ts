@@ -5,20 +5,12 @@ import {
   ACTION_SECTION_CODES,
   actionShapeFor,
   type ActionCode,
+  type ActionDetail,
   type ActionShape,
   type RoleCode,
 } from '@lms/shared';
 
 import { currentLogContext } from '../../common/logging/log-context';
-
-/** One decided fact. A string, a number or a boolean, and nothing with parts.
- *
- * The flatness is the rule 7a wrote down about `detail` — the decided facts, never a copy of the row
- * the action touched — enforced where a caller will meet it. A snapshot is an object, so
- * `detail: course` does not compile, and a room name or a token has to be deliberately named as a
- * fact to arrive here at all. */
-export type ActionDetailValue = string | number | boolean;
-export type ActionDetail = Record<string, ActionDetailValue>;
 
 /** What a write decides to record: which action, which row, and what was settled.
  *

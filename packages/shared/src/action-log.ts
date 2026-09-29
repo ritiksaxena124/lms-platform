@@ -342,3 +342,68 @@ export function actionShapeFor(action: string): ActionShape {
   }
   return shape;
 }
+
+/** One decided fact. A string, a number or a boolean, and nothing with parts.
+ *
+ * This sits with the vocabulary rather than beside the writer because the column has one shape for
+ * both directions: what a write may file and what a reader is handed are the same promise, and two
+ * definitions of it would be free to disagree. The flatness is 7a's rule — the decided facts, never
+ * a copy of the row the action touched — and an object is what a snapshot would have to be, so
+ * `detail: { course }` does not compile here either. */
+export type ActionDetailValue = string | number | boolean;
+export type ActionDetail = Record<string, ActionDetailValue>;
+
+/** The person the row credits, as the read side answers it.
+ *
+ * A name and an id, which is the same line the teacher's roster draws: an email address never
+ * arrives here, because a log row outlives both the correction a person makes to their account and
+ * the deletion they ask for, and an address in a ledger is an address kept forever.
+ *
+ * `roleCode` is the role as the row stored it — what this person was allowed to do at the time — so
+ * a promotion does not rewrite what they did before it. Their current role is readable from the
+ * account, and is a different question. It is null only on a row written with no role to read, which
+ * the recorder reports rather than invents. */
+export interface ActionLogActor {
+  id: string;
+  fullName: string;
+  roleCode: string | null;
+}
+
+/**
+ * One row of the ledger, read.
+ *
+ * Nine answers and no translation: the columns are named what `action_log` names them, so a person
+ * comparing a row here with the table it came from is not reconciling two vocabularies. Two of them
+ * are worth saying why they are here at all:
+ *
+ * - `requestId` is the link to the access-log line of the same name, and it is null for a
+ *   scheduler's work because a sweep has no request to point back to.
+ * - `actor` is null in exactly those rows, and only there — the split an operator reads as
+ *   "how much of this was the machine".
+ *
+ * `targetId` is a uuid with no promise it still resolves, which is the point of keeping the record:
+ * a course archived next year was published in September, and the row says so either way.
+ */
+export interface ActionLogEntry {
+  id: string;
+  actionCode: ActionCode;
+  sectionCode: ActionSectionCode;
+  actorKind: ActionActorKindCode;
+  targetTable: ActionTargetTableCode;
+  targetId: string;
+  detail: ActionDetail;
+  actor: ActionLogActor | null;
+  requestId: string | null;
+  /** When the action happened, as the transaction that wrote it timed it — UTC on the wire, and the
+   * portal that draws it decides the zone it shows. */
+  createdAt: string;
+}
+
+/** A page of the log, newest first. `total` counts everything the filters matched, not the rows on
+ * this page, which is what lets a screen say "412 sign-ins" rather than "25". */
+export interface ActionListResponse {
+  items: ActionLogEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
