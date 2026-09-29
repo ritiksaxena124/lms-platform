@@ -1,0 +1,1389 @@
+{
+  "generatedBy": "bun run --filter @lms/api docs:data",
+  "models": [
+    {
+      "name": "LkpType",
+      "table": "lkp_type",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "code",
+          "column": "code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "description",
+          "column": "description",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [],
+      "uniqueKeys": [
+        [
+          "code"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "LkpValue",
+      "table": "lkp_value",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "typeId",
+          "column": "type_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "code",
+          "column": "code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "label",
+          "column": "label",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "position",
+          "column": "position",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "type",
+          "type": "LkpType",
+          "columns": [
+            "typeId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "typeId",
+          "code"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "User",
+      "table": "users",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "email",
+          "column": "email",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "passwordHash",
+          "column": "password_hash",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "fullName",
+          "column": "full_name",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "timezone",
+          "column": "timezone",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "roleValueId",
+          "column": "role_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "statusValueId",
+          "column": "status_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "emailVerifiedAt",
+          "column": "email_verified_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "lastLoginAt",
+          "column": "last_login_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "deletedAt",
+          "column": "deleted_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "role",
+          "type": "LkpValue",
+          "columns": [
+            "roleValueId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "status",
+          "type": "LkpValue",
+          "columns": [
+            "statusValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "email"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "TeacherProfile",
+      "table": "teacher_profile",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "userId",
+          "column": "user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "headline",
+          "column": "headline",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "bio",
+          "column": "bio",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "hourlyRateMinorUnits",
+          "column": "hourly_rate_minor_units",
+          "type": "Int",
+          "optional": true
+        },
+        {
+          "name": "currencyCode",
+          "column": "currency_code",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "deletedAt",
+          "column": "deleted_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "user",
+          "type": "User",
+          "columns": [
+            "userId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "userId"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "TeacherSubject",
+      "table": "teacher_subject",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "profileId",
+          "column": "profile_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "subjectValueId",
+          "column": "subject_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "deletedAt",
+          "column": "deleted_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "profile",
+          "type": "TeacherProfile",
+          "columns": [
+            "profileId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "subject",
+          "type": "LkpValue",
+          "columns": [
+            "subjectValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "profileId",
+          "subjectValueId"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Course",
+      "table": "course",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "teacherUserId",
+          "column": "teacher_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "column": "title",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "slug",
+          "column": "slug",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "summary",
+          "column": "summary",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "description",
+          "column": "description",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "levelValueId",
+          "column": "level_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "statusValueId",
+          "column": "status_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "priceMinorUnits",
+          "column": "price_minor_units",
+          "type": "Int",
+          "optional": true
+        },
+        {
+          "name": "priceCurrencyValueId",
+          "column": "price_currency_value_id",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "demoBookingsEnabled",
+          "column": "demo_bookings_enabled",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "deletedAt",
+          "column": "deleted_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "teacher",
+          "type": "User",
+          "columns": [
+            "teacherUserId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "level",
+          "type": "LkpValue",
+          "columns": [
+            "levelValueId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "status",
+          "type": "LkpValue",
+          "columns": [
+            "statusValueId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "priceCurrency",
+          "type": "LkpValue",
+          "columns": [
+            "priceCurrencyValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "teacherUserId",
+          "slug"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Module",
+      "table": "module",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "courseId",
+          "column": "course_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "column": "title",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "summary",
+          "column": "summary",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "description",
+          "column": "description",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "position",
+          "column": "position",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "course",
+          "type": "Course",
+          "columns": [
+            "courseId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "courseId",
+          "position"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Lesson",
+      "table": "lesson",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "moduleId",
+          "column": "module_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "title",
+          "column": "title",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "body",
+          "column": "body",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "estimatedMinutes",
+          "column": "estimated_minutes",
+          "type": "Int",
+          "optional": true
+        },
+        {
+          "name": "isFreePreview",
+          "column": "is_free_preview",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "position",
+          "column": "position",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "statusValueId",
+          "column": "status_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "module",
+          "type": "Module",
+          "columns": [
+            "moduleId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "status",
+          "type": "LkpValue",
+          "columns": [
+            "statusValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "moduleId",
+          "position"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "LessonAsset",
+      "table": "lesson_asset",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "lessonId",
+          "column": "lesson_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "displayName",
+          "column": "display_name",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "storedKey",
+          "column": "stored_key",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "contentType",
+          "column": "content_type",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "bytes",
+          "column": "bytes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "lesson",
+          "type": "Lesson",
+          "columns": [
+            "lessonId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "storedKey"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Enrollment",
+      "table": "enrollment",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "studentUserId",
+          "column": "student_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "courseId",
+          "column": "course_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "student",
+          "type": "User",
+          "columns": [
+            "studentUserId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "course",
+          "type": "Course",
+          "columns": [
+            "courseId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "courseId",
+          "studentUserId"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "AvailabilityRule",
+      "table": "availability_rule",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "teacherUserId",
+          "column": "teacher_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "weekday",
+          "column": "weekday",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "startMinutes",
+          "column": "start_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "endMinutes",
+          "column": "end_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "slotMinutes",
+          "column": "slot_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "teacher",
+          "type": "User",
+          "columns": [
+            "teacherUserId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "teacherUserId",
+          "weekday",
+          "startMinutes"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Booking",
+      "table": "booking",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "studentUserId",
+          "column": "student_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "teacherUserId",
+          "column": "teacher_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "courseId",
+          "column": "course_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "typeValueId",
+          "column": "type_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "statusValueId",
+          "column": "status_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "startsAt",
+          "column": "starts_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "durationMinutes",
+          "column": "duration_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "slotHeldAt",
+          "column": "slot_held_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "roomName",
+          "column": "room_name",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "student",
+          "type": "User",
+          "columns": [
+            "studentUserId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "teacher",
+          "type": "User",
+          "columns": [
+            "teacherUserId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "course",
+          "type": "Course",
+          "columns": [
+            "courseId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "type",
+          "type": "LkpValue",
+          "columns": [
+            "typeValueId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "status",
+          "type": "LkpValue",
+          "columns": [
+            "statusValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "roomName"
+        ],
+        [
+          "teacherUserId",
+          "slotHeldAt"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "RefreshToken",
+      "table": "refresh_token",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "tokenHash",
+          "column": "token_hash",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "userId",
+          "column": "user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "expiresAt",
+          "column": "expires_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "revokedAt",
+          "column": "revoked_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "userAgent",
+          "column": "user_agent",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "user",
+          "type": "User",
+          "columns": [
+            "userId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "tokenHash"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "EmailTemplate",
+      "table": "email_template",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "eventCode",
+          "column": "event_code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "subject",
+          "column": "subject",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "heading",
+          "column": "heading",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "bodyLines",
+          "column": "body_lines",
+          "type": "String[]",
+          "optional": false
+        },
+        {
+          "name": "ctaLabel",
+          "column": "cta_label",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [],
+      "uniqueKeys": [
+        [
+          "eventCode"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "MailOutbox",
+      "table": "mail_outbox",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "eventCode",
+          "column": "event_code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "payload",
+          "column": "payload",
+          "type": "Json",
+          "optional": false
+        },
+        {
+          "name": "recipientUserId",
+          "column": "recipient_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "status",
+          "column": "status",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "attempts",
+          "column": "attempts",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "nextAttemptAt",
+          "column": "next_attempt_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "sentAt",
+          "column": "sent_at",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "failureReason",
+          "column": "failure_reason",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "recipient",
+          "type": "User",
+          "columns": [
+            "recipientUserId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "ActionLog",
+      "table": "action_log",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "actionCode",
+          "column": "action_code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "sectionCode",
+          "column": "section_code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "actorKind",
+          "column": "actor_kind",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "actorUserId",
+          "column": "actor_user_id",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "actorRoleCode",
+          "column": "actor_role_code",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "targetTable",
+          "column": "target_table",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "targetId",
+          "column": "target_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "detail",
+          "column": "detail",
+          "type": "Json",
+          "optional": false
+        },
+        {
+          "name": "requestId",
+          "column": "request_id",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "actor",
+          "type": "User",
+          "columns": [
+            "actorUserId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [],
+      "softDelete": false,
+      "tracksUpdates": false
+    }
+  ]
+}

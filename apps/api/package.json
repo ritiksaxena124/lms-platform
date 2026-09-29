@@ -19,6 +19,7 @@
     "db:deploy": "prisma migrate deploy",
     "db:seed": "bun src/reference/seed-cli.ts",
     "docs:export": "bun src/docs/export-endpoints-cli.ts",
+    "docs:data": "bun src/docs/export-data-model-cli.ts",
     "db:studio": "prisma studio"
   },
   "dependencies": {
