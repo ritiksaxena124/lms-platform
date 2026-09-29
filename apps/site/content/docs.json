@@ -1,0 +1,20 @@
+[
+  {
+    "group": "Start here",
+    "slug": "index",
+    "title": "What this is",
+    "summary": "The system in one page: what a class is here, and what is built versus planned."
+  },
+  {
+    "group": "Start here",
+    "slug": "running-it-locally",
+    "title": "Run it locally",
+    "summary": "From a clone to a signed-in browser, and the ports each piece listens on."
+  },
+  {
+    "group": "How it works",
+    "slug": "conventions",
+    "title": "Rules the code enforces",
+    "summary": "The handful of constraints the rest of the design relies on, and what checks them."
+  }
+]

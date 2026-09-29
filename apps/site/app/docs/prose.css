@@ -1,0 +1,161 @@
+/*
+ * The markdown @lms/ui has no primitive for.
+ *
+ * `@tailwindcss/typography` was not added for two reasons: it brings its own colour and type scale
+ * and then asks to be re-tuned back to yours, and its house style is a serif reading column, which
+ * is not this system. The page is 90% of the site's surface area, so it is worth the ninety lines to
+ * draw prose from the same tokens every screen in the product already uses.
+ */
+
+.prose-doc {
+  max-width: var(--container-reading);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--color-ink);
+}
+
+.prose-doc h1 {
+  margin: 0 0 0.75rem;
+  font-size: var(--text-h1);
+  line-height: var(--text-h1--line-height);
+  letter-spacing: var(--text-h1--letter-spacing);
+  font-weight: var(--text-h1--font-weight);
+  color: var(--color-ink-strong);
+}
+
+.prose-doc h2 {
+  margin: 2.75rem 0 0.75rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--color-line);
+  font-size: var(--text-h2);
+  line-height: var(--text-h2--line-height);
+  letter-spacing: var(--text-h2--letter-spacing);
+  font-weight: var(--text-h2--font-weight);
+  color: var(--color-ink-strong);
+  scroll-margin-top: 5rem;
+}
+
+.prose-doc h3 {
+  margin: 2rem 0 0.5rem;
+  font-size: var(--text-h3);
+  line-height: var(--text-h3--line-height);
+  font-weight: var(--text-h3--font-weight);
+  color: var(--color-ink-strong);
+  scroll-margin-top: 5rem;
+}
+
+/* The first section heading sits under the title and the summary line, where a rule above it would
+ * be drawing a boundary around nothing. */
+.prose-doc h1 + h2 {
+  margin-top: 1.5rem;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.prose-doc p {
+  margin: 0 0 1rem;
+}
+
+.prose-doc a {
+  color: var(--color-brand);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  text-decoration-thickness: 1px;
+}
+
+.prose-doc a:hover {
+  color: var(--color-brand-deep);
+}
+
+.prose-doc ul,
+.prose-doc ol {
+  margin: 0 0 1rem;
+  padding-left: 1.25rem;
+}
+
+.prose-doc ul {
+  list-style: disc;
+}
+
+.prose-doc ol {
+  list-style: decimal;
+}
+
+.prose-doc li {
+  margin: 0.3rem 0;
+}
+
+.prose-doc li > p {
+  margin: 0;
+}
+
+.prose-doc code {
+  padding: 0.125rem 0.375rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-field);
+  background: var(--color-paper-sunk);
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--color-ink-strong);
+}
+
+/* A block of commands is copied, not read, so it gets the well the portals give a value that is
+ * machine-written: sunk paper, mono, and a line to keep it off the page behind it. */
+.prose-doc pre {
+  margin: 0 0 1.25rem;
+  padding: 0.875rem 1rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-sunk);
+  overflow-x: auto;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+}
+
+.prose-doc pre code {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-size: inherit;
+  color: var(--color-ink);
+}
+
+.prose-doc table {
+  width: 100%;
+  margin: 0 0 1.25rem;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.prose-doc th,
+.prose-doc td {
+  padding: 0.5rem 0.75rem;
+  border-bottom: 1px solid var(--color-line);
+  text-align: left;
+  vertical-align: top;
+}
+
+.prose-doc th {
+  background: var(--color-paper-sunk);
+  font-weight: var(--text-label--font-weight);
+  color: var(--color-ink-muted);
+}
+
+.prose-doc blockquote {
+  margin: 0 0 1.25rem;
+  padding-left: 1rem;
+  border-left: 2px solid var(--color-brand-line);
+  color: var(--color-ink-muted);
+}
+
+.prose-doc hr {
+  margin: 2.5rem 0;
+  border: 0;
+  border-top: 1px solid var(--color-line);
+}
+
+.prose-doc strong {
+  font-weight: 620;
+  color: var(--color-ink-strong);
+}

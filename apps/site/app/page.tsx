@@ -1,3 +1,5 @@
+import Link from 'next/link';
+
 import { buttonClass, cn, Stagger } from '@lms/ui';
 
 import { readPortalUrls } from '@/lib/portals';
@@ -87,6 +89,9 @@ export default function Home() {
             >
               Student portal
             </a>
+            <Link href="/docs" className={buttonClass({ variant: 'ghost', size: 'lg' })}>
+              Read the docs
+            </Link>
           </div>
 
           <p className="mt-6 max-w-reading text-label leading-relaxed text-ink-faint">
@@ -179,6 +184,12 @@ export default function Home() {
           <span className="text-label text-ink-faint">
             A working proof: one API, three portals, one component library, one database.
           </span>
+          <Link
+            href="/docs"
+            className="ml-auto text-label text-ink-muted transition-colors duration-[var(--duration-fast)] ease-[var(--ease-out)] hover:text-ink"
+          >
+            Documentation
+          </Link>
         </div>
       </footer>
     </>

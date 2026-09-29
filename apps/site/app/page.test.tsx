@@ -1,6 +1,7 @@
 import { render, screen, within } from '@testing-library/react';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
+import { docRoutes } from '@/lib/docs';
 import Home from './page';
 
 const ENV = {
@@ -43,6 +44,20 @@ describe('the landing page', () => {
       'href',
       ENV.NEXT_PUBLIC_STUDENT_PORTAL_URL,
     );
+    expect(screen.getByRole('link', { name: /read the docs/i })).toHaveAttribute('href', '/docs');
+  });
+
+  it('links nothing the export does not build', () => {
+    render(<Home />);
+
+    // The header has the same guard for the chrome; this is the body. Links that leave are exempt:
+    // their 404 belongs to whoever owns that host, and a static export only answers for the paths it
+    // emitted files for.
+    const built = new Set(['/', ...docRoutes()]);
+    for (const link of screen.getAllByRole('link')) {
+      const href = link.getAttribute('href') ?? '';
+      if (!href.startsWith('http')) expect(built).toContain(href);
+    }
   });
 
   it('walks one class, in the order it happens', () => {

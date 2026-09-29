@@ -1,6 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
+import { docRoutes } from '@/lib/docs';
 import { SiteHeader } from './site-header';
 
 const PORTALS = {
@@ -9,10 +10,11 @@ const PORTALS = {
 };
 
 describe('the site header', () => {
-  it('carries the two doors a visitor can actually walk through', () => {
+  it('carries the docs and the two doors a visitor can walk through', () => {
     render(<SiteHeader portals={PORTALS} />);
 
     expect(screen.getByRole('banner')).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Docs' })).toHaveAttribute('href', '/docs');
     expect(screen.getByRole('link', { name: 'Teacher portal' })).toHaveAttribute(
       'href',
       PORTALS.teacher,
@@ -29,7 +31,7 @@ describe('the site header', () => {
     // A static export has no server to answer an unknown path, so an internal href is only as good as
     // the file behind it — and nothing in the build checks that. Off-origin links are exempt: their
     // 404 belongs to whoever owns that host, not to this one.
-    const built = new Set(['/']);
+    const built = new Set(['/', ...docRoutes()]);
     for (const link of screen.getAllByRole('link')) {
       const href = link.getAttribute('href') ?? '';
       if (!href.startsWith('http')) expect(built).toContain(href);
@@ -49,6 +51,15 @@ describe('the site header', () => {
       'rel',
       expect.stringContaining('noopener'),
     );
+    expect(screen.getByRole('link', { name: 'Docs' })).not.toHaveAttribute('target');
+  });
+
+  it('names the wordmark even where it is not drawn', () => {
+    render(<SiteHeader portals={PORTALS} />);
+
+    // Below `sm` the words are hidden and only the dot is painted, so the name lives in the label
+    // rather than in text a media query can switch off.
+    expect(screen.getByRole('link', { name: 'Teacher Marketplace' })).toHaveAttribute('href', '/');
   });
 
   it('does not mention the operator, its queue, or its ledger', () => {
