@@ -455,7 +455,7 @@ moving.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
   published from what the code already says rather than restated into a second copy that drifts.
 
-**Phases 0 through 7 are closed.** The first four are the ground the product stands on —
+**Phases 0 through 8 are closed.** The first four are the ground the product stands on —
 ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 went one brick at a time, and so
 did the news phase after it:
 
