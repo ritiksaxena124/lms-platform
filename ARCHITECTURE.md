@@ -510,6 +510,11 @@ these rules hold:
   person is looking at their own account; there is nothing to hide and something to act on.
 - **`ops` is not self-registerable.** The list lives in `@lms/shared`, so the sign-up form
   and the server read the same one and a client payload cannot mint an administrator.
+- **An `ops` account is issued by another `ops` account, and the first one comes from the seed.**
+  Phase 8 keeps the sign-up refusal and adds the only other way in: a role change on the accounts
+  screen, guarded by role rather than by relationship, with the route refusing to let an operator
+  revoke their own `ops` role. The alternative is a platform locking itself out of its own admin in
+  one click, with no support desk standing behind it.
 - **Both guards are global, registered in `AuthModule` as `APP_GUARD`.** A feature module
   added next month is authenticated before anyone remembers to ask; the way a route becomes
   public is `@Public()`, and forgetting it fails as a 401 in development rather than as an

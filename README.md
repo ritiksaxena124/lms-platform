@@ -579,6 +579,21 @@ answer scanned clean of any `@` and of any password. The suites carry what a liv
 every code, the four account events, the scheduler's rows with nobody credited, and a pagination that
 never hands the same row to two pages.
 
+**Phase 8 is scoped, not started.** The third app, `ops.localtest.me:3002`, for the role the sign-up form
+will not hand out. Two decisions shape it before a line is written. **It is read-mostly, with exactly two
+bites** — an operator can disable an account and can issue or revoke the `ops` role, and nothing else. An
+unpublish would undo a teacher's decision about their own material, money is Phase 9's, and the two
+writes that remain are the two only the platform can make for itself. **And every screen reads an
+endpoint that either already exists or is added for it**: Phase 7's `GET /actions`, which has had no door
+since it shipped; `mail_outbox`, which has no reader at all today; and an accounts surface that exists in
+no form. The portal copies `apps/teacher`'s frame rather than designing a third look — the held-still
+sidebar, `@lms/ui` primitives, Inter, the same `localtest.me` session cookie — because three doors on one
+product are three doors on one component library, and an operator's information density is a teacher's.
+What is deliberately not in the phase: attendance (`completed` and `no_show` are seeded statuses no code
+can write, and marking a class taught is a teacher's act, not an admin's), any edit of a teacher's
+content, and deployment. It ends when somebody can sign in on a third port, find a person, read what that
+person did and what they were told, and stop an account that ought to stop.
+
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wanted every kind of write to
 exist before it fixed what a record looks like. Coupons land last among the things a student
