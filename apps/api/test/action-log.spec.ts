@@ -195,7 +195,12 @@ afterAll(async () => {
   const userIds = (
     await prisma.user.findMany({ where: { email: { contains: `.${RUN}@` } }, select: { id: true } })
   ).map((user) => user.id);
-  await prisma.actionLog.deleteMany({ where: { id: { in: rowIds } } });
+  // The probe's own rows, and every row the auth routes filed for the accounts this spec
+  // registered — sign-in and registration are writes like any other, and the restriction below
+  // cannot tell the two sources apart.
+  await prisma.actionLog.deleteMany({
+    where: { OR: [{ actorUserId: { in: userIds } }, { id: { in: rowIds } }] },
+  });
   await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
   await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   await prisma.$disconnect();

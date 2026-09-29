@@ -89,8 +89,17 @@ describe('auth sessions', () => {
 
   afterAll(async () => {
     await app?.close();
-    await prisma.refreshToken.deleteMany({ where: { user: { email: { contains: `.${RUN}@` } } } });
-    await prisma.user.deleteMany({ where: { email: { contains: `.${RUN}@` } } });
+    const userIds = (
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
+    ).map((row) => row.id);
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    // This file rotates, replays and ends sessions, and each of those that changed a row filed a
+    // record of the account. The ledger outlives the account it describes (§7).
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });
 

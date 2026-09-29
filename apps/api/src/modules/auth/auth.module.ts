@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 
+import { ActionLogModule } from '../action-log/action-log.module';
 import { ACCESS_TOKENS, JwtAccessTokens } from './access-tokens.service';
 import { JwtAuthGuard, RolesGuard } from './auth.guard';
 import { AuthController } from './auth.controller';
@@ -10,6 +11,9 @@ import { RefreshTokensRepository } from './refresh-tokens.repository';
 import { UsersRepository } from './users.repository';
 
 @Module({
+  // The four account events are the only records in the platform written by a caller that names its
+  // own actor, because these are the only routes with no session in the request to read one from (§7).
+  imports: [ActionLogModule],
   controllers: [AuthController],
   providers: [
     AuthService,

@@ -42,8 +42,17 @@ describe('POST /api/v1/auth/register', () => {
   });
 
   afterEach(async () => {
-    await prisma.refreshToken.deleteMany({ where: { user: { email: { contains: `.${RUN}@` } } } });
-    await prisma.user.deleteMany({ where: { email: { contains: `.${RUN}@` } } });
+    const userIds = (
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
+    ).map((row) => row.id);
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    // The record of an account outlives the account by design — `actor_user_id` is `Restrict` — so a
+    // fixture that wants its user gone takes the ledger's rows for that account first (§7).
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
   });
 
   afterAll(async () => {

@@ -78,8 +78,17 @@ describe('the bearer token guard', () => {
 
   afterAll(async () => {
     await app?.close();
-    await prisma.refreshToken.deleteMany({ where: { user: { email: { contains: `.${RUN}@` } } } });
-    await prisma.user.deleteMany({ where: { email: { contains: `.${RUN}@` } } });
+    const userIds = (
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
+    ).map((row) => row.id);
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    // A sign-in is a write, and the row it filed names this account: the ledger outlives the account
+    // it describes, so the fixture has to take its own records down first (§7).
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });
 

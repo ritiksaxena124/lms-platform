@@ -25,7 +25,17 @@ describe('credential throttling', () => {
 
   afterAll(async () => {
     await app?.close();
-    await prisma.user.deleteMany({ where: { email: { contains: `.${RUN}@` } } });
+    const userIds = (
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
+    ).map((row) => row.id);
+    await prisma.refreshToken.deleteMany({ where: { userId: { in: userIds } } });
+    // Every sign-in the budget let through filed a record naming this account, and the ledger outlives
+    // the account it describes (§7).
+    await prisma.actionLog.deleteMany({ where: { actorUserId: { in: userIds } } });
+    await prisma.user.deleteMany({ where: { id: { in: userIds } } });
     await prisma.$disconnect();
   });
 
