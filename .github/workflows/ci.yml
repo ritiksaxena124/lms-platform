@@ -1,0 +1,76 @@
+# The gate the release script already runs, run by somebody else too.
+#
+# `bun run release` refuses to tag a dirty tree, so a green tag means `bun run verify` passed on
+# one Windows box on one afternoon. This runs the same command on a clean Linux box against a
+# database nobody has touched, which is the only way to learn that a suite depended on rows left
+# over from last week's manual testing.
+#
+# There is deliberately no deploy workflow here. Deployment is not decided yet; a workflow that
+# pushed to a server would be a door in a wall that is not built.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: build + typecheck + lint + test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: lms_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d lms_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+
+    env:
+      NODE_ENV: test
+      # The test harness refuses to run unless the database is named lms_test, so this is the
+      # only name that gets a suite at all. It is a throwaway container on a throwaway runner.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/lms_test?schema=public
+      # Every value below is required by the env schema at boot, and every one is a local address:
+      # nothing here is a real host, a real inbox, or a credential.
+      API_PUBLIC_URL: http://localhost:4000
+      TEACHER_PORTAL_URL: http://localhost:3000
+      STUDENT_PORTAL_URL: http://localhost:3001
+      CORS_ORIGINS: http://localhost:3000,http://localhost:3001
+      JWT_SECRET: ci-throwaway-secret-for-tests-only-0123456789abcdef
+      # SMTP_URL is absent on purpose: with no SMTP_URL the mail port resolves to the none
+      # adapter, so a suite that tries to send writes a row instead of reaching a real server.
+      STORAGE_PROVIDER: local
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          # Pinned to the version the lockfile was written by, so a runner cannot resolve a
+          # different dependency graph than the one `bun install` checked locally.
+          bun-version: 1.2.15
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Generate the Prisma client
+        run: bun run --filter @lms/api db:generate
+
+      # build:shared -> typecheck -> lint -> test, in that order, across all five packages. The
+      # API suite migrates lms_test itself on first contact, so no separate migrate step.
+      - name: Verify
+        run: bun run verify
