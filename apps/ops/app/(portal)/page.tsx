@@ -14,21 +14,20 @@ import {
 /**
  * The desk and the three questions it is for.
  *
- * A card links only when its screen exists. The accounts and the queue are answered by the API
- * (8a, 8b) and their screens arrive beside them, and a link to a page this repo has not written is
- * worse than a card that says so: an operator clicks it in good faith and lands on a 404 in a tool
- * meant for incidents.
+ * A card links only when its screen exists, which since 8d is a sentence that applies to all three
+ * of them. The fourth card this desk could have is one nobody is building: a place to edit a course
+ * or refund a class, which belongs to the portals whose owners are answerable for that content.
  */
 export default function OpsDeskPage() {
   return (
     <RouteTransition>
       <PageHeader
         title="Ops desk"
-        description="Everything this platform recorded about itself, in one read-only place."
-        meta="Phase 8 · the ledger is open; the accounts and the queue screens follow it"
+        description="Everything this platform recorded about itself, in one place you can read but not rewrite."
+        meta="Phase 8 · three screens, two writes, and a ledger that reads both back"
         actions={
           <StatusPill tone="ember" pulse>
-            Being built
+            Being verified
           </StatusPill>
         }
       />
@@ -68,6 +67,13 @@ export default function OpsDeskPage() {
             title="Notification queue"
             description="Seven kinds of news, the state each one reached, and the reason a retry stopped."
           />
+          <Link
+            href="/outbox"
+            transitionTypes={['nav-forward']}
+            className={cn(buttonClass({ variant: 'secondary', size: 'sm' }), 'mt-4')}
+          >
+            Read the queue
+          </Link>
         </Card>
       </Stagger>
 

@@ -14,6 +14,7 @@ const ITEMS = [
   { href: '/', label: 'Desk' },
   { href: '/activity', label: 'Activity log' },
   { href: '/accounts', label: 'Accounts' },
+  { href: '/outbox', label: 'Queue' },
 ] as const;
 
 /**
