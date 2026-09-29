@@ -18,6 +18,10 @@ export default tseslint.config(
       // Where uploaded bytes land on a dev box. Anchored: `storage/**` also matched
       // `apps/api/src/providers/storage`, which is the code that reads that directory.
       'apps/api/storage/**',
+      // The site's static export, and the only build output that is not `dist/` or `.next/`.
+      // Anchored for the same reason as above — `**/out/**` would also hush a source folder
+      // that chose the word `out`, and the whole point of an ignore is that it cannot lie.
+      'apps/site/out/**',
     ],
   },
   js.configs.recommended,

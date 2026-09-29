@@ -1,0 +1,5 @@
+@import 'tailwindcss';
+@import '@lms/ui/styles.css';
+
+/* Inter arrives with @lms/ui, self-hosted and subset by unicode-range — the public page gets the same
+ * file the portals get, so the face and the product are drawn from one alphabet. */
