@@ -1,3 +1,5 @@
+import type { MailEventCode } from './mail-events';
+
 /**
  * The states a queued notification passes through.
  *
@@ -32,6 +34,64 @@ export const MAIL_OUTBOX_STATUS_CODES = {
 
 export type MailOutboxStatusCode =
   (typeof MAIL_OUTBOX_STATUS_CODES)[keyof typeof MAIL_OUTBOX_STATUS_CODES];
+
+/**
+ * The words an operator's screen puts next to a status.
+ *
+ * `queued` and `sending` are the two that earn their place: on a queue, "still to come" and
+ * "somebody is holding it right now" look the same to anyone reading a bare code, and they are
+ * different answers to "how long until it goes". Typed as a `Record` over the codes, so a sixth
+ * status with no word beside it is a compile error rather than a blank cell.
+ */
+export const MAIL_OUTBOX_STATUS_LABELS: Record<MailOutboxStatusCode, string> = {
+  [MAIL_OUTBOX_STATUS_CODES.QUEUED]: 'Waiting',
+  [MAIL_OUTBOX_STATUS_CODES.SENDING]: 'Sending',
+  [MAIL_OUTBOX_STATUS_CODES.SENT]: 'Sent',
+  [MAIL_OUTBOX_STATUS_CODES.FAILED]: 'Failed',
+  [MAIL_OUTBOX_STATUS_CODES.DROPPED]: 'Dropped',
+};
+
+/** The phrase for a status, or the status itself when there is none — the same reading rule the
+ * ledger uses, and for the same reason: the column is text, and a hand-written row is not a reason
+ * to refuse to answer about the queue. */
+export function mailOutboxStatusLabel(code: string): string {
+  return MAIL_OUTBOX_STATUS_LABELS[code as MailOutboxStatusCode] ?? code;
+}
+
+/**
+ * One row of the queue, as the ops screen reads it.
+ *
+ * What is deliberately absent is the letter. `payload` holds the answers a template asks for and the
+ * one page its button goes to, none of which helps with the only question this screen is for — has
+ * this been sent, and if not, why not — and a route that exposed the column would become the place
+ * senders put whatever they had to hand. The recipient's address is absent for the reason 6c gave
+ * for the column that is not there: the queue names a person so that no copy of an address can
+ * outlive the correction they make to it, and a read that resolved the id into an email on the way
+ * out would have undone that choice from the other end.
+ */
+export interface OutboxEntry {
+  id: string;
+  eventCode: MailEventCode;
+  eventLabel: string;
+  status: MailOutboxStatusCode;
+  statusLabel: string;
+  /** Times the transport has been asked, as the claim left it — so a screen can say "out of tries"
+   * by comparing this against the curve rather than by guessing from the status. */
+  attempts: number;
+  nextAttemptAt: string;
+  sentAt: string | null;
+  /** The transport's own short code from the last refusal (`EAUTH`, `smtp 550`), never its message. */
+  failureReason: string | null;
+  recipient: { id: string; fullName: string };
+  createdAt: string;
+}
+
+export interface OutboxListResponse {
+  items: OutboxEntry[];
+  page: number;
+  pageSize: number;
+  total: number;
+}
 
 /**
  * How long a row waits before each retry, in minutes, and the whole of the retry budget.

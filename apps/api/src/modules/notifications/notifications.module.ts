@@ -4,6 +4,9 @@ import { MailModule } from '../../providers/mail/mail.module';
 import { MailDeliveryService } from './mail-delivery.service';
 import { MailQueue } from './mail-queue.service';
 import { MailOutboxRepository } from './mail-outbox.repository';
+import { OutboxController } from './outbox.controller';
+import { OutboxRepository } from './outbox.repository';
+import { OutboxService } from './outbox.service';
 
 /**
  * The platform's send decisions, filed as news, and the sweep that sends them.
@@ -19,10 +22,20 @@ import { MailOutboxRepository } from './mail-outbox.repository';
  * learns anything about SMTP from the other: bookings and enrollments import the queue, and nobody
  * outside this module asks for the repository or the service — the cron is the only caller the
  * sweep needs (§6).
+ *
+ * The fourth part arrived with Phase 8: an ops-gated read over the same table, in its own repository
+ * file, because the file the claim lives in should not also be the one a route pages through.
  */
 @Module({
   imports: [MailModule],
-  providers: [MailQueue, MailOutboxRepository, MailDeliveryService],
+  controllers: [OutboxController],
+  providers: [
+    MailQueue,
+    MailOutboxRepository,
+    MailDeliveryService,
+    OutboxRepository,
+    OutboxService,
+  ],
   exports: [MailQueue],
 })
 export class NotificationsModule {}

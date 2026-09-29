@@ -3,9 +3,11 @@ import { describe, expect, it } from 'vitest';
 import {
   MAIL_DELIVERY_BATCH_SIZE,
   MAIL_OUTBOX_STATUS_CODES,
+  MAIL_OUTBOX_STATUS_LABELS,
   MAIL_RETRY_DELAYS_MINUTES,
   MAIL_SENDING_RECLAIM_MINUTES,
   MAIL_SWEEP_INTERVAL_MINUTES,
+  mailOutboxStatusLabel,
   mailRetryDelayMinutes,
 } from './mail-outbox';
 
@@ -33,6 +35,19 @@ describe('mail outbox statuses', () => {
     // asking why they never heard.
     expect(MAIL_OUTBOX_STATUS_CODES.DROPPED).not.toBe(MAIL_OUTBOX_STATUS_CODES.SENT);
     expect(MAIL_OUTBOX_STATUS_CODES.DROPPED).toBe('dropped');
+  });
+
+  it('gives the queue screen a phrase for every state, and one for a state that is not a state', () => {
+    // The label is what tells `waiting` from `sending` apart to somebody reading a table, and the
+    // fallback is what keeps one hand-written row from failing the page beside it — the column is
+    // text, and 6c's schema test proves the table accepts a status no code writes.
+    expect(Object.keys(MAIL_OUTBOX_STATUS_LABELS).sort()).toEqual(
+      [...Object.values(MAIL_OUTBOX_STATUS_CODES)].sort(),
+    );
+    expect(MAIL_OUTBOX_STATUS_LABELS[MAIL_OUTBOX_STATUS_CODES.QUEUED]).not.toBe(
+      MAIL_OUTBOX_STATUS_LABELS[MAIL_OUTBOX_STATUS_CODES.SENDING],
+    );
+    expect(mailOutboxStatusLabel('invented_by_a_test')).toBe('invented_by_a_test');
   });
 });
 

@@ -702,6 +702,10 @@ model MailOutbox {
   recipient User @relation("mail_outbox_recipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
 
   @@index([status, nextAttemptAt], map: "ix_mail_outbox_due")
+  /// "What has this person's news done" — the queue screen's second question, and the one the due
+  /// index cannot answer, since a recipient is not a prefix of it. `createdAt` is the second column
+  /// because that is the order the read answers in, newest letter first.
+  @@index([recipientUserId, createdAt], map: "ix_mail_outbox_recipient")
   @@map("mail_outbox")
 }
 

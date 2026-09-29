@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 
-import { MAIL_EVENT_CODES, type MailEventCode } from './mail-events';
+import {
+  MAIL_EVENT_CODES,
+  MAIL_EVENT_LABELS,
+  mailEventLabel,
+  type MailEventCode,
+} from './mail-events';
 
 /**
  * The seven things this platform sends mail about.
@@ -41,5 +46,16 @@ describe('mail event codes', () => {
     for (const code of Object.values(MAIL_EVENT_CODES) as MailEventCode[]) {
       expect(code).toMatch(/^[a-z][a-z0-9_]*$/);
     }
+  });
+
+  it('gives the queue screen a phrase for every code, and one for a code that is not a code', () => {
+    // The table takes any string in this column, so a reader that insisted on this list would fail
+    // a whole page of the queue over one hand-written row. The phrase for a row nobody declared is
+    // the row's own string.
+    expect(Object.keys(MAIL_EVENT_LABELS).sort()).toEqual(
+      [...Object.values(MAIL_EVENT_CODES)].sort(),
+    );
+    expect(mailEventLabel(MAIL_EVENT_CODES.BOOKING_EXPIRED)).toBe('Request expired');
+    expect(mailEventLabel('invented_by_a_report')).toBe('invented_by_a_report');
   });
 });
