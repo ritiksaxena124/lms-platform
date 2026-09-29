@@ -127,6 +127,23 @@ describe('reference data seeding', () => {
 
     expect(await prisma.lkpValue.count()).toBe(before);
   });
+
+  it('survives several processes seeding it at once', async () => {
+    // Every spec file seeds for itself and four run concurrently, so on a database that has never
+    // been seeded the seeders used to look for the same missing `LkpType` at the same moment, all
+    // find nothing, and all insert it — and the loser of that was a `P2002` in a `beforeAll`.
+    // A warm database cannot show the race, which is the point of putting it here: CI seeds cold,
+    // so this is the run that would catch it coming back.
+    const clients = Array.from({ length: 4 }, () => new PrismaClient());
+
+    try {
+      await expect(Promise.all(clients.map((client) => seedLookups(client)))).resolves.toHaveLength(
+        4,
+      );
+    } finally {
+      await Promise.all(clients.map((client) => client.$disconnect()));
+    }
+  });
 });
 
 describe('seed target guard', () => {
