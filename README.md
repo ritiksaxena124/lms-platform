@@ -4,12 +4,14 @@ A marketplace where learners book 1:1 and group sessions with independent teache
 Three portals (teacher, student, ops) share one API, one database and one component
 library.
 
-**Status: Phase 7 done** — a teacher writes a course and opens a week in it, a learner reads enough
+**Status: Phase 8 done** — a teacher writes a course and opens a week in it, a learner reads enough
 of that course to want a place, asks for a minute of the teacher's time, is let into a room for it when
 the teacher says yes, is told about all of it by email, and every one of those decisions leaves a
-record the platform can be asked about. Everything listed under [What each portal
-does](#what-each-portal-does) is shipped, tested and clickable; the ops portal, money and the two
-apps outside the product are still ahead, and [Phases](#phases) keeps the ordered record of why.
+record the platform can be asked about. An operator now signs in on a third port and asks: who wrote
+what, who is standing behind an account, what happened to a letter that was meant to tell somebody.
+Everything listed under [What each portal does](#what-each-portal-does) is shipped, tested and
+clickable; money and the two apps outside the product are still ahead, and
+[Phases](#phases) keeps the ordered record of why.
 
 ## Contents
 
@@ -85,9 +87,29 @@ apps outside the product are still ahead, and [Phases](#phases) keeps the ordere
   shows the same class in the student's own timezone, _Leave this class_ gives the minute back
   while it still stands, and Join opens the room for the class happening now.
 
-The ops portal, money and the two apps outside the product are still ahead —
-[Phases](#phases) says in which order they arrive. What has no screen yet is the action log: it has an
-endpoint (`/api/v1/actions`) and no door to stand in, which is Phase 8's first page.
+### The operator's desk
+
+<http://ops.localtest.me:3002>, for the role the sign-up form will not hand out. Three screens, and
+two things it may change.
+
+- **The ledger** — `/activity` (`/api/v1/actions`). Every standing-row write since Phase 7, newest
+  first, each row naming its actor and the part of the app it belongs to, with the facts the change
+  decided printed beside it. Filter by section, and page through what is left. Nothing on this screen
+  can be edited: the log is written beside the write that earned it, and a screen that could rewrite
+  it would undo the only reason the table exists.
+- **The accounts** — `/accounts` (`/api/v1/users`). A search over names, a role filter, and one
+  button per row: disable an account, enable it again, make somebody an operator, revoke them. Those
+  are the portal's two writes and the only two bites an operator gets at another person's account —
+  an operator who could rename a student or edit a course would be an operator whose ledger cannot be
+  trusted. Your own row carries no buttons, because the route refuses a self-change and a screen that
+  showed the button anyway would only teach that refusal by throwing it.
+- **The queue** — `/outbox` (`/api/v1/outbox`). What the platform decided to tell somebody, the state
+  each letter reached, how many times the transport was dialed, and the short reason a retry stopped.
+  Read-only, and deliberately thin: the letter's body is not read by the route, and an address has not
+  been stored in the row since Phase 6, so neither can appear here.
+
+Money, the two apps outside the product and attendance are still ahead —
+[Phases](#phases) says in which order they arrive.
 
 ---
 
@@ -110,6 +132,7 @@ cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_te
 # JWT_SECRET has no default in either file; generate one:  openssl rand -hex 32
 cp apps/teacher/.env.example apps/teacher/.env.development   # where the portal finds the API
 cp apps/student/.env.example apps/student/.env.development   # the same, for the public shelf
+cp apps/ops/.env.example apps/ops/.env.development           # the same, for the operator's desk
 
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
@@ -118,11 +141,13 @@ bun run --filter @lms/api db:seed       # reference rows + the three demo accoun
 
 # 3. Everything else is derived from those two files
 bun run verify        # build + typecheck + lint + test across the workspace
-bun run dev           # API on :4000, teacher portal on :3000, student shelf on :3001
+bun run dev           # API on :4000, teacher portal on :3000, student shelf on :3001,
+                      # operator's desk on :3002
 ```
 
-Open <http://teacher.localtest.me:3000> for the portal a teacher works in and
-<http://student.localtest.me:3001> for what a stranger sees of that work.
+Open <http://teacher.localtest.me:3000> for the portal a teacher works in,
+<http://student.localtest.me:3001> for what a stranger sees of that work, and
+<http://ops.localtest.me:3002> for the desk that reads both back.
 `*.localtest.me` resolves to `127.0.0.1` and gives every portal a subdomain of one
 registrable domain, which is what lets the three apps share a session cookie in development
 without `localhost` CORS hacks. One shared cookie means one signed-in account per browser
@@ -143,7 +168,12 @@ is the entire reason they exist:
 All three sign in with `lms-demo-password`, at <http://teacher.localtest.me:3000/login> —
 the sign-in form has a button that fills the teacher one for you. The student portal has its own
 sign-in at <http://student.localtest.me:3001/login> and still opens on the shelf, because a shelf
-asks nothing of whoever walks up to it. Accounts are created only in `lms` and `lms_test`: seeding
+asks nothing of whoever walks up to it. The operator's desk signs in at
+<http://ops.localtest.me:3002/login> and offers no sign-up, because `ops` is a role an operator hands
+out from its own accounts screen and the seed writes only the first one. Because all three ports read
+one cookie, a teacher's session that wanders onto :3002 gets a screen that says it is at the wrong
+desk rather than a page of empty tables pretending to be an ops desk.
+Accounts are created only in `lms` and `lms_test`: seeding
 refuses when `NODE_ENV=production`, and re-running `db:seed` after you have changed one leaves it
 changed.
 The addresses sit under the reserved `.test` domain, so a demo account can never be pointed at
@@ -232,15 +262,37 @@ because the platform stores bytes and does not transcode them; and a room is onl
 name, so `JITSI_DOMAIN` and the minted room name are the whole lock, which is why no list, log or
 link carries an address.
 
+#### Then the same week, from the desk
+
+Phase 8's loop, on <http://ops.localtest.me:3002> as `ops@example.test`. It needs a **third browser
+profile**: one cookie holds one account, and signing in as the operator in the teacher's profile logs
+the teacher out of it.
+
+1. `/activity` is the whole story so far — the teacher's publish, the student's ask, the confirm, the
+   room, the emails. Newest first, each row naming who did it (or the scheduler), the part of the app
+   it belongs to, and the facts the change decided. Filter to _Classes_ and the booking loop is the
+   only thing left.
+2. `/accounts` is where you find the person the story is about. Search a name, or filter to the `ops`
+   role and the list is one row long — yours, the only row on this screen with no buttons.
+3. _Disable_ the student, and go back to `/activity`: the row is there, in the API's own words, signed
+   with your name. Their own portal now answers `ACCOUNT_DISABLED`. _Enable_ puts them back.
+4. `/outbox` lists the letters that story sent — the ask the teacher got, the confirmation the student
+   got — with the state each one reached. No button, and no body: a row that reached `failed` has spent
+   the retry curve, so the reason printed beside it is the whole answer.
+5. Sign out, and sign in as the student on the same port. The desk says _This desk is for the ops role_
+   and asks the API for nothing — which is the one screen on this portal worth watching in the network
+   tab.
+
 ## Commands
 
 | Command               | What it does                                                             |
 | --------------------- | ------------------------------------------------------------------------ |
 | `bun run verify`      | The gate: shared build, typecheck, lint, tests. Run before every commit. |
-| `bun run dev`         | API + teacher portal + student shelf together.                           |
+| `bun run dev`         | API + all three portals together.                                        |
 | `bun run dev:api`     | NestJS API with watch mode.                                              |
 | `bun run dev:teacher` | Next.js teacher portal.                                                  |
 | `bun run dev:student` | Next.js student portal — the public catalog.                             |
+| `bun run dev:ops`     | Next.js operator's desk.                                                 |
 | `bun run dev:ui`      | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
 | `bun run test`        | All test suites (Vitest, one package at a time — see ARCHITECTURE §17).  |
 | `bun run format`      | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
@@ -250,8 +302,8 @@ link carries an address.
 
 A release is a phase boundary, not a deploy. `main` carries work in flight; a tag says
 "this commit passed the gate", and the tag is what a demo, a hand-off or a rollback points
-at. Versions track the phase table below — Phase 6 closed at `v0.6.0` and Phase 7 at `v0.7.0`;
-`v0.8.0` will be Phase 8.
+at. Versions track the phase table below — Phase 6 closed at `v0.6.0`, Phase 7 at `v0.7.0` and
+Phase 8 at `v0.8.0`.
 
 ```
 bun run release v0.8.0 --title="Phase 8: the ops portal"
@@ -275,6 +327,7 @@ apps/
   api/        NestJS modular monolith — the only writer to the database
   teacher/    Next.js App Router portal for teachers — courses, syllabus, the week, the queue
   student/    Next.js App Router portal for learners — shelf, outline, places and classes
+  ops/        Next.js App Router desk for operators — the ledger, the accounts, the queue
 packages/
   shared/     Framework-free TypeScript: error codes, lookup codes, money, timezones
   ui/         Design tokens, primitives and motion shared by all three portals
@@ -291,6 +344,7 @@ which is why editing a component hot-reloads in the portal.
 | `@lms/api`     | Every route, every write, and the database's only owner    | <http://api.localtest.me:4000/api/v1> |
 | `@lms/teacher` | The teacher's work: courses, syllabus, the week, the queue | <http://teacher.localtest.me:3000>    |
 | `@lms/student` | The reader's work: shelf, outline, places, classes         | <http://student.localtest.me:3001>    |
+| `@lms/ops`     | The operator's desk: three screens, two writes             | <http://ops.localtest.me:3002>        |
 | `@lms/ui`      | Tokens, primitives, motion, illustrations                  | Storybook on <http://localhost:6006>  |
 | `@lms/shared`  | Error codes, lookup codes, money, timezones                | — a library, not a server             |
 
@@ -343,8 +397,8 @@ decision was made, and what was deliberately left out.
 | 4     | Availability, bookings and scheduling across timezones — with a calendar  | **Done**    |
 | 5     | Video + storage behind provider ports — Jitsi classes, uploaded lessons   | **Done**    |
 | 6     | Email notifications behind the SMTP port — the queue reached an inbox     | **Done**    |
-| 7     | Action log — who did what, to what, in which part of the app              | Not started |
-| 8     | Ops portal — moderation and the read-side of everything above             | Not started |
+| 7     | Action log — who did what, to what, in which part of the app              | **Done**    |
+| 8     | Ops portal — the desk that reads the log, the accounts and the queue      | **Done**    |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
 | 10    | The teacher's calendar — a course's class series, holidays, no-class days | Not started |
 | 11    | Product website — the public face of the marketplace                      | Not started |
@@ -352,8 +406,8 @@ decision was made, and what was deliberately left out.
 
 ### All twelve, in order
 
-The table is the index; this is what each one is for. Phases 0–6 are shipped, the last of them with
-its letters read back out of a mailbox that is not a test double, and 7–12 are the ordered
+The table is the index; this is what each one is for. Phases 0–8 are shipped, the last of them putting
+a door in front of what the two before it had only recorded, and 9–12 are the ordered
 backlog — each one sits where it does because of what it needs to exist before its shape stops
 moving.
 
@@ -385,8 +439,10 @@ moving.
   append-only record the API writes beside its own business writes. It waits until every kind of
   write exists, because a record's shape is only worth fixing once.
 - **Phase 8 — the ops portal.** The third app, `ops.localtest.me:3002`, for the role the sign-up
-  form will not hand out: moderation and the read-side of everything above it, including the outbox
-  Phase 6 fills and the log Phase 7 writes.
+  form will not hand out: the ledger Phase 7 writes, the accounts behind it, and the outbox
+  Phase 6 fills. It is read-mostly with exactly two bites — disable an account, issue or revoke the
+  `ops` role — because an operator who can unpublish a course or move a price is undoing a decision
+  that was somebody else's to make.
 - **Phase 9 — money.** Coupons a teacher generates per course, each with its own discount and its
   own run-time, redeemed on enrollment, and `PAYMENT_PROVIDER` ceasing to be `none`. Last among the
   surfaces a student touches, because a discount only means something beside a price that is
@@ -579,20 +635,57 @@ answer scanned clean of any `@` and of any password. The suites carry what a liv
 every code, the four account events, the scheduler's rows with nobody credited, and a pagination that
 never hands the same row to two pages.
 
-**Phase 8 is scoped, not started.** The third app, `ops.localtest.me:3002`, for the role the sign-up form
-will not hand out. Two decisions shape it before a line is written. **It is read-mostly, with exactly two
-bites** — an operator can disable an account and can issue or revoke the `ops` role, and nothing else. An
-unpublish would undo a teacher's decision about their own material, money is Phase 9's, and the two
-writes that remain are the two only the platform can make for itself. **And every screen reads an
-endpoint that either already exists or is added for it**: Phase 7's `GET /actions`, which has had no door
-since it shipped; `mail_outbox`, which has no reader at all today; and an accounts surface that exists in
-no form. The portal copies `apps/teacher`'s frame rather than designing a third look — the held-still
-sidebar, `@lms/ui` primitives, Inter, the same `localtest.me` session cookie — because three doors on one
-product are three doors on one component library, and an operator's information density is a teacher's.
-What is deliberately not in the phase: attendance (`completed` and `no_show` are seeded statuses no code
+**Phase 8 is closed.** The third app exists: `ops.localtest.me:3002`, for the role the sign-up form will
+not hand out. The two decisions taken before a line was written both held. **It is read-mostly, with
+exactly two bites** — an operator can disable an account and can issue or revoke the `ops` role, and
+nothing else; an unpublish would undo a teacher's decision about their own material, money is Phase 9's,
+and the two writes that remain are the two only the platform can make for itself. **And every screen
+reads an endpoint rather than a table**: Phase 7's `GET /actions`, which had no door since it shipped,
+an accounts surface built for this phase, and an outbox reader that Phase 6 left unwritten. What is
+still deliberately not in the phase: attendance (`completed` and `no_show` are seeded statuses no code
 can write, and marking a class taught is a teacher's act, not an admin's), any edit of a teacher's
-content, and deployment. It ends when somebody can sign in on a third port, find a person, read what that
-person did and what they were told, and stop an account that ought to stop.
+content, and deployment.
+
+**Step 8a, the accounts, is in** (`/api/v1/users`). A list with a name search, a role filter and a status
+filter over three pages, a single read, and the two patches. Both patches refuse to be asked twice — a
+status that already stands and a role that already holds come back 409 rather than rewriting the ledger
+with a row that changed nothing. An operator cannot change their own account, and a role change that
+moves a person between the two boundaries the platform recognizes is refused rather than guessed at. The
+reads carry another person's email address — the only surface in this API that does, on a route guarded by
+role rather than open — and every write hands back the account with what it is holding: courses, places,
+classes and live sessions. Those counts are what make a disable a decision rather than a guess.
+
+**Step 8b, the queue's read side, is in** (`GET /api/v1/outbox`). The state, the attempt count, the next
+time the transport will dial, and the one short reason a retry stopped — joined to the recipient's name
+and nothing else. There is no `q`, because searching a `jsonb` payload rides no index and an operator who
+means a specific person already found them on the accounts desk. There is no letter body, because the
+route does not read `payload`, and no address, because `mail_outbox` has held none since 6c.
+
+**Step 8c, the portal, is in** (`apps/ops`). The teacher app's frame rather than a third look — the
+held-still sidebar, `@lms/ui` primitives, Inter, the same `localtest.me` session cookie — because three
+doors on one product are three doors on one component library, and an operator's information density is a
+teacher's. Its gate answers two questions and shows a different screen for each: no session redirects to
+sign-in, a session that is not `ops` is told so in place and fetches nothing, because a password box put
+in front of somebody who has just proved who they are answers the wrong question.
+
+**Step 8d, the three screens, is in.** `/activity` reads the ledger, `/accounts` reads and changes the
+people, `/outbox` reads the letters. Each is a paged list with its own filters, and each row prints only
+what the route was willing to send. The accounts screen replaces the row on screen with the row the write
+returns, so what an operator reads afterwards is what the API recorded rather than what the button was
+asked to do; their own row is the one row with no controls. The queue is read-only by design: a row that
+reached `failed` has spent the retry curve the sweep obeys, so the only fix an operator has is the reason
+printed beside it.
+
+**Verified, live.** Signed in as the seeded operator on :3002: the ledger showed eighteen rows, and the
+two account writes made from the accounts screen appeared in it in the API's own words — `Account status
+changed` carrying `from: active` before `to: disabled`, signed with the operator's name. `role=ops`
+narrowed the accounts desk to exactly one row, the row that said _This is your account_ and offered
+nothing to press. Disabling and re-enabling Sandbox Student round-tripped with the API's wording in the
+toast and both rows in the log; issuing and revoking the `ops` role did the same, and the account came
+back Student and Active. The queue listed seven letters with their states and no address anywhere in the
+document. Then, with the same cookie holding a student session, `/activity` answered _This desk is for the
+ops role_ and the network log for that load shows one call — the session refresh — and no `/actions`
+request: the screen was refused before it could ask.
 
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wanted every kind of write to

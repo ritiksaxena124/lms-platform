@@ -25,11 +25,7 @@ export default function OpsDeskPage() {
         title="Ops desk"
         description="Everything this platform recorded about itself, in one place you can read but not rewrite."
         meta="Phase 8 · three screens, two writes, and a ledger that reads both back"
-        actions={
-          <StatusPill tone="ember" pulse>
-            Being verified
-          </StatusPill>
-        }
+        actions={<StatusPill tone="success">Shipped</StatusPill>}
       />
 
       <Stagger className="mt-8 grid gap-4 md:grid-cols-3" startIndex={1}>

@@ -511,7 +511,7 @@ these rules hold:
 - **`ops` is not self-registerable.** The list lives in `@lms/shared`, so the sign-up form
   and the server read the same one and a client payload cannot mint an administrator.
 - **An `ops` account is issued by another `ops` account, and the first one comes from the seed.**
-  Phase 8 keeps the sign-up refusal and adds the only other way in: a role change on the accounts
+  The sign-up refusal stands; Phase 8 added the only other way in — a role change on the accounts
   screen, guarded by role rather than by relationship, with the route refusing to let an operator
   revoke their own `ops` role. The alternative is a platform locking itself out of its own admin in
   one click, with no support desk standing behind it.
@@ -1239,7 +1239,7 @@ offered at, and everything else about the hour happens somewhere else.
 ## 16. Development environment
 
 - Dev hostnames are `*.localtest.me` (resolves to `127.0.0.1`), so `teacher:3000`,
-  `student:3001`, `ops:…` and `api:4000` share one registrable domain and therefore one
+  `student:3001`, `ops:3002` and `api:4000` share one registrable domain and therefore one
   `Domain=localtest.me` session cookie. This is the reason auth will work across portals in
   development exactly the way it will in production, with no CORS or localhost hacks.
 - **One browser profile holds one session, because that is what one cookie slot means.** The
@@ -1278,7 +1278,7 @@ vitest processes sharing one box stopped being a gate: the teacher's 245 tests f
 alone and were timing single `userEvent` waits past fifteen seconds inside the parallel run, with a
 different set of files failing every time — which is a gate measuring the machine, not the code.
 Ordering is the cheapest cap there is, so the per-suite caps stay as well: the API holds at four
-forks (§16's Prisma pool), the UI kit and both portals at two threads each, and a component test
+forks (§16's Prisma pool), the UI kit and the three portals at two threads each, and a component test
 waits fifteen seconds rather than vitest's five. The numbers were set by running the gate until it
 stopped being wrong, not by a theory about core counts.
 
@@ -1354,4 +1354,67 @@ email, the include graph is the only way the account is reached, and a ledger is
 should age. The reader keeps its own file so the writer still holds no connection, and a repository with
 a `find` on it is one somebody will start reading through.
 
-What Phase 8 draws on top of this is a screen. The answers above are what it is allowed to ask.
+What §19's desk draws on top of this is a screen, and the answers above are all it is allowed to ask.
+
+## 19. The operator's desk
+
+`apps/ops` is the third portal, on `ops.localtest.me:3002`, for the role the sign-up form will not
+hand out. It was scoped before it was written and it did not move: **three screens, two writes, and no
+new kind of permission.**
+
+**The writes are the two only the platform can make for itself.** An operator disables an account and
+issues or revokes the `ops` role. Nothing else about a person belongs here, and no teacher's course,
+class or price is editable from this portal at all: an unpublish would undo a decision that was the
+teacher's to make, and money is Phase 9's. The reason to name the two so narrowly is the ledger — every
+write made here is itself recorded, so a desk with more buttons is a desk whose log has more ways to be
+wrong.
+
+**`PATCH /api/v1/users/:id/status` and `/role` are idempotence-refused.** A status that already stands
+and a role that already holds come back `409`, not `200`. `PUT` would be the lazy shape — send the whole
+account and let the server diff it — but two one-field patches say what is being changed, and the pair is
+what the front end can render as one button per row without guessing at the rest of the record. A replay
+that filed a second `Account status changed` row would also be a ledger claiming a change that did not
+happen, which is the property Phase 7 exists to hold.
+
+**A self-change is a `403`, and the first operator comes from the seed.** The person who issued the last
+`ops` role may be the only one left; a screen that let an operator revoke themselves, or disable their
+own account, is a platform that locks itself out of its own admin in one click with no support desk
+standing behind it. The route refuses it, and `RequireSession` never offers the button — a refusal the
+screen shows anyway would only teach the rule by throwing it.
+
+**Reads carry another person's email address, and this is the only surface that does.** The accounts list returns
+`{id, email, fullName, roleCode, roleLabel, statusCode, statusLabel, lastLoginAt, createdAt}`, and a
+single read or a write returns that plus `counts` — how many courses, places, classes and live sessions
+the account holds. The counts are what makes a disable a decision rather than a guess: an operator who is
+about to stop an account should know it is in the middle of four classes. §18 and §6 both refused an
+address because a log and a queue are where a value ages in public; an operator's directory is the place
+it is actually needed, and is guarded by role rather than open.
+
+**`GET /api/v1/outbox` has no `q`, and that is a decision about indexes.** Every other list in this API
+searches a name; the queue's text lives in a `jsonb` payload nobody is allowed to read out, and a `LIKE`
+across it rides no index on a table the sweep writes every minute. An operator who means a specific person
+has already found them on the accounts desk, so `recipient` is a uuid filter and the state is the one
+worth paging by. The letter body was left out of the query for the same reason §6c left the address out of
+the column: a read that does not select a thing cannot leak it.
+
+**The role gate is a courtesy on top of the API's refusal, and it does not redirect.** Every route this
+portal calls is `@Roles(ops)` on the server, so a teacher's session would find out from four 403s; what
+`RequireSession` saves them is a page of empty tables dressed up as an ops desk. Sending a
+non-operator to the sign-in page would put a password box in front of somebody who has just proved who
+they are, and "you are signed in" plus "you are not ops" are two facts worth stating together. It was
+verified against a live student session: the screen named the account and the role, and the network log
+for that load held one request — the session refresh — and no `/actions` call at all.
+
+**The screens copy the teacher app's frame rather than designing a third look.** Held-still sidebar,
+`@lms/ui` primitives, Inter, the same `localtest.me` cookie, the same paged-list idiom (`Previous` /
+`Next page`, `Page X of Y`, a filter that resets to page 1). Three doors on one product are three doors on
+one component library, and an operator's information density is a teacher's. What is added is one thing
+no other portal shows: the signed-in account's own name, role and email in the sidebar, because on this
+portal the person standing in front of the screen is the fact most worth naming — every row they read is
+somebody else's history, and every write is made in their own name.
+
+**A ledger row's detail has no order, so the reading end chooses one.** `detail` is a flat `jsonb` of
+decided facts, and `{to, from}` is a plausible rendering of a change that went the other way. The screen
+sorts the keys before printing them, which puts a change's `from:` before its `to:` and will not drift
+when an event gains a third key. This is the kind of thing only a real screen shows: every fixture in the
+suite carried one row and one fact, and both read correctly.
