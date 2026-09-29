@@ -1,0 +1,761 @@
+{
+  "generatedBy": "bun run --filter @lms/api docs:export",
+  "endpoints": [
+    {
+      "method": "GET",
+      "path": "/api/v1/actions",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "ops"
+        ]
+      },
+      "controller": "ActionLogController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/login",
+      "statusCode": 200,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "AuthController",
+      "handler": "login"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/logout",
+      "statusCode": 204,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "AuthController",
+      "handler": "logout"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/auth/me",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": []
+      },
+      "controller": "AuthController",
+      "handler": "me"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/refresh",
+      "statusCode": 200,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "AuthController",
+      "handler": "refresh"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/auth/register",
+      "statusCode": 201,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "AuthController",
+      "handler": "register"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/availability/rules",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "AvailabilityController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/availability/rules",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "AvailabilityController",
+      "handler": "create"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/availability/rules/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "AvailabilityController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/availability/rules/:id/retire",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "AvailabilityController",
+      "handler": "retire"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/bookings",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "mine"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "create"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/:id/cancel",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/:id/confirm",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "confirm"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/:id/reject",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "reject"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/:id/room",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": []
+      },
+      "controller": "BookingsController",
+      "handler": "room"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/bookings/classes",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "classes"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/bookings/requests",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "requests"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/bookings/slots",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "slots"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/courses",
+      "statusCode": 200,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "CatalogController",
+      "handler": "list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/courses/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "optional-session",
+        "roles": []
+      },
+      "controller": "CatalogController",
+      "handler": "read"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/courses/:id/lessons/:lessonId",
+      "statusCode": 200,
+      "access": {
+        "kind": "optional-session",
+        "roles": []
+      },
+      "controller": "CatalogController",
+      "handler": "lesson"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/courses/:id/lessons/:lessonId/video",
+      "statusCode": 200,
+      "access": {
+        "kind": "optional-session",
+        "roles": []
+      },
+      "controller": "CatalogController",
+      "handler": "video"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/catalog/courses/levels",
+      "statusCode": 200,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "CatalogController",
+      "handler": "levels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "create"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/:courseId/modules",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CourseModulesController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/modules",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CourseModulesController",
+      "handler": "create"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/courses/:courseId/modules/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CourseModulesController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/modules/:id/deactivate",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CourseModulesController",
+      "handler": "deactivate"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/modules/reorder",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CourseModulesController",
+      "handler": "reorder"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/:courseId/roster",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CourseRosterController",
+      "handler": "list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "read"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/courses/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:id/archive",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "archive"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:id/demo-bookings",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "setDemoBookings"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:id/publish",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "publish"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/currencies",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "currencies"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/levels",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "levels"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/enrollments",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "EnrollmentsController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/enrollments",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "EnrollmentsController",
+      "handler": "enroll"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/enrollments/:id/cancel",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "controller": "EnrollmentsController",
+      "handler": "cancel"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/health",
+      "statusCode": 200,
+      "access": {
+        "kind": "public",
+        "roles": []
+      },
+      "controller": "HealthController",
+      "handler": "check"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/modules/:moduleId/lessons",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modules/:moduleId/lessons",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "create"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/modules/:moduleId/lessons/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modules/:moduleId/lessons/:id/deactivate",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "deactivate"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modules/:moduleId/lessons/:id/publish",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "publish"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modules/:moduleId/lessons/:id/unpublish",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "unpublish"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/modules/:moduleId/lessons/:lessonId/asset",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonAssetsController",
+      "handler": "standing"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modules/:moduleId/lessons/:lessonId/asset",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonAssetsController",
+      "handler": "attach"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/modules/:moduleId/lessons/:lessonId/asset/video",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonAssetsController",
+      "handler": "play"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/modules/:moduleId/lessons/reorder",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "LessonsController",
+      "handler": "reorder"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/outbox",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "ops"
+        ]
+      },
+      "controller": "OutboxController",
+      "handler": "list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/teacher/profile",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "TeacherProfileController",
+      "handler": "read"
+    },
+    {
+      "method": "PUT",
+      "path": "/api/v1/teacher/profile",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "controller": "TeacherProfileController",
+      "handler": "save"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "ops"
+        ]
+      },
+      "controller": "AccountsController",
+      "handler": "list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/users/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "ops"
+        ]
+      },
+      "controller": "AccountsController",
+      "handler": "read"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/users/:id/role",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "ops"
+        ]
+      },
+      "controller": "AccountsController",
+      "handler": "changeRole"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/users/:id/status",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "ops"
+        ]
+      },
+      "controller": "AccountsController",
+      "handler": "changeStatus"
+    }
+  ]
+}
