@@ -335,12 +335,18 @@ describe('the class news a booking write files', () => {
     const theirs = await booked(other, course.id, (await nextSlot(other, course.id)).startsAt);
     await waitingSince(theirs.id, PENDING_REQUEST_HOURS + 4);
 
-    const swept = await expiry.expireStale(new Date());
+    await expiry.expireStale(new Date());
 
-    expect(swept).toBeGreaterThanOrEqual(2);
-    expect(
-      (await prisma.booking.findUniqueOrThrow({ where: { id: theirs.id } })).statusValueId,
-    ).toBe(await statusId(BOOKING_STATUS_CODES.EXPIRED));
+    // The sweep's tally is not this file's number to assert. Three spec files call `expireStale`
+    // against one `lms_test` booking table, and a fork that ends these two rows in the moment before
+    // this call returns a smaller count for the same work. What is owed here is about the rows, so it
+    // is read off the rows: both ended, and both minutes given back.
+    const expiredStatusId = await statusId(BOOKING_STATUS_CODES.EXPIRED);
+    for (const id of [mine.booking.id, theirs.id]) {
+      const ended = await prisma.booking.findUniqueOrThrow({ where: { id } });
+      expect(ended.statusValueId).toBe(expiredStatusId);
+      expect(ended.slotHeldAt).toBeNull();
+    }
     // Two rows ended, two letters, and neither addressed to both students. A sweep that filed one
     // row per teacher — or filed the same row twice — would satisfy a count and go unnoticed until
     // somebody wrote in about a class they were never in.

@@ -222,13 +222,18 @@ describe('ModuleLessons', () => {
     const list = await rows();
     await userEvent.click(within(list[0] as HTMLElement).getByRole('button', { name: /edit/i }));
 
-    await userEvent.clear(await screen.findByLabelText('Title'));
-    await userEvent.type(screen.getByLabelText('Title'), 'Halves, thirds and sixths');
-    await userEvent.clear(screen.getByLabelText('The page'));
-    await userEvent.type(screen.getByLabelText('The page'), 'Sixths last.');
-    await userEvent.clear(screen.getByLabelText('Estimated minutes'));
-    await userEvent.type(screen.getByLabelText('Estimated minutes'), '12');
-    await userEvent.click(screen.getByRole('button', { name: /^save$/i }));
+    // `delay: null` types every keystroke in one batch instead of waiting a macrotask per
+    // character. The events are the same and the boxes are still filled the way a keyboard fills
+    // them; what this spec is measuring is the payload a save carries, and at thirty-nine
+    // characters the per-key wait was the slowest thing in the file.
+    const user = userEvent.setup({ delay: null });
+    await user.clear(await screen.findByLabelText('Title'));
+    await user.type(screen.getByLabelText('Title'), 'Halves, thirds and sixths');
+    await user.clear(screen.getByLabelText('The page'));
+    await user.type(screen.getByLabelText('The page'), 'Sixths last.');
+    await user.clear(screen.getByLabelText('Estimated minutes'));
+    await user.type(screen.getByLabelText('Estimated minutes'), '12');
+    await user.click(screen.getByRole('button', { name: /^save$/i }));
 
     await waitFor(() =>
       expect(api.updateLesson).toHaveBeenCalledWith('m1', 'l1', {

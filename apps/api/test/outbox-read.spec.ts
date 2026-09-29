@@ -375,16 +375,25 @@ describe('GET /api/v1/outbox', () => {
     expect(tooMany.body.code).toBe(API_ERROR_CODES.VALIDATION_FAILED);
   });
 
-  it('pages without repeating a row or losing one', async () => {
-    const first = await list('keeper', { page: 1, pageSize: 2 });
-    const second = await list('keeper', { page: 2, pageSize: 2 });
+  it("pages one recipient's letters without repeating a row or losing one", async () => {
+    // Scoped to a recipient rather than left to the whole table. `total` is counted inside the
+    // transaction that reads the page, and another suite's fork is filing letters while these two
+    // calls are in flight — so an unfiltered pair of pages disagrees about a number that is not the
+    // question either page is answering. Three rows are this file's own, all it can promise.
+    const mine = { recipient: accountId('learner') };
+
+    const first = await list('keeper', { ...mine, page: 1, pageSize: 2 });
+    const second = await list('keeper', { ...mine, page: 2, pageSize: 2 });
 
     expect(body(first).items).toHaveLength(2);
     expect(body(first).page).toBe(1);
     expect(body(first).pageSize).toBe(2);
-    expect(body(first).total).toBe(body(second).total);
+    expect(body(first).total).toBe(3);
+    expect(body(second).items).toHaveLength(1);
+    expect(body(second).total).toBe(3);
 
     const seen = [...ids(first), ...ids(second)];
     expect(new Set(seen).size).toBe(seen.length);
+    expect(new Set(seen).size).toBe(3);
   });
 });

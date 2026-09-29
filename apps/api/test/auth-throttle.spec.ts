@@ -39,6 +39,10 @@ describe('credential throttling', () => {
     await prisma.$disconnect();
   });
 
+  // Longer than the suite's own 20 s, because the work here is spending a real budget one request
+  // at a time: every attempt is a password check the server answers, and the loop may need all
+  // twenty-five of them before the limiter says no. What is asserted is the envelope of the refusal,
+  // not how quickly the box got there.
   it('stops answering the login form once the budget is spent, in the error envelope', async () => {
     let status = 0;
     // Wrong passwords are all this takes: the budget is per address, not per outcome.
@@ -58,5 +62,5 @@ describe('credential throttling', () => {
     expect(limited.body.requestId).toBeTruthy();
     // The portal needs this to know when to stop retrying.
     expect(limited.headers['retry-after']).toBeTruthy();
-  });
+  }, 60_000);
 });

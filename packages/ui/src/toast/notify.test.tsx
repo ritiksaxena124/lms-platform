@@ -1,8 +1,15 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import toast from 'react-hot-toast';
+import { beforeEach, describe, expect, it } from 'vitest';
 
 import { notify, Toaster } from './index';
+
+// The toast store is a module singleton and RTL's cleanup only unmounts the DOM, so every test in
+// this file would otherwise mount a Toaster that renders all the previous tests' toasts too — eight
+// cards entering, animating and expiring on one clock while the newest one is being looked for. The
+// reset lives here rather than in the shared setup because this file is the only one that fills it.
+beforeEach(() => toast.remove());
 
 describe('notify', () => {
   it('shows a success toast with the message the caller passed', async () => {

@@ -244,9 +244,11 @@ describe('the request nobody answered', () => {
     const booking = await booked(member, course.id, slot.startsAt);
     await waitingSince(booking.id, PENDING_REQUEST_HOURS + 1);
 
-    const swept = await sweep();
+    await sweep();
 
-    expect(swept).toBeGreaterThanOrEqual(1);
+    // Read off the row, not off the sweep's tally: the tally counts every pending request in
+    // `lms_test`, and another spec file's sweep can end this one a moment earlier. The row says the
+    // same thing about the work that was owed here, and the minute is the proof it was done.
     const row = await rowOf(booking.id);
     expect(row.statusValueId).toBe(await statusId(BOOKING_STATUS_CODES.EXPIRED));
     expect(row.slotHeldAt).toBeNull();
