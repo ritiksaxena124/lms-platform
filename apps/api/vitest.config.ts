@@ -7,7 +7,13 @@ export default defineConfig({
     include: ['test/**/*.spec.ts', 'src/**/*.spec.ts', 'src/**/*.spec.tsx'],
     globalSetup: ['test/global-setup.ts'],
     testTimeout: 20_000,
-    hookTimeout: 30_000,
+    // Generous, because the heaviest hook in this package is not a fixture — it is `beforeAll`
+    // building the entire application: every module, every provider, the Prisma client, the crons, and
+    // the reference seed in front of it. Four of those happen at once by design, on a box that is also
+    // holding three dev servers and a browser, and at thirty seconds one of them loses the race and the
+    // file reports a broken suite when nothing about the code changed. The tests themselves stay on the
+    // tight budget above; only the boot gets room.
+    hookTimeout: 60_000,
     // Every spec file boots its own Nest app and holds its own `PrismaClient` for assertions,
     // and a Prisma pool defaults to twice the core count — so at full parallelism on a 12-core
     // box the files ask the server for far more than the 100 connections it allows, and a
