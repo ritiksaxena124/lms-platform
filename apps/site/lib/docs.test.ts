@@ -1,9 +1,9 @@
-import { readdirSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
 
-import { docGroups, docRoutes, docSlugs, readDoc } from './docs';
+import { docGroups, docRoutes, docSlugs, readDoc, type EndpointsFile } from './docs';
 
 const CONTENT_DIR = resolve(import.meta.dirname, '../content');
 
@@ -112,6 +112,57 @@ describe('the routes the export builds', () => {
       for (const href of internalLinks(readDoc(slug).html)) {
         expect(built.has(href), `${slug}.md links ${href}, which is not a page`).toBe(true);
       }
+    }
+  });
+});
+
+describe('the route table the API exports', () => {
+  // Read from the file rather than from `lib/docs`, because the point of the page is that a reader
+  // sees every route: a renderer that dropped a group would still look complete from the inside.
+  const exported = (
+    JSON.parse(
+      readFileSync(resolve(CONTENT_DIR, 'endpoints.json'), 'utf8'),
+    ) as unknown as EndpointsFile
+  ).endpoints;
+
+  const page = readDoc('api-reference');
+
+  it('renders every route the app answers', () => {
+    expect(exported.length).toBeGreaterThan(40);
+
+    // Each route by name, rather than a row count: a page of prose beside the table has its own
+    // code cells, and arithmetic that happens to close proves nothing about which route is missing.
+    for (const endpoint of exported) {
+      expect(
+        page.html,
+        `${endpoint.method} ${endpoint.path} is not on the page`,
+      ).toContain(`<td><code>${endpoint.path}</code></td>`);
+    }
+  });
+
+  it('puts each resource in the page contents as a word, not as markup', () => {
+    // The generated sections are headings so a reader can jump to `bookings`, and the on-page
+    // contents prints their text raw — a backtick left in the source reaches the rail as a backtick.
+    const sections = readDoc('api-reference').headings.map((heading) => heading.text);
+
+    expect(sections).toContain('bookings');
+    expect(sections.join(' ')).not.toContain('`');
+  });
+
+  it('names the access rule in words the guard actually enforces', () => {
+    // The four cases the API really has, each visible on the page: a stranger's door, a door that
+    // reads a session without requiring one, a role, and any signed-in account at all.
+    expect(page.html).toContain('anyone');
+    expect(page.html).toContain('session read if offered');
+    expect(page.html).toContain('teacher');
+    expect(page.html).toContain('any signed-in account');
+  });
+
+  it('leaves no marker unfilled on any page', () => {
+    // A fence the renderer does not know becomes a code block that prints its own name — the worst
+    // kind of stale docs, because they look like a placeholder somebody will get to.
+    for (const slug of docSlugs()) {
+      expect(readDoc(slug).html).not.toMatch(/language-endpoints|```/);
     }
   });
 });

@@ -13,6 +13,12 @@
   },
   {
     "group": "How it works",
+    "slug": "api-reference",
+    "title": "The API reference",
+    "summary": "Every route the API answers, with the access rule it enforces and the status it returns."
+  },
+  {
+    "group": "How it works",
     "slug": "conventions",
     "title": "Rules the code enforces",
     "summary": "The handful of constraints the rest of the design relies on, and what checks them."
