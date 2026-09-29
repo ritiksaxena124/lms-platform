@@ -125,6 +125,8 @@ export const ACCOUNT_STATUS_CODES = {
   DISABLED: 'disabled',
 } as const;
 
+export type AccountStatusCode = (typeof ACCOUNT_STATUS_CODES)[keyof typeof ACCOUNT_STATUS_CODES];
+
 export const VERIFICATION_STATUS_CODES = {
   UNVERIFIED: 'unverified',
   PENDING: 'pending',

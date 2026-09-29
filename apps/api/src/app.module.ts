@@ -10,6 +10,7 @@ import { PrismaModule } from './common/prisma/prisma.module';
 import { EnvModule } from './config/env.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { ActionLogModule } from './modules/action-log/action-log.module';
+import { AccountsModule } from './modules/accounts/accounts.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
@@ -40,6 +41,9 @@ import { ReferenceModule } from './reference/reference.module';
     // modules can hand it their transactions, and so the one route that reads the table back out
     // has a module to stand on.
     ActionLogModule,
+    // The accounts screen and its two writes: the surface that makes the ops role issuable, which is
+    // what the ledger's guard has been waiting for since Phase 7.
+    AccountsModule,
     // The port behind every uploaded byte, selected by `STORAGE_PROVIDER` (§6). Registered
     // before any route uses it, so the provider string is checked at boot rather than on the
     // first upload of a term.

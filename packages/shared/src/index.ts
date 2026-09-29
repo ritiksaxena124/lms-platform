@@ -1,4 +1,5 @@
 export * from './action-log';
+export * from './accounts';
 export * from './availability';
 export * from './auth';
 export * from './bookings';

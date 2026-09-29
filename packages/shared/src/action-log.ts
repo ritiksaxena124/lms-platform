@@ -88,6 +88,13 @@ export const ACTION_CODES = {
    * event a person would want explained to them. */
   SESSION_REPLAY_DETECTED: 'session_replay_detected',
 
+  /** The two things an operator does *to* an account rather than as one. One code per switch, in
+   * both directions, with the direction in `detail` — the same shape the demo-bookings flag chose,
+   * because an operator who disabled an account and one who enabled it made one decision each, not
+   * two different kinds of decision. */
+  ACCOUNT_STATUS_CHANGED: 'account_status_changed',
+  ACCOUNT_ROLE_CHANGED: 'account_role_changed',
+
   TEACHER_PROFILE_SAVED: 'teacher_profile_saved',
 
   COURSE_CREATED: 'course_created',
@@ -167,6 +174,20 @@ export const ACTION_SHAPES = {
     actorKind: ACTION_ACTOR_KIND_CODES.USER,
   },
   session_replay_detected: {
+    section: ACTION_SECTION_CODES.ACCOUNT,
+    targetTable: ACTION_TARGET_TABLE_CODES.USERS,
+    actorKind: ACTION_ACTOR_KIND_CODES.USER,
+  },
+  /** Both are about the account the operator selected, and both are credited to the operator: the
+   * actor is the person who pressed the button, and the account moved is the target. That split is
+   * the whole reason these two are not `recordAs` rows — an operator's session is in the request, so
+   * the recorder reads the actor rather than being told it. */
+  account_status_changed: {
+    section: ACTION_SECTION_CODES.ACCOUNT,
+    targetTable: ACTION_TARGET_TABLE_CODES.USERS,
+    actorKind: ACTION_ACTOR_KIND_CODES.USER,
+  },
+  account_role_changed: {
     section: ACTION_SECTION_CODES.ACCOUNT,
     targetTable: ACTION_TARGET_TABLE_CODES.USERS,
     actorKind: ACTION_ACTOR_KIND_CODES.USER,
