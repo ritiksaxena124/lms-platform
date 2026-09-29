@@ -281,7 +281,13 @@ describe('courses', () => {
   it('answers a stranger’s id and a malformed id identically', async () => {
     const id = await createDraft(teacher);
 
-    await getCourse(id.replace(/.$/, '0'), teacher).expect(404);
+    // The last character is changed rather than set, because setting it to `0` asks for the draft
+    // unchanged whenever its id already ends in `0` — one run in sixteen — and the endpoint then
+    // returns 200 for a course that exists and belongs to the person asking. That is the right
+    // answer to a question this test did not mean to ask.
+    const somebodyElses = `${id.slice(0, -1)}${id.endsWith('0') ? '1' : '0'}`;
+
+    await getCourse(somebodyElses, teacher).expect(404);
     await getCourse('not-a-uuid', teacher).expect(404);
   });
 
