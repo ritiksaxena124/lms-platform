@@ -1,4 +1,4 @@
-import { readdirSync, readFileSync } from 'node:fs';
+import { existsSync, readdirSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
@@ -13,6 +13,7 @@ import {
 } from './docs';
 
 const CONTENT_DIR = resolve(import.meta.dirname, '../content');
+const REPO_ROOT = resolve(CONTENT_DIR, '../../..');
 
 /** The `.md` files that actually exist, as slugs. */
 function filesOnDisk(): string[] {
@@ -20,6 +21,37 @@ function filesOnDisk(): string[] {
     .filter((name) => name.endsWith('.md'))
     .map((name) => name.replace(/\.md$/, ''))
     .sort();
+}
+
+/**
+ * The phase table, parsed by the test straight out of the repository README.
+ *
+ * The page reads the same file, so a guard that merely agreed with the page would prove nothing —
+ * what this checks is that the renderer emitted every row the record holds, in order.
+ */
+function readmePhases(): { phase: string; scope: string; status: string }[] {
+  const source = readFileSync(resolve(REPO_ROOT, 'README.md'), 'utf8').replace(/\r\n/g, '\n');
+
+  return [...source.matchAll(/^\| (\d+)\s*\| (.+?)\s*\| (.+?)\s*\|$/gm)].map((match) => ({
+    phase: match[1] ?? '',
+    scope: match[2] ?? '',
+    status: (match[3] ?? '').replace(/\*\*/g, ''),
+  }));
+}
+
+/** Every workspace the monorepo holds, as the folder a reader would open. */
+function workspaces(): string[] {
+  return ['apps', 'packages'].flatMap((group) =>
+    readdirSync(resolve(REPO_ROOT, group))
+      .filter((name) => existsSync(resolve(REPO_ROOT, group, name, 'package.json')))
+      .map((name) => `${group}/${name}`)
+      .sort(),
+  );
+}
+
+/** The provider ports the API defines, by folder. */
+function providerPorts(): string[] {
+  return readdirSync(resolve(REPO_ROOT, 'apps/api/src/providers')).sort();
 }
 
 /** Every internal link in rendered markdown, anchors to another page rather than a section. */
@@ -31,6 +63,21 @@ function internalLinks(html: string): string[] {
   }
 
   return hrefs;
+}
+
+/**
+ * The README writes an apostrophe as one character; marked emits the entity HTML reserves it as.
+ *
+ * Comparing a cell straight against the markup would fail on `teacher's calendar` and teach the next
+ * reader to trust the escape rather than the page.
+ */
+function asRendered(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 describe('the docs manifest', () => {
@@ -168,7 +215,7 @@ describe('the route table the API exports', () => {
     // A fence the renderer does not know becomes a code block that prints its own name — the worst
     // kind of stale docs, because they look like a placeholder somebody will get to.
     for (const slug of docSlugs()) {
-      expect(readDoc(slug).html).not.toMatch(/language-(?:endpoints|data-model)|```/);
+      expect(readDoc(slug).html).not.toMatch(/language-(?:endpoints|data-model|phases)|```/);
     }
   });
 });
@@ -250,6 +297,67 @@ describe('the data model the API exports', () => {
 
     expect(sections).toContain('Booking');
     expect(sections.join(' ')).not.toContain('`');
+  });
+});
+
+describe('the guide', () => {
+  const page = readDoc('guide');
+
+  it('names every piece the monorepo holds', () => {
+    // The tables on these pages are written by hand, so the check runs the other way, from the
+    // folders: a workspace added to the repository has to be explained to a reader before these
+    // pages are allowed to go on not mentioning it.
+    const named = docSlugs()
+      .map((slug) => readDoc(slug).html)
+      .join('');
+
+    expect(workspaces().length).toBeGreaterThanOrEqual(7);
+    for (const workspace of workspaces()) {
+      expect(named, `${workspace} is not named anywhere in the docs`).toContain(
+        `<code>${workspace}</code>`,
+      );
+    }
+  });
+
+  it('names every port the API stands behind', () => {
+    // The three folders in `apps/api/src/providers` are the whole surface the platform offers to
+    // hand to somebody else's system, and a guide that leaves one out teaches the design wrongly.
+    expect(providerPorts()).toHaveLength(3);
+
+    for (const port of providerPorts()) {
+      expect(page.html, `the ${port} port is not on the guide`).toContain(`<code>${port}</code>`);
+    }
+  });
+
+  it('sends the reader to the pages that hold the generated facts', () => {
+    // The guide explains; the tables belong to the pages the code fills in. A fourth place writing
+    // out routes or columns is a copy that drifts.
+    for (const href of ['/docs/api-reference', '/docs/data-model', '/docs/conventions']) {
+      expect(page.html).toContain(`href="${href}"`);
+    }
+  });
+});
+
+describe('the phase record', () => {
+  const rows = readmePhases();
+  const page = readDoc('phases');
+
+  it('publishes the table the repository keeps instead of restating it', () => {
+    // Parsed from the README by the test as well as by the page, so the guard proves the renderer
+    // emitted every row — not that two hand-kept copies happen to agree today.
+    expect(rows).toHaveLength(13);
+
+    for (const row of rows) {
+      expect(page.html, `phase ${row.phase} lost its number`).toContain(`<td>${row.phase}</td>`);
+      expect(page.html, `phase ${row.phase} lost its scope`).toContain(asRendered(row.scope));
+      expect(page.html, `phase ${row.phase} lost its status`).toContain(asRendered(row.status));
+    }
+  });
+
+  it('keeps the phases in the order the record sets them', () => {
+    const numbers = [...page.html.matchAll(/<td>(\d+)<\/td>/g)].map((match) => match[1]);
+
+    expect(numbers).toEqual(rows.map((row) => row.phase));
   });
 });
 

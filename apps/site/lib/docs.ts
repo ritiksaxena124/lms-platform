@@ -98,6 +98,31 @@ const DATA_MODEL = JSON.parse(
   readFileSync(resolve(CONTENT_DIR, 'data-model.json'), 'utf8'),
 ) as DataModelFile;
 
+/**
+ * The repository's own README, three folders up from this package's `content` directory.
+ *
+ * The phase record on the site is this file's table and nothing else. A second copy of a roadmap is
+ * the classic way for documentation to disagree with itself, and the page has no reason to exist if
+ * it is going to be typed out again.
+ */
+const README_PATH = resolve(CONTENT_DIR, '../../../README.md');
+
+interface PhaseRow {
+  phase: string;
+  scope: string;
+  status: string;
+}
+
+function readmePhases(): PhaseRow[] {
+  const source = readFileSync(README_PATH, 'utf8').replace(/\r\n/g, '\n');
+
+  return [...source.matchAll(/^\| (\d+)\s*\| (.+?)\s*\| (.+?)\s*\|$/gm)].map((match) => ({
+    phase: match[1] ?? '',
+    scope: match[2] ?? '',
+    status: match[3] ?? '',
+  }));
+}
+
 function slugify(text: string): string {
   return text
     .toLowerCase()
@@ -221,12 +246,28 @@ function endpointTables(): string {
 }
 
 /**
+ * The record as the repository keeps it: every phase, what it was for, and whether it shipped.
+ *
+ * The scope text arrives with the emphasis markers the README writes its statuses with, and marked
+ * turns those into bold on this page too — so the table is passed through rather than reworded,
+ * which is the whole point of reading it from one file.
+ */
+function phaseTable(): string {
+  return [
+    '| Phase | What it was for | Status |',
+    '| --- | --- | --- |',
+    ...readmePhases().map((row) => `| ${row.phase} | ${row.scope} | ${row.status} |`),
+  ].join('\n');
+}
+
+/**
  * The fence a page writes to ask for a generated block. The body is allowed to be blank because a
  * formatter passing over an empty code block puts a line inside it, and a marker that only matches
  * the exact bytes it was written with breaks on a reflow rather than on a real mistake.
  */
 const ENDPOINT_MARKER = /^```endpoints\n[ \t\n]*```$/m;
 const DATA_MODEL_MARKER = /^```data-model\n[ \t\n]*```$/m;
+const PHASES_MARKER = /^```phases\n[ \t\n]*```$/m;
 
 function tableOf(modelName: string): string {
   return DATA_MODEL.models.find((model) => model.name === modelName)?.table ?? modelName;
@@ -329,7 +370,8 @@ function modelSections(): string {
 function fillGenerated(markdown: string): string {
   return markdown
     .replace(ENDPOINT_MARKER, endpointTables())
-    .replace(DATA_MODEL_MARKER, modelSections());
+    .replace(DATA_MODEL_MARKER, modelSections())
+    .replace(PHASES_MARKER, phaseTable());
 }
 
 export function readDoc(slug: string): DocPage {

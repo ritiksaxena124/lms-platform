@@ -13,6 +13,12 @@
   },
   {
     "group": "How it works",
+    "slug": "guide",
+    "title": "How the system fits together",
+    "summary": "The path of a request, the modules it passes through, and the ports third parties sit behind."
+  },
+  {
+    "group": "How it works",
     "slug": "api-reference",
     "title": "The API reference",
     "summary": "Every route the API answers, with the access rule it enforces and the status it returns."
@@ -28,5 +34,11 @@
     "slug": "conventions",
     "title": "Rules the code enforces",
     "summary": "The handful of constraints the rest of the design relies on, and what checks them."
+  },
+  {
+    "group": "The repository",
+    "slug": "phases",
+    "title": "The phase record",
+    "summary": "The order the thing was built in, what each phase was for, and what is still a plan."
   }
 ]
