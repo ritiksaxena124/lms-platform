@@ -785,6 +785,7 @@ model ActionLog {
   actor User? @relation("action_log_actor", fields: [actorUserId], references: [id], onDelete: Restrict)
 
   @@index([actorUserId, createdAt], map: "ix_action_log_actor")
+  @@index([sectionCode, createdAt], map: "ix_action_log_section")
   @@index([targetTable, targetId, createdAt], map: "ix_action_log_target")
   @@index([actionCode, createdAt], map: "ix_action_log_action")
   @@index([createdAt], map: "ix_action_log_recent")

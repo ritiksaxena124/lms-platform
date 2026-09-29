@@ -37,7 +37,8 @@ import { ReferenceModule } from './reference/reference.module';
     // news to it; the sweep that reads it back out arrives with 6e.
     NotificationsModule,
     // The record every standing-row write files beside itself. Registered here so the feature
-    // modules can hand it their transactions; it owns a table and no connections of its own.
+    // modules can hand it their transactions, and so the one route that reads the table back out
+    // has a module to stand on.
     ActionLogModule,
     // The port behind every uploaded byte, selected by `STORAGE_PROVIDER` (§6). Registered
     // before any route uses it, so the provider string is checked at boot rather than on the
