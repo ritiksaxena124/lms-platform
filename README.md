@@ -13,9 +13,10 @@ what, who is standing behind an account, what happened to a letter that was mean
 And the thing now has a face and a manual: `apps/site` publishes the public page a stranger reads and
 the docs a builder needs, both generated from what the code already says. Every API route is explained
 endpoint by endpoint, with purpose, gates, fields and failures documented alongside the contract the
-code enforces. Everything listed under [What each portal does](#what-each-portal-does) is shipped, tested and
-clickable; money, the teacher's repeating calendar and attendance are still ahead, and
-[Phases](#phases) keeps the ordered record of why.
+code enforces. The teacher's recurring calendar is complete: class series auto-enroll students into
+weekly instances, and holidays block slot generation on specified dates. Everything listed under
+[What each portal does](#what-each-portal-does) is shipped, tested and clickable; coupons and payments
+are still ahead, and [Phases](#phases) keeps the ordered record of why.
 
 ## Contents
 
@@ -56,6 +57,10 @@ clickable; money, the teacher's repeating calendar and attendance are still ahea
 - **The week** — `/availability` (`/api/v1/availability/rules`). A window is four numbers — weekday,
   opens, closes, how long a class runs — kept in the teacher's own timezone, and the grid below it
   fills with the minutes that window offers over the next thirty days.
+- **Recurring classes** — `/courses/[id]/series` for weekly class slots that auto-enroll students.
+  A series is Monday at 09:00–10:00 as a 45-minute class, repeating until retired.
+- **Holidays** — `/holidays` for days the teacher doesn't teach. Festivals, personal days off, or
+  recurring annual observances that block all slot generation on those dates.
 - **The queue, and the classes** — an ask lands in `/requests` as `pending` and holds the minute;
   nothing is a class until the teacher confirms or refuses it. `/classes` holds the answer either
   way, soonest first.
