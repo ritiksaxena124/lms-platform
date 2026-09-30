@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
-import { EnrollmentsModule } from '../src/modules/enrollments/enrollments.module';
+import { AppModule } from '../src/app.module';
 import { seedLookups } from '../src/reference/seed-lookups';
 import { createTestApp } from './utils/create-test-app';
 
@@ -32,27 +32,36 @@ async function tokenFor(name: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  app = await createTestApp({ imports: [EnrollmentsModule] });
+  app = await createTestApp({ imports: [AppModule] });
   await app.listen(0);
   await seedLookups(prisma);
 });
 
 afterAll(async () => {
-  // Cleanup
+  // Cleanup - delete in reverse foreign key order
   await prisma.payment.deleteMany({
-    where: { enrollment: { studentUserId: { contains: `.${RUN}@` } } },
+    where: { enrollment: { course: { slug: { startsWith: `coupon-test-${RUN}` } } } },
   });
   await prisma.enrollment.deleteMany({
-    where: { studentUserId: { contains: `.${RUN}@` } },
+    where: { course: { slug: { startsWith: `coupon-test-${RUN}` } } },
   });
   await prisma.coupon.deleteMany({
-    where: { code: { startsWith: 'TEST' } },
+    where: { course: { slug: { startsWith: `coupon-test-${RUN}` } } },
   });
   await prisma.course.deleteMany({
     where: { slug: { startsWith: `coupon-test-${RUN}` } },
   });
+  await prisma.refreshToken.deleteMany({
+    where: { user: { email: { endsWith: `.${RUN}@localtest.me` } } },
+  });
+  await prisma.mailOutbox.deleteMany({
+    where: { recipient: { email: { endsWith: `.${RUN}@localtest.me` } } },
+  });
+  await prisma.actionLog.deleteMany({
+    where: { actor: { email: { endsWith: `.${RUN}@localtest.me` } } },
+  });
   await prisma.user.deleteMany({
-    where: { email: { contains: `.${RUN}@` } },
+    where: { email: { endsWith: `.${RUN}@localtest.me` } },
   });
 
   await app.close();
@@ -107,7 +116,7 @@ describe('Enrollment with coupon', () => {
         levelValueId,
         statusValueId,
         priceMinorUnits: 10000, // $100.00
-        currencyValueId,
+        priceCurrencyValueId: currencyValueId,
         teacherUserId: (await prisma.user.findFirstOrThrow({
           where: { email: teacherEmail },
         })).id,
@@ -140,21 +149,18 @@ describe('Enrollment with coupon', () => {
     expect(enrollResponse.body.enrollment.course.id).toBe(course.id);
 
     // Verify payment was created with correct discounted amount (20% off $100 = $80)
+    const studentUser = await prisma.user.findFirstOrThrow({
+      where: { email: studentEmail },
+    });
+
     const payment = await prisma.payment.findFirst({
-      where: { enrollment: { courseId: course.id, studentUserId: enrollResponse.body.enrollment.id.split('-')[0] } },
+      where: { enrollment: { courseId: course.id, studentUserId: studentUser.id } },
       include: { coupon: true },
     });
 
-    // Note: We can't easily verify the exact payment because we don't have the student user ID
-    // But we can check that at least one payment exists for this course enrollment
-    const payments = await prisma.payment.findMany({
-      where: { enrollment: { courseId: course.id } },
-      include: { coupon: true },
-    });
-
-    expect(payments.length).toBeGreaterThan(0);
-    expect(payments[0].amountMinorUnits).toBe(8000); // 20% off $100 = $80
-    expect(payments[0].coupon?.code).toBe('TEST20');
+    expect(payment).toBeDefined();
+    expect(payment?.amountMinorUnits).toBe(8000); // 20% off $100 = $80
+    expect(payment?.coupon?.code).toBe('TEST20');
 
     // Verify coupon redemption count was incremented
     const updatedCoupon = await prisma.coupon.findUnique({
@@ -190,7 +196,7 @@ describe('Enrollment with coupon', () => {
       .send({ courseId: course.id, couponCode: 'INVALID' })
       .expect(400);
 
-    expect(response.body.message).toContain('Invalid coupon');
+    expect(response.body.message).toContain('Coupon not found');
   });
 
   it('allows enrollment without a coupon', async () => {

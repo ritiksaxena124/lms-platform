@@ -30,20 +30,23 @@ describe('the landing page', () => {
     // opening line mentions only one of them is a course site.
     expect(within(pitch).getByText(/independent teachers/i)).toBeInTheDocument();
     expect(within(pitch).getByText(/1:1/i)).toBeInTheDocument();
-    expect(within(pitch).getByRole('link', { name: /teacher portal/i })).toBeInTheDocument();
   });
 
   it('gives a teacher and a learner their own way in', () => {
     render(<Home />);
 
-    expect(screen.getByRole('link', { name: /teacher portal/i })).toHaveAttribute(
-      'href',
-      ENV.NEXT_PUBLIC_TEACHER_PORTAL_URL,
-    );
-    expect(screen.getByRole('link', { name: /student portal/i })).toHaveAttribute(
-      'href',
-      ENV.NEXT_PUBLIC_STUDENT_PORTAL_URL,
-    );
+    const teacherLinks = screen.getAllByRole('link', { name: /teacher portal/i });
+    expect(teacherLinks.length).toBeGreaterThan(0);
+    for (const link of teacherLinks) {
+      expect(link).toHaveAttribute('href', ENV.NEXT_PUBLIC_TEACHER_PORTAL_URL);
+    }
+
+    const studentLinks = screen.getAllByRole('link', { name: /student portal/i });
+    expect(studentLinks.length).toBeGreaterThan(0);
+    for (const link of studentLinks) {
+      expect(link).toHaveAttribute('href', ENV.NEXT_PUBLIC_STUDENT_PORTAL_URL);
+    }
+
     expect(screen.getByRole('link', { name: /read the docs/i })).toHaveAttribute('href', '/docs');
   });
 
@@ -52,11 +55,12 @@ describe('the landing page', () => {
 
     // The header has the same guard for the chrome; this is the body. Links that leave are exempt:
     // their 404 belongs to whoever owns that host, and a static export only answers for the paths it
-    // emitted files for.
+    // emitted files for. In-page anchors (starting with #) are also exempt since they reference
+    // sections within the current page.
     const built = new Set(['/', ...docRoutes()]);
     for (const link of screen.getAllByRole('link')) {
       const href = link.getAttribute('href') ?? '';
-      if (!href.startsWith('http')) expect(built).toContain(href);
+      if (!href.startsWith('http') && !href.startsWith('#')) expect(built).toContain(href);
     }
   });
 

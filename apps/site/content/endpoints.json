@@ -794,6 +794,444 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/availability/holidays",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesListResponse",
+        "note": "A week's worth of series for one course, in the order a teacher reads them: by day, then by the minute each series opens.",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "ClassSeries[]",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "HolidayController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/availability/holidays",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "date",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the date as YYYY-MM-DD."
+            ],
+            "values": []
+          },
+          {
+            "name": "reason",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A reason is text."
+            ],
+            "values": []
+          },
+          {
+            "name": "isRecurringAnnual",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Recurring annually is yes or no."
+            ],
+            "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "series",
+            "optional": false,
+            "type": "ClassSeries",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "HolidayController",
+      "handler": "create"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/availability/holidays/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "date",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the date as YYYY-MM-DD."
+            ],
+            "values": []
+          },
+          {
+            "name": "reason",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A reason is text."
+            ],
+            "values": []
+          },
+          {
+            "name": "isRecurringAnnual",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Recurring annually is yes or no."
+            ],
+            "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "series",
+            "optional": false,
+            "type": "ClassSeries",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "HolidayController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/availability/holidays/:id/retire",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "series",
+            "optional": false,
+            "type": "ClassSeries",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "HolidayController",
+      "handler": "retire"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/availability/rules",
       "statusCode": 200,
       "access": {
@@ -3108,6 +3546,696 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/courses/:courseId/coupons",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CouponListResponse",
+        "note": "Response envelope for listing coupons.",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "Coupon[]",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Coupon",
+            "note": "A discount code a teacher issues for one of their courses.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "discountType",
+                "optional": false,
+                "type": "DiscountTypeCode",
+                "note": ""
+              },
+              {
+                "name": "discountAmount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "validFrom",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "validUntil",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "maxRedemptions",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "redemptionCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CouponController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/coupons",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "code",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "not empty",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "discountType",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: percentage, fixed",
+              "text"
+            ],
+            "values": [
+              "percentage",
+              "fixed"
+            ]
+          },
+          {
+            "name": "discountAmount",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 0",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "validFrom",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an ISO-8601 instant"
+            ],
+            "values": []
+          },
+          {
+            "name": "validUntil",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an ISO-8601 instant"
+            ],
+            "values": []
+          },
+          {
+            "name": "maxRedemptions",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CouponResponse",
+        "note": "Response envelope for a single coupon.",
+        "fields": [
+          {
+            "name": "coupon",
+            "optional": false,
+            "type": "Coupon",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Coupon",
+            "note": "A discount code a teacher issues for one of their courses.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "discountType",
+                "optional": false,
+                "type": "DiscountTypeCode",
+                "note": ""
+              },
+              {
+                "name": "discountAmount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "validFrom",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "validUntil",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "maxRedemptions",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "redemptionCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CouponController",
+      "handler": "create"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/:courseId/coupons/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CouponResponse",
+        "note": "Response envelope for a single coupon.",
+        "fields": [
+          {
+            "name": "coupon",
+            "optional": false,
+            "type": "Coupon",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Coupon",
+            "note": "A discount code a teacher issues for one of their courses.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "discountType",
+                "optional": false,
+                "type": "DiscountTypeCode",
+                "note": ""
+              },
+              {
+                "name": "discountAmount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "validFrom",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "validUntil",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "maxRedemptions",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "redemptionCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CouponController",
+      "handler": "getById"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/courses/:courseId/coupons/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "code",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "not empty",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "discountAmount",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 0",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "validFrom",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an ISO-8601 instant"
+            ],
+            "values": []
+          },
+          {
+            "name": "validUntil",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an ISO-8601 instant"
+            ],
+            "values": []
+          },
+          {
+            "name": "maxRedemptions",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CouponResponse",
+        "note": "Response envelope for a single coupon.",
+        "fields": [
+          {
+            "name": "coupon",
+            "optional": false,
+            "type": "Coupon",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Coupon",
+            "note": "A discount code a teacher issues for one of their courses.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "discountType",
+                "optional": false,
+                "type": "DiscountTypeCode",
+                "note": ""
+              },
+              {
+                "name": "discountAmount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "validFrom",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "validUntil",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "maxRedemptions",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "redemptionCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CouponController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/coupons/:id/deactivate",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CouponResponse",
+        "note": "Response envelope for a single coupon.",
+        "fields": [
+          {
+            "name": "coupon",
+            "optional": false,
+            "type": "Coupon",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Coupon",
+            "note": "A discount code a teacher issues for one of their courses.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "discountType",
+                "optional": false,
+                "type": "DiscountTypeCode",
+                "note": ""
+              },
+              {
+                "name": "discountAmount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "validFrom",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "validUntil",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "maxRedemptions",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "redemptionCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CouponController",
+      "handler": "deactivate"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/courses/:courseId/modules",
       "statusCode": 200,
       "access": {
@@ -3748,6 +4876,486 @@
       },
       "controller": "CourseRosterController",
       "handler": "list"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/courses/:courseId/series",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesListResponse",
+        "note": "A week's worth of series for one course, in the order a teacher reads them: by day, then by the minute each series opens.",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "ClassSeries[]",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "ClassSeriesController",
+      "handler": "list"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/series",
+      "statusCode": 201,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "weekday",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday."
+            ],
+            "values": []
+          },
+          {
+            "name": "startMinutes",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "endMinutes",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "durationMinutes",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes."
+            ],
+            "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "series",
+            "optional": false,
+            "type": "ClassSeries",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "ClassSeriesController",
+      "handler": "create"
+    },
+    {
+      "method": "PATCH",
+      "path": "/api/v1/courses/:courseId/series/:id",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "weekday",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday."
+            ],
+            "values": []
+          },
+          {
+            "name": "startMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "endMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "durationMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes."
+            ],
+            "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "series",
+            "optional": false,
+            "type": "ClassSeries",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "ClassSeriesController",
+      "handler": "update"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:courseId/series/:id/retire",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "ClassSeriesResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "series",
+            "optional": false,
+            "type": "ClassSeries",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ClassSeries",
+            "note": "One slot in a course's weekly schedule. `durationMinutes` is stored separately from `endMinutes - startMinutes` because a teacher may want a 60-minute window with 45-minute classes and 15-minute breaks between them. The series says how long each class inside the window lasts; the window itself is the container.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "ClassSeriesController",
+      "handler": "retire"
     },
     {
       "method": "GET",
@@ -4755,6 +6363,17 @@
             "nested": false,
             "rules": [
               "between 1 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "couponCode",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 1 and 50 characters",
               "text"
             ],
             "values": []

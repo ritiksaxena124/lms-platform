@@ -1384,6 +1384,364 @@
       "uniqueKeys": [],
       "softDelete": false,
       "tracksUpdates": false
+    },
+    {
+      "name": "ClassSeries",
+      "table": "class_series",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "courseId",
+          "column": "course_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "weekday",
+          "column": "weekday",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "startMinutes",
+          "column": "start_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "endMinutes",
+          "column": "end_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "durationMinutes",
+          "column": "duration_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "course",
+          "type": "Course",
+          "columns": [
+            "courseId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "courseId",
+          "weekday",
+          "startMinutes"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Holiday",
+      "table": "holiday",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "teacherUserId",
+          "column": "teacher_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "date",
+          "column": "date",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "reason",
+          "column": "reason",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isRecurringAnnual",
+          "column": "is_recurring_annually",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "teacher",
+          "type": "User",
+          "columns": [
+            "teacherUserId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "teacherUserId",
+          "date"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Coupon",
+      "table": "coupon",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "courseId",
+          "column": "course_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "code",
+          "column": "code",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "discountTypeValueId",
+          "column": "discount_type_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "discountAmount",
+          "column": "discount_amount",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "validFrom",
+          "column": "valid_from",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "validUntil",
+          "column": "valid_until",
+          "type": "DateTime",
+          "optional": true
+        },
+        {
+          "name": "maxRedemptions",
+          "column": "max_redemptions",
+          "type": "Int",
+          "optional": true
+        },
+        {
+          "name": "redemptionCount",
+          "column": "redemption_count",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "course",
+          "type": "Course",
+          "columns": [
+            "courseId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "discountType",
+          "type": "LkpValue",
+          "columns": [
+            "discountTypeValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "courseId",
+          "code"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "Payment",
+      "table": "payment",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "enrollmentId",
+          "column": "enrollment_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "couponId",
+          "column": "coupon_id",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "amountMinorUnits",
+          "column": "amount_minor_units",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "currencyValueId",
+          "column": "currency_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "statusValueId",
+          "column": "status_value_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "providerReference",
+          "column": "provider_reference",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "providerError",
+          "column": "provider_error",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "enrollment",
+          "type": "Enrollment",
+          "columns": [
+            "enrollmentId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "coupon",
+          "type": "Coupon",
+          "columns": [
+            "couponId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "currency",
+          "type": "LkpValue",
+          "columns": [
+            "currencyValueId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "status",
+          "type": "LkpValue",
+          "columns": [
+            "statusValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [],
+      "softDelete": false,
+      "tracksUpdates": true
     }
   ]
 }

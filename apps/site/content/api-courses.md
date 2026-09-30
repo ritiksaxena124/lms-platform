@@ -149,3 +149,39 @@ This route lives on this address and not a public one because the key these byte
 Lists the students who hold a place in one of the calling teacher's courses. Optional query parameters `page` and `pageSize` paginate the results (default page size is reasonable for a class list). Success answers `200` with `{ items: CourseRosterEntry[], page, pageSize, total }`, where `total` counts every open place in the course, not just the ones on this page.
 
 Each entry shows the student's `id` and `fullName`, plus `enrolledAt` (the day the place was first taken, which is not the day a student who left came back). There is no email address — a roster answers "who is coming to class", and an address is the field a list like this gains by convenience and never drops. There is also no enrollment id: leaving is the student's decision, so giving the roster a primary key would be an invitation to build the route that removes somebody's place for them.
+
+## GET /api/v1/courses/:courseId/series
+
+Lists recurring weekly class series scheduled for a course. Each series defines a recurring weekly slot (weekday, startMinutes, endMinutes, durationMinutes) that generates regular class sessions.
+
+## POST /api/v1/courses/:courseId/series
+
+Creates a new recurring weekly class series for the specified course.
+
+## PATCH /api/v1/courses/:courseId/series/:id
+
+Updates an existing class series schedule for the course.
+
+## POST /api/v1/courses/:courseId/series/:id/retire
+
+Retires a class series so it stops generating future class slots.
+
+## GET /api/v1/courses/:courseId/coupons
+
+Lists all discount coupons created by the teacher for this course.
+
+## POST /api/v1/courses/:courseId/coupons
+
+Creates a new discount coupon for this course with amount, type (percentage or fixed), and optional expiration or redemption limits.
+
+## GET /api/v1/courses/:courseId/coupons/:id
+
+Gets details of a specific coupon by its identifier.
+
+## PATCH /api/v1/courses/:courseId/coupons/:id
+
+Updates coupon parameters such as expiration date or max redemption limits.
+
+## POST /api/v1/courses/:courseId/coupons/:id/deactivate
+
+Deactivates a coupon so it can no longer be redeemed for new enrollments.

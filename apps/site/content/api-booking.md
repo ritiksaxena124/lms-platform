@@ -24,6 +24,22 @@ The caller must own the rule; ops staff may edit any rule.
 
 Marks a rule as inactive without deleting it. Retired rules remain visible in history but no longer produce bookable slots. This operation is irreversible.
 
+## GET /api/v1/availability/holidays
+
+Lists all holidays (blocked teaching dates) scheduled by the authenticated teacher.
+
+## POST /api/v1/availability/holidays
+
+Creates a new holiday date entry to block classes on that date for the calling teacher.
+
+## PATCH /api/v1/availability/holidays/:id
+
+Updates an existing holiday date, reason, or recurring annual status.
+
+## POST /api/v1/availability/holidays/:id/retire
+
+Retires an existing holiday so that date is no longer blocked.
+
 ## GET /api/v1/bookings
 
 Lists bookings filtered by role. Teachers see bookings for their own courses; students see their own enrollments; ops sees everything. Query parameters support filtering by course, status, and date range.

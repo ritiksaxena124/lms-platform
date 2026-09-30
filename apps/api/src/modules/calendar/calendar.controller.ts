@@ -1,4 +1,10 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
+import type {
+  ClassSeriesListResponse,
+  ClassSeriesResponse,
+  HolidayListResponse,
+  HolidayResponse,
+} from '@lms/shared';
 import { ROLE_CODES } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
@@ -25,7 +31,7 @@ export class ClassSeriesController {
   constructor(private readonly calendar: CalendarService) {}
 
   @Get()
-  async list(@Param('courseId') courseId: string) {
+  async list(@Param('courseId') courseId: string): Promise<ClassSeriesListResponse> {
     return this.calendar.listSeries(courseId);
   }
 
@@ -33,7 +39,7 @@ export class ClassSeriesController {
   async create(
     @Param('courseId') courseId: string,
     @Body() dto: CreateClassSeriesDto,
-  ) {
+  ): Promise<ClassSeriesResponse> {
     return this.calendar.createSeries(courseId, dto);
   }
 
@@ -42,14 +48,17 @@ export class ClassSeriesController {
     @Param('courseId') courseId: string,
     @Param('id') id: string,
     @Body() dto: UpdateClassSeriesDto,
-  ) {
+  ): Promise<ClassSeriesResponse> {
     return this.calendar.updateSeries(courseId, id, dto);
   }
 
   /** Retirement is its own endpoint so an edit cannot smuggle in a flag change beside new times. */
   @Post(':id/retire')
   @HttpCode(HttpStatus.OK)
-  async retire(@Param('courseId') courseId: string, @Param('id') id: string) {
+  async retire(
+    @Param('courseId') courseId: string,
+    @Param('id') id: string,
+  ): Promise<ClassSeriesResponse> {
     return this.calendar.retireSeries(courseId, id);
   }
 }
@@ -67,7 +76,7 @@ export class HolidayController {
   constructor(private readonly calendar: CalendarService) {}
 
   @Get()
-  async list(@CurrentUser() user: AuthenticatedUser) {
+  async list(@CurrentUser() user: AuthenticatedUser): Promise<HolidayListResponse> {
     return this.calendar.listHolidays(user.id);
   }
 
@@ -75,7 +84,7 @@ export class HolidayController {
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateHolidayDto,
-  ) {
+  ): Promise<HolidayResponse> {
     return this.calendar.createHoliday(user.id, dto);
   }
 
@@ -84,13 +93,16 @@ export class HolidayController {
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
     @Body() dto: UpdateHolidayDto,
-  ) {
+  ): Promise<HolidayResponse> {
     return this.calendar.updateHoliday(user.id, id, dto);
   }
 
   @Post(':id/retire')
   @HttpCode(HttpStatus.OK)
-  async retire(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+  async retire(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<HolidayResponse> {
     return this.calendar.retireHoliday(user.id, id);
   }
 }

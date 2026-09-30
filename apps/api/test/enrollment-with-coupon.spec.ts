@@ -39,31 +39,30 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  // Cleanup - use startsWith for UUID fields
-  const studentUsers = await prisma.user.findMany({
-    where: { email: { endsWith: `@localtest.me` }, fullName: { contains: RUN } },
-    select: { id: true },
+  // Cleanup - delete in reverse foreign key order
+  await prisma.payment.deleteMany({
+    where: { enrollment: { course: { slug: { startsWith: `coupon-e2e-${RUN}` } } } },
   });
-  
-  const studentIds = studentUsers.map(u => u.id);
-  
-  if (studentIds.length > 0) {
-    await prisma.payment.deleteMany({
-      where: { enrollment: { studentUserId: { in: studentIds } } },
-    });
-    await prisma.enrollment.deleteMany({
-      where: { studentUserId: { in: studentIds } },
-    });
-  }
-  
+  await prisma.enrollment.deleteMany({
+    where: { course: { slug: { startsWith: `coupon-e2e-${RUN}` } } },
+  });
   await prisma.coupon.deleteMany({
-    where: { code: { startsWith: 'TEST' } },
+    where: { course: { slug: { startsWith: `coupon-e2e-${RUN}` } } },
   });
   await prisma.course.deleteMany({
     where: { slug: { startsWith: `coupon-e2e-${RUN}` } },
   });
+  await prisma.refreshToken.deleteMany({
+    where: { user: { email: { endsWith: `.${RUN}@localtest.me` } } },
+  });
+  await prisma.mailOutbox.deleteMany({
+    where: { recipient: { email: { endsWith: `.${RUN}@localtest.me` } } },
+  });
+  await prisma.actionLog.deleteMany({
+    where: { actor: { email: { endsWith: `.${RUN}@localtest.me` } } },
+  });
   await prisma.user.deleteMany({
-    where: { id: { in: studentIds } },
+    where: { email: { endsWith: `.${RUN}@localtest.me` } },
   });
 
   await app.close();
@@ -117,7 +116,7 @@ describe('Enrollment with coupon - E2E', () => {
         levelValueId,
         statusValueId,
         priceMinorUnits: 10000, // $100.00
-        currencyValueId,
+        priceCurrencyValueId: currencyValueId,
         teacherUserId: teacher.id,
       },
     });
@@ -140,9 +139,9 @@ describe('Enrollment with coupon - E2E', () => {
       })
       .expect(201);
 
-    const couponId = createCouponResponse.body.id;
-    expect(createCouponResponse.body.code).toBe('TEST25');
-    expect(createCouponResponse.body.discountAmount).toBe(25);
+    const couponId = createCouponResponse.body.coupon.id;
+    expect(createCouponResponse.body.coupon.code).toBe('TEST25');
+    expect(createCouponResponse.body.coupon.discountAmount).toBe(25);
 
     // Student enrolls with the coupon
     const enrollResponse = await request(app.getHttpServer())

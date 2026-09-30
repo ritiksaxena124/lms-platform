@@ -491,9 +491,11 @@ function controllerSources(): Map<string, string> {
     if (!path.endsWith('.controller.ts')) continue;
 
     const source = readSource(path);
-    const name = source.match(/export class (\w+)/u)?.[1];
+    const matches = source.matchAll(/export class (\w+)/gu);
 
-    if (name) found.set(name, source);
+    for (const match of matches) {
+      if (match[1]) found.set(match[1], source);
+    }
   }
 
   controllerFiles = found;

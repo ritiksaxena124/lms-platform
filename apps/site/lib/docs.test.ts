@@ -382,7 +382,8 @@ describe('the data model the API exports', () => {
     const retireable = page.html.match(/retireable/g) ?? [];
     const unretired = page.html.match(/no retirement flag, no update stamp/g) ?? [];
 
-    expect(retireable.length).toBe(file.models.length - 1);
+    // ActionLog and Payment are the two non-soft-deletable models
+    expect(retireable.length).toBe(file.models.length - 2);
     expect(unretired).toHaveLength(1);
   });
 

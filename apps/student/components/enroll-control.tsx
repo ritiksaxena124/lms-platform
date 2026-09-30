@@ -97,7 +97,8 @@ export function EnrollControl({
   async function enroll() {
     setPending(true);
     try {
-      const place = await takePlace(courseId, couponCode.trim() || undefined);
+      const code = couponCode.trim();
+      const place = await (code ? takePlace(courseId, code) : takePlace(courseId));
       setTaken({ key, place });
       notify.success('You are in this course');
       setCouponCode(''); // Clear coupon after successful enrollment

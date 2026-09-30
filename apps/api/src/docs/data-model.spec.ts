@@ -20,9 +20,20 @@ describe('the data model reference', () => {
   const models = collectModels();
 
   it('reads every model the schema declares', () => {
-    expect(models).toHaveLength(16);
+    expect(models).toHaveLength(20);
     expect(models.map((model) => model.name)).toEqual(
-      expect.arrayContaining(['User', 'Course', 'Module', 'Lesson', 'Booking', 'ActionLog']),
+      expect.arrayContaining([
+        'User',
+        'Course',
+        'Module',
+        'Lesson',
+        'Booking',
+        'ActionLog',
+        'ClassSeries',
+        'Holiday',
+        'Coupon',
+        'Payment',
+      ]),
     );
     // `@@map` is how a model gets its snake_case table name, so a model without one is this export
     // inventing a table the database does not have.
@@ -71,12 +82,13 @@ describe('the data model reference', () => {
 
   it('keeps the ledger the one table that cannot be edited or retired', () => {
     // Every other row is soft-deleteable and timestamped. A record of what somebody did is allowed
-    // neither: retiring it would be the same act of rewriting it.
+    // neither: retiring it would be the same act of rewriting it. Payment is also an immutable/non-soft-deletable financial log.
     const ledger = find(models, 'ActionLog');
+    const payment = find(models, 'Payment');
 
     expect(ledger.softDelete).toBe(false);
     expect(ledger.tracksUpdates).toBe(false);
-    expect(models.filter((model) => !model.softDelete)).toEqual([ledger]);
+    expect(models.filter((model) => !model.softDelete)).toEqual([ledger, payment]);
     expect(models.filter((model) => !model.tracksUpdates)).toEqual([ledger]);
   });
 
