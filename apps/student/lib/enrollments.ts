@@ -35,8 +35,8 @@ export async function myPlaces(): Promise<Enrollment[]> {
  * Idempotent at the far end: pressing this twice answers with the place that already exists,
  * with its original `enrolledAt`, so the caller never has to know whether it is the first time.
  */
-export async function takePlace(courseId: string): Promise<Enrollment> {
-  const input: CreateEnrollmentInput = { courseId };
+export async function takePlace(courseId: string, couponCode?: string): Promise<Enrollment> {
+  const input: CreateEnrollmentInput = { courseId, couponCode };
   const { enrollment } = await apiJson<EnrollmentResponse>('/enrollments', {
     method: 'POST',
     body: input,

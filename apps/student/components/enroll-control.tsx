@@ -49,6 +49,7 @@ export function EnrollControl({
   const [settled, setSettled] = useState<{ key: string; roster: Roster } | null>(null);
   const [taken, setTaken] = useState<{ key: string; place: Enrollment } | null>(null);
   const [pending, setPending] = useState(false);
+  const [couponCode, setCouponCode] = useState('');
   const roster = settled && settled.key === key ? settled.roster : null;
   const places = roster && 'places' in roster ? roster.places : null;
 
@@ -96,9 +97,10 @@ export function EnrollControl({
   async function enroll() {
     setPending(true);
     try {
-      const place = await takePlace(courseId);
+      const place = await takePlace(courseId, couponCode.trim() || undefined);
       setTaken({ key, place });
       notify.success('You are in this course');
+      setCouponCode(''); // Clear coupon after successful enrollment
       onPlaceTaken?.();
     } catch (error) {
       // The place was not taken, so nothing about this page has changed. A button that
@@ -134,21 +136,39 @@ export function EnrollControl({
         : 'Reading starts as soon as you take a place.';
 
   return (
-    <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-5 py-4">
-      <p className="max-w-[46ch] text-[0.9375rem] text-ink-muted">{message}</p>
-
-      {status === 'signed-out' ? (
-        <Link
-          href={`/login?next=${encodeURIComponent(`/courses/${courseId}`)}`}
-          className={buttonClass({ size: 'sm' })}
-        >
-          Sign in to enroll
-        </Link>
-      ) : (
-        <Button type="button" size="sm" loading={pending} onClick={() => void enroll()}>
-          Enroll in this course
-        </Button>
+    <div className="mt-4 space-y-3 rounded-card border border-line bg-surface px-5 py-4">
+      {status === 'signed-in' && !inside && (
+        <div>
+          <label htmlFor="coupon-code" className="block text-sm font-medium text-ink mb-1">
+            Have a coupon code?
+          </label>
+          <input
+            id="coupon-code"
+            type="text"
+            value={couponCode}
+            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+            placeholder="Enter code"
+            className="w-full rounded-md border border-line bg-white px-3 py-2 text-sm text-ink placeholder:text-ink-faint focus:border-brand focus:outline-none focus:ring-1 focus:ring-brand"
+          />
+        </div>
       )}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="max-w-[46ch] text-[0.9375rem] text-ink-muted">{message}</p>
+
+        {status === 'signed-out' ? (
+          <Link
+            href={`/login?next=${encodeURIComponent(`/courses/${courseId}`)}`}
+            className={buttonClass({ size: 'sm' })}
+          >
+            Sign in to enroll
+          </Link>
+        ) : (
+          <Button type="button" size="sm" loading={pending} onClick={() => void enroll()}>
+            Enroll in this course
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

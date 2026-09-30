@@ -52,9 +52,11 @@ There is no URL for these bytes anywhere else in this API, which is what makes t
 
 Take a place in a course. `student` role required — teachers and operators cannot reach this route at all, because a teacher cannot enroll in their own work and an internal account does not hold a place.
 
-The body is `{ courseId }`, where `courseId` is the UUID of the course to join. There is no "as which student" — the session answers that, and a body that could name somebody else would be a way to take a place in a stranger's name. And there is no "as of" date, no note, no intended start: those are booking decisions, and a place in a course is not an appointment.
+The body is `{ courseId, couponCode? }`, where `courseId` is the UUID of the course to join, and `couponCode` is an optional discount code issued by the teacher for that course. There is no "as which student" — the session answers that, and a body that could name somebody else would be a way to take a place in a stranger's name. And there is no "as of" date, no note, no intended start: those are booking decisions, and a place in a course is not an appointment.
 
 Taking a place is idempotent. Pressing the button twice is one event: the write finds the row that already exists — open, or left behind when the student went away — and answers with it rather than with a conflict or a duplicate. That is also why the route replies `200` on a first enrollment instead of `201`: two status codes for one button would ask the portal whether it had been clicked before.
+
+When a valid `couponCode` is provided, the system validates the coupon against the course (checking existence, validity window, and redemption limits), calculates the discounted price, creates a payment record linking the enrollment to the coupon, and increments the coupon's redemption counter — all within the same transaction that opens the place. An invalid or expired coupon returns `400` with `BAD_REQUEST`.
 
 A course that is not published, never existed, or was archived answers `404` with `NOT_FOUND` and "We cannot find that course." — the same message the catalog gives, because enrolling in a draft would be a way to walk a teacher's unpublished work with a form.
 
