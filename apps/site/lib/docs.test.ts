@@ -168,6 +168,32 @@ describe('the routes the export builds', () => {
       }
     }
   });
+
+  it('lands every anchor the prose points at', () => {
+    // A section link that misses its heading still loads the page, so the reader arrives and finds
+    // the top of a long document instead of the sentence the link promised. Renaming a heading is a
+    // prose edit, and prose edits outrank the tests that were written against the old wording.
+    const anchored = docSlugs().flatMap((slug) =>
+      [...readDoc(slug).html.matchAll(/href="\/docs\/?([^"#]*)#([a-z0-9-]+)"/g)].map((match) => ({
+        slug,
+        target: match[1] ?? '',
+        id: match[2] ?? '',
+      })),
+    );
+
+    // Non-vacuous: the guard is only worth having while some page actually sends a reader to a
+    // section rather than to a document.
+    expect(anchored.length).toBeGreaterThan(0);
+
+    for (const link of anchored) {
+      const page = readDoc(link.target === '' ? 'index' : link.target);
+
+      expect(
+        page.html,
+        `${link.slug} sends the reader to #${link.id}, which ${link.target} does not hold`,
+      ).toContain(`id="${link.id}"`);
+    }
+  });
 });
 
 describe('the route table the API exports', () => {

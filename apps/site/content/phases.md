@@ -24,7 +24,9 @@ that an operator can read it back.
 
 The last four are what a stranger would want before trusting the build with a class: money, a
 teacher's repeating calendar, the public face of the marketplace, and these docs — the phase that
-turns what `ARCHITECTURE.md` already argues into pages somebody outside the repository can read.
+turns what `ARCHITECTURE.md` already argues into pages somebody outside the repository can read. Two
+of those four are standing now, and this page is one of them: the row above it is read from the
+repository's own record, so it says Done for the same reason the record does.
 
 What remains genuinely unbuilt is the part involving money: coupons and payments (Phase 9), and the
 teacher's repeating calendar (Phase 10). A course carries a price today and nothing is charged for it.

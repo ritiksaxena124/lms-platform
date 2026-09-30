@@ -1,16 +1,19 @@
-# LMS Platform POC — Teacher Marketplace
+# Hourloom — Courses, cohorts and booked classes for independent teachers
 
-A marketplace where learners book 1:1 and group sessions with independent teachers.
-Three portals (teacher, student, ops) share one API, one database and one component
+Hourloom is where a learner books a 1:1 or small-group class with an independent teacher: the
+teacher writes the course, opens the week they teach and keeps the record; three portals (teacher,
+student, ops), one public site and one docs site share one API, one database and one component
 library.
 
-**Status: Phase 8 done** — a teacher writes a course and opens a week in it, a learner reads enough
+**Status: Phase 12 done** — a teacher writes a course and opens a week in it, a learner reads enough
 of that course to want a place, asks for a minute of the teacher's time, is let into a room for it when
 the teacher says yes, is told about all of it by email, and every one of those decisions leaves a
-record the platform can be asked about. An operator now signs in on a third port and asks: who wrote
+record the platform can be asked about. An operator signs in on a third port and asks: who wrote
 what, who is standing behind an account, what happened to a letter that was meant to tell somebody.
+And the thing now has a face and a manual: `apps/site` publishes the public page a stranger reads and
+the docs a builder needs, both generated from what the code already says.
 Everything listed under [What each portal does](#what-each-portal-does) is shipped, tested and
-clickable; money and the two apps outside the product are still ahead, and
+clickable; money, the teacher's repeating calendar and attendance are still ahead, and
 [Phases](#phases) keeps the ordered record of why.
 
 ## Contents
@@ -22,9 +25,9 @@ clickable; money and the two apps outside the product are still ahead, and
 | [First run](#first-run)                                           | Environment, database, seed, and the ports the apps answer   |
 | [Signing in](#signing-in)                                         | The three demo accounts `db:seed` writes                     |
 | [Walking the demo](#walking-the-demo)                             | The same course, from a teacher's page to a stranger's shelf |
-| [Commands](#commands)                                             | The gate, the dev servers, the release                       |
+| [Commands](#commands)                                             | The gate, the dev servers, the docs exports, the release     |
 | [Releases](#releases)                                             | What a tag means here, and how one is cut                    |
-| [Layout](#layout)                                                 | The five workspace packages and what each one owns           |
+| [Layout](#layout)                                                 | The seven workspace packages and what each one owns          |
 | [Design system — Graphite](#design-system--graphite)              | The five rules that outrank taste                            |
 | [Conventions](#conventions-that-are-enforced-not-documented-away) | The four rules ESLint holds                                  |
 | [Phases](#phases)                                                 | The twelve, their status, and why that order                 |
@@ -108,8 +111,21 @@ two things it may change.
   Read-only, and deliberately thin: the letter's body is not read by the route, and an address has not
   been stored in the row since Phase 6, so neither can appear here.
 
-Money, the two apps outside the product and attendance are still ahead —
-[Phases](#phases) says in which order they arrive.
+### The public site and the docs
+
+<http://localhost:3003> — `apps/site`, a static export with no server of its own.
+
+- **The face** — `/` is the page a teacher or a school reads before anybody signs up: what a class is
+  here, the four moves one class makes, what works today and what is still a plan, said as a plan
+  rather than left out. It links the two doors a stranger can walk through and not the operator's.
+- **The docs** — `/docs` renders the markdown in `apps/site/content` through one small engine: the
+  guide, the API reference, the data model, the rules the code enforces and the phase record.
+- **Generated, not restated** — the route table is reflected from the Nest application's own module
+  graph and the table of columns from `schema.prisma`, both committed as artifacts the specs compare
+  against what the code says now; the phase table is read out of this README at build time. Three
+  ways of saying the same thing: a page cannot report a fact the source has stopped holding.
+
+Money and attendance are still ahead — [Phases](#phases) says in which order they arrive.
 
 ---
 
@@ -133,6 +149,7 @@ cp apps/api/.env.example apps/api/.env.test  # DATABASE_URL must point at lms_te
 cp apps/teacher/.env.example apps/teacher/.env.development   # where the portal finds the API
 cp apps/student/.env.example apps/student/.env.development   # the same, for the public shelf
 cp apps/ops/.env.example apps/ops/.env.development           # the same, for the operator's desk
+cp apps/site/.env.example apps/site/.env.local              # the two portal addresses the public page links to
 
 # 2. Database (roles and databases are created once, by hand, on the local server)
 bun run --filter @lms/api db:generate
@@ -142,12 +159,14 @@ bun run --filter @lms/api db:seed       # reference rows + the three demo accoun
 # 3. Everything else is derived from those two files
 bun run verify        # build + typecheck + lint + test across the workspace
 bun run dev           # API on :4000, teacher portal on :3000, student shelf on :3001,
-                      # operator's desk on :3002
+                      # operator's desk on :3002, public site and docs on :3003
 ```
 
 Open <http://teacher.localtest.me:3000> for the portal a teacher works in,
-<http://student.localtest.me:3001> for what a stranger sees of that work, and
-<http://ops.localtest.me:3002> for the desk that reads both back.
+<http://student.localtest.me:3001> for what a stranger sees of that work,
+<http://ops.localtest.me:3002> for the desk that reads both back, and
+<http://localhost:3003> for the page somebody outside this repository reads first — its
+`/docs` is the same material written for a builder.
 `*.localtest.me` resolves to `127.0.0.1` and gives every portal a subdomain of one
 registrable domain, which is what lets the three apps share a session cookie in development
 without `localhost` CORS hacks. One shared cookie means one signed-in account per browser
@@ -285,25 +304,34 @@ the teacher out of it.
 
 ## Commands
 
-| Command               | What it does                                                             |
-| --------------------- | ------------------------------------------------------------------------ |
-| `bun run verify`      | The gate: shared build, typecheck, lint, tests. Run before every commit. |
-| `bun run dev`         | API + all three portals together.                                        |
-| `bun run dev:api`     | NestJS API with watch mode.                                              |
-| `bun run dev:teacher` | Next.js teacher portal.                                                  |
-| `bun run dev:student` | Next.js student portal — the public catalog.                             |
-| `bun run dev:ops`     | Next.js operator's desk.                                                 |
-| `bun run dev:ui`      | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
-| `bun run test`        | All test suites (Vitest, one package at a time — see ARCHITECTURE §17).  |
-| `bun run format`      | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
-| `bun run release`     | Cut a tagged GitHub release: verify, tag, push, publish.                 |
+| Command                                 | What it does                                                             |
+| --------------------------------------- | ------------------------------------------------------------------------ |
+| `bun run verify`                        | The gate: shared build, typecheck, lint, tests. Run before every commit. |
+| `bun run dev`                           | API + all three portals + the public site, together.                     |
+| `bun run dev:api`                       | NestJS API with watch mode.                                              |
+| `bun run dev:teacher`                   | Next.js teacher portal.                                                  |
+| `bun run dev:student`                   | Next.js student portal — the public catalog.                             |
+| `bun run dev:ops`                       | Next.js operator's desk.                                                 |
+| `bun run dev:site`                      | Next.js public site and docs on <http://localhost:3003>.                 |
+| `bun run dev:ui`                        | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
+| `bun run --filter @lms/api docs:export` | Rewrite `content/endpoints.json` from the Nest route table.              |
+| `bun run --filter @lms/api docs:data`   | Rewrite `content/data-model.json` from `schema.prisma`.                  |
+| `bun run test`                          | All test suites (Vitest, one package at a time — see ARCHITECTURE §17).  |
+| `bun run format`                        | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
+| `bun run release`                       | Cut a tagged GitHub release: verify, tag, push, publish.                 |
+
+The two `docs:` commands are run when a route or a table changes, and committed with it: a spec in
+each package compares the committed file against what the code says now, so forgetting to re-export
+turns the gate red rather than publishing a page that describes an older build.
 
 ## Releases
 
 A release is a phase boundary, not a deploy. `main` carries work in flight; a tag says
 "this commit passed the gate", and the tag is what a demo, a hand-off or a rollback points
 at. Versions track the phase table below — Phase 6 closed at `v0.6.0`, Phase 7 at `v0.7.0` and
-Phase 8 at `v0.8.0`.
+Phase 8 at `v0.8.0`. Phases 9 and 10 are still in the backlog, so the number has stopped being the
+phase number: `v0.9.0` closes Phases 11 and 12, the two apps outside the product. A tag marks the
+gate, and the table says what is inside it.
 
 ```
 bun run release v0.8.0 --title="Phase 8: the ops portal"
@@ -328,9 +356,10 @@ apps/
   teacher/    Next.js App Router portal for teachers — courses, syllabus, the week, the queue
   student/    Next.js App Router portal for learners — shelf, outline, places and classes
   ops/        Next.js App Router desk for operators — the ledger, the accounts, the queue
+  site/       Next.js static export — the public page, and the docs generated from the code
 packages/
   shared/     Framework-free TypeScript: error codes, lookup codes, money, timezones
-  ui/         Design tokens, primitives and motion shared by all three portals
+  ui/         Design tokens, primitives and motion shared by all three portals and the public site
 scripts/
   release.mjs Tag a phase boundary, push it, publish the release
 ```
@@ -345,6 +374,7 @@ which is why editing a component hot-reloads in the portal.
 | `@lms/teacher` | The teacher's work: courses, syllabus, the week, the queue | <http://teacher.localtest.me:3000>    |
 | `@lms/student` | The reader's work: shelf, outline, places, classes         | <http://student.localtest.me:3001>    |
 | `@lms/ops`     | The operator's desk: three screens, two writes             | <http://ops.localtest.me:3002>        |
+| `@lms/site`    | The public page and the docs, exported to static files     | <http://localhost:3003>               |
 | `@lms/ui`      | Tokens, primitives, motion, illustrations                  | Storybook on <http://localhost:6006>  |
 | `@lms/shared`  | Error codes, lookup codes, money, timezones                | — a library, not a server             |
 
@@ -401,15 +431,15 @@ decision was made, and what was deliberately left out.
 | 8     | Ops portal — the desk that reads the log, the accounts and the queue      | **Done**    |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | Not started |
 | 10    | The teacher's calendar — a course's class series, holidays, no-class days | Not started |
-| 11    | Product website — the public face of the marketplace                      | Not started |
-| 12    | Docs site — guide, data model, API reference and the phase record         | Not started |
+| 11    | Product website — the public face of the marketplace                      | **Done**    |
+| 12    | Docs site — guide, data model, API reference and the phase record         | **Done**    |
 
 ### All twelve, in order
 
-The table is the index; this is what each one is for. Phases 0–8 are shipped, the last of them putting
-a door in front of what the two before it had only recorded, and 9–12 are the ordered
-backlog — each one sits where it does because of what it needs to exist before its shape stops
-moving.
+The table is the index; this is what each one is for. Phases 0–8 are the product, the last of them
+putting a door in front of what the two before it had only recorded, and 11–12 are the two apps that
+sit outside it — the face and the manual. 9 and 10 are the ordered backlog that remains: each one sits
+where it does because of what has to exist before its shape stops moving.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -687,6 +717,56 @@ document. Then, with the same cookie holding a student session, `/activity` answ
 ops role_ and the network log for that load shows one call — the session refresh — and no `/actions`
 request: the screen was refused before it could ask.
 
+**Phases 11 and 12 are closed.** They shipped in one workspace: `apps/site`, a Next.js static export
+with no server of its own, no database connection and no second backend — the API stays the only
+writer (§1). Phase 11 is `/`, the page a teacher or a school reads before anybody signs up: what a
+class is here, the four moves one class makes, and what works today set beside what is still a plan,
+said as a plan rather than left out. It links the two doors a stranger can walk through and
+deliberately not the operator's desk, because publishing the address of the surface that hands out the
+`ops` role is a gift to anybody scanning for a login form that belongs to somebody else. Phase 12 is
+`/docs`: the guide, the API reference, the data model, the rules the code enforces, and this phase
+record.
+
+**The rule the phase was judged on: a page may not restate a fact it can read.** A docs site is the
+easiest way for a repository to grow a lie — nothing fails when prose drifts from code, and the drift
+is invisible until somebody follows it. So three kinds of content are generated, each from exactly one
+source, each committed as an artifact a spec compares against what the code says now:
+
+- **The route table** (`docs:export` → `apps/site/content/endpoints.json`) walks the Nest
+  application's module graph and reads what Nest itself recorded: each controller's path and methods,
+  the `@HttpCode` a handler sets, and this project's three keys for a route that is public, reads a
+  session if one is offered, or names the roles it admits. Sixty routes over twelve resources, with
+  the access rule printed in the words a reader acts on rather than the decorator that produced it.
+  Request and response bodies are _not_ in it — DTO field metadata does not survive the test
+  transform, so a page claiming a body's fields would be claiming what it cannot check.
+- **The data model** (`docs:data` → `content/data-model.json`) is read off `prisma/schema.prisma`
+  rather than from a live database, because the schema is the fact: sixteen models, one hundred and
+  fifty-seven columns each named twice — the Prisma field and the `@map`'d physical column — the
+  owning half of all twenty-five relations with the `onDelete` each carries, and every unique key.
+- **The phase record** is this README's own table, read at build time. The page holds no copy of it,
+  so a phase closing changes the row there and therefore here.
+
+The remaining guards are the same idea turned on the site: the manifest and the files on disk agree,
+every link and every anchor in the prose lands on a page the export builds, no page prints an unfilled
+generated block, and no page prints a seeded address or password — the three demo accounts are
+documented in this file for the person at the keyboard, and these pages are read by strangers. The
+guide's own assertions were read back against the code before they were written down: the two
+scheduled jobs are the actual `@Cron` expressions (`mail-outbox-delivery` every five minutes,
+`booking-request-expiry` every hour), the ten module folders are the actual folder list, and the three
+ports are the three folders under `apps/api/src/providers`.
+
+**Verified, live.** The export was built and every page read from the artifact rather than from the
+renderer: `/` and the six docs routes, the API reference carrying twelve route tables over the sixty
+exported routes, the data model printing one section per table with all one hundred and fifty-seven
+columns named, the phase page holding thirteen rows in this file's own order, and `action_log` the one
+table saying it has neither a retirement flag nor an update stamp. A scan of every exported file finds
+no unfilled fence, no `@example.test` and no `lms-demo-password`, and every `href` and `src` inside
+them resolves within the export — the check a static site needs, since nothing is left running to
+answer an unknown path. One thing this cannot settle is worth saying: the browser this was verified in
+reports a hidden viewport, so what is proven is the served structure, not how the pages look at
+1440px. Screenshots are the missing witness, and the layout is the one claim here that rests on the
+shared `@lms/ui` tokens rather than on observation.
+
 **Why that order, and why the rest of it is still in the table.** A live class needs a booked slot
 to attach to, which is why booking came before video. The action log wanted every kind of write to
 exist before it fixed what a record looks like. Coupons land last among the things a student
@@ -696,16 +776,17 @@ course's classes to repeat weekly, and marking the days they are on holiday so n
 on them, are both edits to what §13's windows mean, and that shape is only worth changing once the
 booking loop, the video inside it and the portals around it are settled.
 
-Phases 11 and 12 are the two apps that sit outside the product, and they are last for the plainest
+Phases 11 and 12 are the two apps that sit outside the product, and they came last for the plainest
 reason — a website advertises a thing that has to exist, and a guide written while a phase is still
-moving is a guide that gets rewritten. Neither would be a backend: the API stays the only writer to
-the database, and a docs page renders what the code already says rather than becoming a second copy
-of it that drifts. The table above is the seed for both: it is what the docs site will publish, and
-what the website will point at.
+moving is a guide that gets rewritten. Neither became a backend: the API is still the only writer to
+the database, and every generated table on the site is a reading of what the code already says rather
+than a second copy of it that can drift. The table above is what the docs site publishes, and what the
+public page points at. What is left in the table is money (Phase 9) and the teacher's repeating
+calendar (Phase 10) — the two shapes still waiting on the decisions around them settling.
 
 ## Environment variables
 
-`apps/api/.env.example` documents every variable. Six are worth knowing early:
+`apps/api/.env.example` documents every variable. Seven are worth knowing early:
 
 - `JWT_SECRET` has **no default and no fallback** — sign-in is impossible without it, and a
   per-process random one would boot cleanly then log everyone out on the next restart.
@@ -733,3 +814,9 @@ what the website will point at.
   URL of their own: a route that has already checked who is asking streams them back, so there is
   no public directory to leak a paid lesson through. `s3` is rejected at boot until it is
   actually implemented.
+- `NEXT_PUBLIC_TEACHER_PORTAL_URL` and `NEXT_PUBLIC_STUDENT_PORTAL_URL` are the site's, in
+  `apps/site/.env.example` rather than the API's, and they are the only two the public page reads.
+  Both are required and neither has a default: the export bakes them in at build time, so a
+  `localhost` fallback would produce a page that builds happily on the machine that wrote it and
+  prints links nobody else can open. The operator's desk has no key here — a static page read by
+  strangers does not publish the address of the surface that hands out the `ops` role.

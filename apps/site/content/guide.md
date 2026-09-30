@@ -94,8 +94,9 @@ after another, in that order, stopping at the first failure. Tests are written b
 describe. The API suite boots the real application through HTTP rather than mocking it, so guards,
 filters, the prefix and validation are exercised as shipped.
 
-These pages are part of the same discipline. The route table is read out of the running application
-and the table of columns out of the schema file, both committed as generated artifacts; a spec
+These pages are part of the same discipline. The route table is reflected out of the application's
+own module graph — imported, not booted, so no port is opened and no database is asked — and the
+table of columns out of the schema file, both committed as generated artifacts; a spec
 compares each committed file against what the code says now, so changing an endpoint or a table
 without re-exporting turns the gate red instead of publishing a stale page.
 
