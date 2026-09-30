@@ -30,7 +30,7 @@ clickable; money, the teacher's repeating calendar and attendance are still ahea
 | [Layout](#layout)                                                 | The seven workspace packages and what each one owns          |
 | [Design system — Graphite](#design-system--graphite)              | The five rules that outrank taste                            |
 | [Conventions](#conventions-that-are-enforced-not-documented-away) | The four rules ESLint holds                                  |
-| [Phases](#phases)                                                 | The twelve, their status, and why that order                 |
+| [Phases](#phases)                                                 | The thirteen, their status, and why that order               |
 | [Environment variables](#environment-variables)                   | The four worth knowing early                                 |
 
 ## What each portal does
@@ -433,13 +433,15 @@ decision was made, and what was deliberately left out.
 | 10    | The teacher's calendar — a course's class series, holidays, no-class days | Not started |
 | 11    | Product website — the public face of the marketplace                      | **Done**    |
 | 12    | Docs site — guide, data model, API reference and the phase record         | **Done**    |
+| 13    | The API explained endpoint by endpoint — purpose, fields, failures        | In progress |
 
-### All twelve, in order
+### All thirteen, in order
 
 The table is the index; this is what each one is for. Phases 0–8 are the product, the last of them
 putting a door in front of what the two before it had only recorded, and 11–12 are the two apps that
 sit outside it — the face and the manual. 9 and 10 are the ordered backlog that remains: each one sits
-where it does because of what has to exist before its shape stops moving.
+where it does because of what has to exist before its shape stops moving. 13 was added on
+2026-09-30, after 12 closed, because a route table is a catalogue and not a manual.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -484,6 +486,13 @@ where it does because of what has to exist before its shape stops moving.
   signs up: an `apps/*` workspace member on `@lms/ui` and `@lms/shared`, and not a second backend.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
   published from what the code already says rather than restated into a second copy that drifts.
+- **Phase 13 — the API, explained.** Phase 12 shipped the route table: every path, its access rule and its
+  success status, reflected out of the module graph. A table tells a new caller where to knock, not what
+  happens when they do. This phase gives every endpoint a page of its own kind — what it is for, what its
+  body and query fields mean and what the validator refuses, what a successful answer holds, and which
+  conflicts and gates it can hit. The fields come out of the same reflection as the table (the DTOs already
+  carry the sentence each rule tells a 400), and the prose is written by hand, with a guard that turns the
+  build red if a route has no explanation or an explanation has no route.
 
 **Phases 0 through 8 are closed.** The first four are the ground the product stands on —
 ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 went one brick at a time, and so
