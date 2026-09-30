@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildTypeIndex, resolveResponse, shapeOf, type TypeIndex } from './response-shape';
+import {
+  buildTypeIndex,
+  parseTypeFields,
+  resolveResponse,
+  shapeOf,
+  type TypeIndex,
+} from './response-shape';
 
 /**
  * A hand-built index, so a test can state a shape in one line rather than in a fixture folder.
@@ -84,6 +90,52 @@ describe('the shape a response type declares', () => {
     expect(shapeOf(index, 'RosterResponse').note).toBe('Who took a place.');
   });
 
+  it('keeps the sentence written above a field, even when that sentence has a semicolon', () => {
+    // The note is the reason the key exists, and it is the part a caller cannot work out from the
+    // name. A comment is also the one thing in a type body whose own punctuation has to be ignored —
+    // split on the semicolon inside it and the field it labels is lost along with the note.
+    const fields = parseTypeFields(
+      [
+        'user: AuthUser;',
+        '/** Seconds until the access token dies; a portal refreshes inside this window. */',
+        'expiresIn: number;',
+      ].join('\n'),
+    );
+
+    expect(fields.map((field) => field.name)).toEqual(['user', 'expiresIn']);
+    expect(fields[0]?.note).toBe('');
+    expect(fields[1]?.note).toBe(
+      'Seconds until the access token dies; a portal refreshes inside this window.',
+    );
+  });
+
+  it('carries the keys an interface inherits, because a page that dropped them would lie', () => {
+    // `OpsAccountDetail extends OpsAccount` adds one key of its own and keeps nine from the row it
+    // extends. Reading only the body would document the detail as a single `counts` field, which is
+    // the quiet kind of wrong: the table renders, and nothing about it says it is short.
+    const shape = shapeOf(
+      indexFrom(
+        JSON.stringify({
+          Account: {
+            kind: 'interface',
+            note: '',
+            parents: [],
+            fields: [{ name: 'id', type: 'string', optional: false, note: 'The account.' }],
+          },
+          AccountDetail: {
+            kind: 'interface',
+            note: '',
+            parents: ['Account'],
+            fields: [{ name: 'counts', type: 'Counts', optional: false, note: '' }],
+          },
+        }),
+      ),
+      'AccountDetail',
+    );
+
+    expect(shape.fields.map((field) => field.name)).toEqual(['id', 'counts']);
+  });
+
   it('refuses a type this read cannot name', () => {
     // An empty block on the page reads as "this route answers nothing", which is a different fact
     // from one the exporter failed to find.
@@ -99,8 +151,7 @@ describe('the shape a response type declares', () => {
 });
 
 describe('the response a deployed handler declares', () => {
-  it('names the keys a session route hands back', () => {
-    const shape = resolveResponse('AuthController', 'login');
+  it('names the keys a session route hands back', () => {    const shape = resolveResponse('AuthController', 'login');
 
     expect(shape).toMatchObject({ kind: 'json', declared: 'AuthSessionResponse' });
     expect(shape.fields.map((field) => field.name)).toEqual([
@@ -137,6 +188,32 @@ describe('the response a deployed handler declares', () => {
     // `LogFields` is `[key: string]: unknown`, so the honest answer is an empty list rather than a
     // page that claims the scan found something.
     expect(shapeOf(buildTypeIndex(), 'LogFields').fields).toEqual([]);
+  });
+
+  it('reaches through a named type to the keys it holds', () => {
+    // `user: AuthUser` documents nothing for a reader who has to render the thing, and the keys live
+    // one name away in the same contract folder. The page shows them under the answer that uses them.
+    const shape = resolveResponse('AuthController', 'login');
+    const user = shape.types.find((type) => type.name === 'AuthUser');
+
+    expect(user?.fields.map((field) => field.name)).toContain('emailVerifiedAt');
+  });
+
+  it('follows a type two names deep, and says each name once', () => {
+    const shape = resolveResponse('CatalogController', 'read');
+    const names = shape.types.map((type) => type.name);
+
+    expect(names).toContain('CatalogModule');
+    expect(names).toContain('CatalogLesson');
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  it('reaches through an object the handler spelled out inline', () => {
+    // `Promise<{ course: Course }>` names no type of its own, but the row it wraps still has keys a
+    // caller is going to read, so the inline body is walked like a declared one.
+    expect(resolveResponse('CoursesController', 'read').types.map((type) => type.name)).toContain(
+      'Course',
+    );
   });
 
   it('refuses a handler that does not say what it answers with', () => {

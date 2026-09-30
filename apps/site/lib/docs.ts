@@ -30,12 +30,60 @@ export interface DocPage {
   headings: DocHeading[];
 }
 
+/** One field of a body or a query string, as the validator that guards it describes itself. */
+export interface RequestFieldDoc {
+  name: string;
+  optional: boolean;
+  conditional: boolean;
+  nested: boolean;
+  /** What the route answers when this field is wrong, in the validator’s own words. */
+  rules: string[];
+  /** The closed set an enumerated field accepts, empty when the field is not enumerated. */
+  values: string[];
+}
+
+export interface EndpointRequestDoc {
+  params: string[];
+  query: RequestFieldDoc[];
+  body: RequestFieldDoc[];
+}
+
+/** One key of the answer, as the type the handler declares spells it. */
+export interface ResponseFieldDoc {
+  name: string;
+  type: string;
+  optional: boolean;
+  note: string;
+}
+
+/**
+ * An object the answer reaches through.
+ *
+ * A field typed `user: AuthUser` says nothing to the reader who has to draw the row, so the keys one
+ * name away travel with the answer that points at them.
+ */
+export interface ResponseTypeDoc {
+  name: string;
+  note: string;
+  fields: ResponseFieldDoc[];
+}
+
+export interface EndpointResponseDoc {
+  kind: 'json' | 'none' | 'stream';
+  declared: string;
+  note: string;
+  fields: ResponseFieldDoc[];
+  types: ResponseTypeDoc[];
+}
+
 /** One row of the table the API writes; see `apps/api/src/docs/endpoint-reference.ts`. */
 export interface EndpointDoc {
   method: string;
   path: string;
   statusCode: number;
   access: { kind: 'public' | 'optional-session' | 'session'; roles: string[] };
+  request: EndpointRequestDoc;
+  response: EndpointResponseDoc;
   controller: string;
   handler: string;
 }
@@ -246,6 +294,230 @@ function endpointTables(): string {
 }
 
 /**
+ * The heading a page writes when it explains one route on its own: the method, a space, and the
+ * address the export gave it. Nothing else in the prose is allowed to look like this, and the
+ * renderer treats a match as a promise that the route exists.
+ */
+const ENDPOINT_HEADING = /^(#{1,6}\s+)?(GET|POST|PUT|PATCH|DELETE|HEAD|OPTIONS) (\/\S*)$/u;
+
+/**
+ * The anchor a reader is sent to for one route.
+ *
+ * `slugify` would fold `POST /api/v1/auth/login` into `post-apiv1authlogin`, which is neither
+ * readable in a link nor what anybody would type. The version here keeps the words a caller is
+ * already holding — the method and the path with its prefixes and colons off.
+ */
+function endpointHeadingId(method: string, path: string): string {
+  const tail = path
+    .replace(/^\/api\/v1/u, '')
+    .replace(/:(\w+)/gu, (_match, name: string) => name.toLowerCase())
+    .replace(/\W+/gu, '-');
+
+  return `${method.toLowerCase()}-${tail.replace(/^-|-$/gu, '')}`;
+}
+
+function endpointOf(method: string, path: string): EndpointDoc {
+  const found = ENDPOINTS.endpoints.find(
+    (endpoint) => endpoint.method === method && endpoint.path === path,
+  );
+
+  if (!found) {
+    throw new Error(
+      `${method} ${path} is explained on a docs page but is not a route the API answers — ` +
+        'run `bun run --filter @lms/api docs:export` and either fix the heading or the export',
+    );
+  }
+
+  return found;
+}
+
+/** Text that came from code, made safe to put inside markup this page writes itself. */
+function escapeHtml(text: string): string {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
+
+/**
+ * A sentence written above a type or a field, put on the page as its author meant it.
+ *
+ * The comments in `packages/shared` mark a type name with backticks because they are read in an
+ * editor, where that is how a developer writes one; a page that printed the characters would show
+ * somebody's markup instead of their sentence.
+ */
+function noteText(text: string): string {
+  return escapeHtml(text).replace(/`([^`]+)`/gu, '<code>$1</code>');
+}
+
+/** The one line a field carries about how it behaves rather than what it looks like. */
+function fieldFlag(field: RequestFieldDoc): string {
+  if (field.optional) return 'may be left out';
+  if (field.conditional) return 'only when another field asks for it';
+  if (field.nested) return 'a nested object';
+
+  return '';
+}
+
+/** What the route answers when a field is wrong — its own sentence, not a paraphrase of it. */
+function fieldRules(field: RequestFieldDoc): string {
+  // An enumerated field states its set twice otherwise, once as a sentence and once as the words a
+  // caller may actually send. The chips are the more useful of the two.
+  const rules = field.values.length > 0
+    ? field.rules.filter((rule) => !rule.startsWith('one of:'))
+    : field.rules;
+
+  const parts = rules.map((rule) => escapeHtml(rule));
+
+  if (field.values.length > 0) {
+    parts.push(`one of ${field.values.map((value) => `<code>${escapeHtml(value)}</code>`).join(' ')}`);
+  }
+
+  return parts.join(' · ');
+}
+
+function requestFields(source: string, fields: RequestFieldDoc[]): string {
+  if (fields.length === 0) return '';
+
+  return [
+    `<table class="endpoint-fields">`,
+    `<caption>${source}</caption>`,
+    '<thead><tr><th>Field</th><th>What the route accepts</th></tr></thead>',
+    '<tbody>',
+    ...fields.map((field) => {
+      const flag = fieldFlag(field);
+
+      return [
+        '<tr>',
+        `<td><code>${escapeHtml(field.name)}</code>${
+          flag ? ` <span class="endpoint-flag">${flag}</span>` : ''
+        }</td>`,
+        `<td>${fieldRules(field) || '—'}</td>`,
+        '</tr>',
+      ].join('');
+    }),
+    '</tbody>',
+    '</table>',
+  ].join('');
+}
+
+/** One set of keys, whether they are the answer's own or an object the answer reaches through. */
+function keyTable(caption: string, fields: ResponseFieldDoc[]): string {
+  return [
+    '<table class="endpoint-fields">',
+    `<caption>${caption}</caption>`,
+    '<thead><tr><th>Key</th><th>Type</th><th>What it holds</th></tr></thead>',
+    '<tbody>',
+    ...fields.map(
+      (field) =>
+        `<tr><td><code>${escapeHtml(field.name)}</code>${field.optional ? '?' : ''}</td>` +
+        `<td><code>${noteText(field.type)}</code></td>` +
+        `<td>${field.note === '' ? '—' : noteText(field.note)}</td></tr>`,
+    ),
+    '</tbody>',
+    '</table>',
+  ].join('');
+}
+
+/** The answer half: the keys a body holds, then every object those keys lead to. */
+function responseFields(response: EndpointResponseDoc): string {
+  if (response.kind === 'none') {
+    return '<p class="endpoint-empty">A successful call answers with the status and no body.</p>';
+  }
+
+  if (response.kind === 'stream') {
+    return '<p class="endpoint-empty">The bytes of the file itself, not JSON. The route takes the response over, so it answers <code>206</code> to a range the player asks for and <code>416</code> to one it cannot meet.</p>';
+  }
+
+  if (response.fields.length === 0) {
+    return `<p class="endpoint-empty">Answers with a plain <code>${escapeHtml(response.declared)}</code> rather than an object of named keys.</p>`;
+  }
+
+  const own = keyTable(`Answers <code>${escapeHtml(response.declared)}</code>`, response.fields);
+  const note = response.note === '' ? '' : `<p class="endpoint-note">${noteText(response.note)}</p>`;
+
+  // The nested keys go under a fold rather than in the open: a course page answers with five objects
+  // deep, and a reader who came for one field should still be able to see the whole card at once.
+  const nested = response.types.map(
+    (type) =>
+      `<details class="endpoint-nested"><summary><code>${escapeHtml(type.name)}</code>` +
+      `<span>${type.fields.length} keys</span></summary>` +
+      (type.note === '' ? '' : `<p class="endpoint-note">${noteText(type.note)}</p>`) +
+      keyTable('Keys', type.fields) +
+      '</details>',
+  );
+
+  return [own, note, ...nested].join('');
+}
+
+/**
+ * Everything a page can honestly say about one route without a human writing it: who gets past the
+ * guard, what the caller sends, what the route gives back, and which class serves it.
+ *
+ * This is the half that would otherwise be typed out per route and go stale per route. The prose a
+ * writer puts around it is the half only a person can supply.
+ */
+function endpointCard(method: string, path: string): string {
+  const endpoint = endpointOf(method, path);
+  const { request, response } = endpoint;
+
+  return [
+    '<div class="endpoint-card">',
+    '<dl class="endpoint-facts">',
+    `<div><dt>Who may call</dt><dd>${escapeHtml(accessLabel(endpoint.access))}</dd></div>`,
+    `<div><dt>Success</dt><dd><code>${endpoint.statusCode}</code></dd></div>`,
+    ...(request.params.length > 0
+      ? [
+          `<div><dt>Address</dt><dd>${request.params
+            .map((param) => `<code>${escapeHtml(param)}</code>`)
+            .join(' ')}</dd></div>`,
+        ]
+      : []),
+    '</dl>',
+    ...(request.body.length > 0 || request.query.length > 0
+      ? [requestFields('Body', request.body), requestFields('Query', request.query)]
+      : ['<p class="endpoint-empty">Sends no body and no query string.</p>']),
+    responseFields(response),
+    `<p class="endpoint-source">Served by <code>${escapeHtml(endpoint.controller)}.${escapeHtml(
+      endpoint.handler,
+    )}</code></p>`,
+    '</div>',
+  ].join('');
+}
+
+/**
+ * The authored headings that name a route, with the generated contract hung under each one.
+ *
+ * A fenced block is skipped rather than matched: an example of somebody else's API documentation in
+ * a page would otherwise be read as a promise about a route this API does not answer.
+ */
+export function explainEndpoints(markdown: string): string {
+  const lines = markdown.split('\n');
+  const out: string[] = [];
+  let inFence = false;
+
+  for (const line of lines) {
+    if (line.trimStart().startsWith('```')) {
+      inFence = !inFence;
+      out.push(line);
+      continue;
+    }
+
+    const heading = inFence ? undefined : ENDPOINT_HEADING.exec(line.trim());
+
+    if (!heading) {
+      out.push(line);
+      continue;
+    }
+
+    out.push(line, '', endpointCard(heading[2] ?? '', heading[3] ?? ''), '');
+  }
+
+  return out.join('\n');
+}
+
+/**
  * The record as the repository keeps it: every phase, what it was for, and whether it shipped.
  *
  * The scope text arrives with the emphasis markers the README writes its statuses with, and marked
@@ -390,7 +662,9 @@ export function readDoc(slug: string): DocPage {
 
   // Newlines are normalised because the marker is matched across one, and a checkout on Windows
   // writes files with the pair.
-  const tokens = marked.lexer(fillGenerated(readFileSync(path, 'utf8').replace(/\r\n/g, '\n')));
+  const tokens = marked.lexer(
+    explainEndpoints(fillGenerated(readFileSync(path, 'utf8').replace(/\r\n/g, '\n'))),
+  );
   const seen = new Set<string>();
   const headings: DocHeading[] = [];
 
@@ -398,7 +672,12 @@ export function readDoc(slug: string): DocPage {
     if (token.type !== 'heading') continue;
 
     const heading = token as HeadingWithId;
-    heading.id = uniqueId(slugify(heading.text), seen);
+    const route = ENDPOINT_HEADING.exec(heading.text);
+
+    heading.id = uniqueId(
+      route ? endpointHeadingId(route[2] ?? '', route[3] ?? '') : slugify(heading.text),
+      seen,
+    );
     if (heading.depth >= 2) {
       headings.push({ depth: heading.depth, text: heading.text, id: heading.id });
     }

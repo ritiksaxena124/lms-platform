@@ -5,14 +5,15 @@ teacher writes the course, opens the week they teach and keeps the record; three
 student, ops), one public site and one docs site share one API, one database and one component
 library.
 
-**Status: Phase 12 done** — a teacher writes a course and opens a week in it, a learner reads enough
+**Status: Phase 13 done** — a teacher writes a course and opens a week in it, a learner reads enough
 of that course to want a place, asks for a minute of the teacher's time, is let into a room for it when
 the teacher says yes, is told about all of it by email, and every one of those decisions leaves a
 record the platform can be asked about. An operator signs in on a third port and asks: who wrote
 what, who is standing behind an account, what happened to a letter that was meant to tell somebody.
 And the thing now has a face and a manual: `apps/site` publishes the public page a stranger reads and
-the docs a builder needs, both generated from what the code already says.
-Everything listed under [What each portal does](#what-each-portal-does) is shipped, tested and
+the docs a builder needs, both generated from what the code already says. Every API route is explained
+endpoint by endpoint, with purpose, gates, fields and failures documented alongside the contract the
+code enforces. Everything listed under [What each portal does](#what-each-portal-does) is shipped, tested and
 clickable; money, the teacher's repeating calendar and attendance are still ahead, and
 [Phases](#phases) keeps the ordered record of why.
 
@@ -433,7 +434,7 @@ decision was made, and what was deliberately left out.
 | 10    | The teacher's calendar — a course's class series, holidays, no-class days | Not started |
 | 11    | Product website — the public face of the marketplace                      | **Done**    |
 | 12    | Docs site — guide, data model, API reference and the phase record         | **Done**    |
-| 13    | The API explained endpoint by endpoint — purpose, fields, failures        | In progress |
+| 13    | The API explained endpoint by endpoint — purpose, fields, failures        | **Done**    |
 
 ### All thirteen, in order
 
@@ -496,6 +497,14 @@ where it does because of what has to exist before its shape stops moving. 13 was
   rather than printing a page that goes quiet about it. The prose between those two — what a route is for,
   which gates it sits behind, which conflicts it answers with — is written by hand, with a guard that turns
   the build red if a route has no explanation or an explanation has no route.
+
+**Phase 13 closed on 2026-09-30.** Every one of the API's 60 routes now has a section in one of five
+domain pages: auth (signing in and accounts), courses (authoring lifecycle), catalog (browsing and
+enrollments), booking (availability rules and class bookings), and platform (health, action log, outbox).
+Each section pairs authored prose explaining purpose and failure modes with generated cards showing request
+fields, response keys (including inherited and nested types), access rules, success status, and the
+controller.handler that serves it. A bidirectional drift guard test verifies every exported route appears
+on some page and every endpoint heading names a real route.
 
 **Phases 0 through 8 are closed.** The first four are the ground the product stands on —
 ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 went one brick at a time, and so

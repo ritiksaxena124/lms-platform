@@ -25,6 +25,36 @@
   },
   {
     "group": "How it works",
+    "slug": "api-auth",
+    "title": "Signing in, accounts and the teacher's profile",
+    "summary": "The routes that open a session, keep it alive, and let an operator manage the register of accounts."
+  },
+  {
+    "group": "How it works",
+    "slug": "api-courses",
+    "title": "Courses, modules, lessons and assets",
+    "summary": "The authoring lifecycle: create, edit, publish, archive, and the roster that follows."
+  },
+  {
+    "group": "How it works",
+    "slug": "api-catalog",
+    "title": "Catalog browsing and enrollments",
+    "summary": "How students discover courses, preview lessons, and take a place."
+  },
+  {
+    "group": "How it works",
+    "slug": "api-booking",
+    "title": "Availability rules and bookings",
+    "summary": "Teacher calendars, slot generation, booking requests, confirmations and room assignments."
+  },
+  {
+    "group": "How it works",
+    "slug": "api-platform",
+    "title": "Platform and infrastructure",
+    "summary": "Health checks, the action log operators rely on, and the outbox queue for reliable delivery."
+  },
+  {
+    "group": "How it works",
     "slug": "data-model",
     "title": "The data model",
     "summary": "Every table and column, under both names, with the keys and pointers the database keeps."

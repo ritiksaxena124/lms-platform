@@ -35,17 +35,32 @@ export interface ResponseShape {
   fields: ResponseField[];
 }
 
+/** A named object the answer reaches through, held once however many fields point at it. */
+export interface ResponseTypeDoc {
+  name: string;
+  note: string;
+  fields: ResponseField[];
+}
+
 export interface ResponseRecord extends ResponseShape {
   /**
    * `json` a body of the keys listed, `none` a status and nothing else, `stream` the bytes the
    * handler writes to the response itself — which is why no list of keys could describe it.
    */
   kind: 'json' | 'none' | 'stream';
+  /**
+   * The objects the listed keys lead to, by name.
+   *
+   * A field typed `user: AuthUser` says nothing to the reader who has to draw the row, and the keys
+   * live one name away in the same contract folder, so they are carried with the answer rather than
+   * left for a page to look up.
+   */
+  types: ResponseTypeDoc[];
 }
 
 /** One declared type, as the index found it. */
 type TypeEntry =
-  | { kind: 'interface'; note: string; fields: ResponseField[] }
+  | { kind: 'interface'; note: string; parents: string[]; fields: ResponseField[] }
   | { kind: 'alias'; note: string; target: string };
 
 /** Declaration name to entry, across every folder this read is allowed to look in. */
@@ -68,6 +83,17 @@ function readSource(path: string): string {
   return readFileSync(path, 'utf8').replace(/\r\n/g, '\n');
 }
 
+/** The text of a `/** … *\/` block, folded onto one line the page can put beside a field. */
+function commentText(block: string): string {
+  return block
+    .replace(/^\/\*+|\*\/$/gu, '')
+    .split('\n')
+    .map((line) => line.replace(/^\s*\*?\s?/u, '').trim())
+    .join(' ')
+    .replace(/\s+/gu, ' ')
+    .trim();
+}
+
 /**
  * The doc block a declaration or a field carries, or an empty string.
  *
@@ -76,57 +102,74 @@ function readSource(path: string): string {
  * belongs to the statement, not here.
  */
 function trailingDocComment(before: string): string {
-  const blocks = [...before.matchAll(/\/\*\*[\s\S]*?\*\//gu)].pop();
-  if (!blocks) return '';
-  if (before.slice((blocks.index ?? 0) + blocks[0].length).trim().length > 0) return '';
+  const last = [...before.matchAll(/\/\*\*[\s\S]*?\*\//gu)].pop();
+  if (!last) return '';
+  if (before.slice((last.index ?? 0) + last[0].length).trim().length > 0) return '';
 
-  return blocks[0]
-    .replace(/^\/\*\*|\*\/$/gu, '')
-    .split('\n')
-    .map((line) => line.replace(/^\s*\*?\s?/u, '').trim())
-    .join(' ')
-    .replace(/\s+/gu, ' ')
-    .trim();
+  return commentText(last[0]);
 }
+
+/** A bracket that cannot appear in a type body, used to stand in for a comment while it is parsed. */
+const MARK = '\u0000';
 
 /** Every property at the top level of a type body, each with the comment above it. */
 export function parseTypeFields(body: string): ResponseField[] {
+  // A comment is taken out of the text first and put back as a marker, because a note is prose and
+  // prose contains the semicolons and line breaks the field list is split on. Left in place, the
+  // sentence above `expiresIn` would split in the middle of itself and take the field with it.
+  const blocks: string[] = [];
+  const stripped = body.replace(/\/\*[\s\S]*?\*\//gu, (block) => {
+    blocks.push(block);
+    return `${MARK}${blocks.length - 1}${MARK}`;
+  });
+
+  const marker = new RegExp(`${MARK}(\\d+)${MARK}`, 'gu');
   const fields: ResponseField[] = [];
+  const notes: number[] = [];
   let entry = '';
-  let pending = '';
   let depth = 0;
 
   const close = (): void => {
-    const match = entry.trim().match(/^(\w+)(\?)?:\s*(.+)$/su);
+    const text = entry;
+    entry = '';
 
-    if (match) {
-      fields.push({
-        name: match[1] ?? '',
-        optional: match[2] === '?',
-        type: (match[3] ?? '').replace(/\s+/gu, ' ').trim(),
-        note: trailingDocComment(pending),
-      });
+    const taken = [...text.matchAll(marker)].map((match) => Number(match[1]));
+    const code = text.replace(marker, '').trim();
+    const match = code.match(/^(\w+)(\?)?:\s*(.+)$/su);
+
+    // Text with no field in it is a comment standing on its own between two fields. It stays held
+    // until the field it sits above arrives, which is the difference between a note and a note about
+    // nothing.
+    if (!match) {
+      notes.push(...taken);
+      return;
     }
 
-    entry = '';
-    pending = '';
+    const labelled = notes.length > 0 ? notes[notes.length - 1] : taken.at(-1);
+    const block = labelled === undefined ? undefined : blocks[labelled];
+
+    fields.push({
+      name: match[1] ?? '',
+      optional: match[2] === '?',
+      type: (match[3] ?? '').replace(/\s+/gu, ' ').trim(),
+      note: block === undefined ? '' : commentText(block),
+    });
+
+    notes.length = 0;
   };
 
-  for (const character of body) {
+  for (const character of stripped) {
     if ('([{<'.includes(character)) depth += 1;
     if (')]}>'.includes(character)) depth -= 1;
 
     // A separator at the top level ends one field. Inside a nested object or a generic the same
     // character is part of the type's own text, which is why the depth is kept.
     if (depth <= 0 && (character === ';' || character === '\n')) {
-      if (entry.trim().length > 0) close();
-      else pending += entry;
-
+      close();
       continue;
     }
 
     entry += character;
-    pending += character;
   }
 
   if (entry.trim().length > 0) close();
@@ -199,7 +242,13 @@ function declarationsOf(source: string): Record<string, TypeEntry> {
         );
       }
 
-      found[name] = { kind: 'interface', note, fields };
+      // `interface X extends Y, Z { … }` — the heritage clause lives between the name and the brace.
+      const heritage = match[3]?.trim();
+      const parents = heritage
+        ? [...heritage.matchAll(/(?:^|,)\s*([\w$]+)/gu)].map((m) => m[1] ?? '')
+        : [];
+
+      found[name] = { kind: 'interface', note, parents, fields };
       continue;
     }
 
@@ -292,10 +341,92 @@ export function shapeOf(index: TypeIndex, typeText: string): ResponseShape {
   }
 
   if (entry.kind === 'interface') {
-    return { declared: name, note: entry.note, fields: entry.fields };
+    return { declared: name, note: entry.note, fields: flattenFields(index, name, new Set()) };
   }
 
   return shapeOf(index, entry.target);
+}
+
+/** Every field an interface declares, including those it inherits from its parents. */
+function flattenFields(index: TypeIndex, name: string, seen: Set<string>): ResponseField[] {
+  if (seen.has(name)) return [];
+  seen.add(name);
+
+  const entry = index[name];
+  if (!entry || entry.kind !== 'interface') return [];
+
+  const own = entry.fields;
+  const inherited = (entry.parents ?? []).flatMap((parent) => flattenFields(index, parent, seen));
+
+  return [...inherited, ...own];
+}
+
+/** A word that names a value rather than an object a reader would want opened. */
+const PLAIN_VALUE = /^(string|number|boolean|bigint|null|undefined|unknown|never|void|'\w+')$/u;
+
+/**
+ * What one field's type text leads to: the names of the objects it points at, and the keys of an
+ * object spelled out in place.
+ *
+ * A union is split rather than matched whole, because `SlotDenialCode | null` and `CatalogLesson[]`
+ * both describe the same shape to a caller as the thing inside them.
+ */
+function pointeesOf(index: TypeIndex, text: string): { names: string[]; fields: ResponseField[] } {
+  const trimmed = text.trim();
+
+  if (trimmed.startsWith('{')) {
+    return { names: [], fields: parseTypeFields(trimmed.slice(1, trimmed.lastIndexOf('}'))) };
+  }
+
+  const names = trimmed
+    .split('|')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0 && !PLAIN_VALUE.test(part))
+    .map((part) => {
+      const { name, entry } = namedType(index, part);
+
+      return entry?.kind === 'interface' ? name : undefined;
+    })
+    .filter((name): name is string => name !== undefined);
+
+  return { names, fields: [] };
+}
+
+/**
+ * Every object one answer reaches through, in the order the answer meets them.
+ *
+ * The walk is transitive with a set of names already shown, which is what both ends the risk: a
+ * `Course` whose modules hold lessons holds the lesson keys three names deep, and a type that ever
+ * points back at itself would otherwise be walked for as long as the page had patience.
+ */
+function reachableTypes(index: TypeIndex, shape: ResponseShape): ResponseTypeDoc[] {
+  const found: ResponseTypeDoc[] = [];
+  const seen = new Set<string>([shape.declared]);
+  const queue: ResponseField[] = [...shape.fields];
+
+  while (queue.length > 0) {
+    const field = queue.shift();
+    if (!field) continue;
+
+    const { names, fields } = pointeesOf(index, field.type);
+
+    for (const name of names) {
+      if (seen.has(name)) continue;
+      seen.add(name);
+
+      const entry = index[name];
+
+      if (entry?.kind !== 'interface') continue;
+
+      const allFields = flattenFields(index, name, new Set());
+      found.push({ name, note: entry.note, fields: allFields });
+      queue.push(...allFields);
+    }
+
+    queue.push(...fields);
+  }
+
+  return found;
 }
 
 /** A handler's own text: the decorators above it and the signature it opens with. */
@@ -399,10 +530,16 @@ export function resolveResponse(controllerName: string, handlerName: string): Re
     const taken = /@Res\(([^)]*)\)/u.exec(`${before}\n${params}`);
     const takesOver = taken !== null && !taken[1]?.includes('passthrough');
 
-    return { kind: takesOver ? 'stream' : 'none', declared: 'none', note: '', fields: [] };
+    return {
+      kind: takesOver ? 'stream' : 'none',
+      declared: 'none',
+      note: '',
+      fields: [],
+      types: [],
+    };
   }
 
   const shape = shapeOf(buildTypeIndex(), returned);
 
-  return { kind: 'json', ...shape };
+  return { kind: 'json', ...shape, types: reachableTypes(buildTypeIndex(), shape) };
 }

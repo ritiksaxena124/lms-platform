@@ -159,3 +159,137 @@
   font-weight: 620;
   color: var(--color-ink-strong);
 }
+
+/*
+ * The contract one route holds, drawn as a card rather than as prose.
+ *
+ * A caller reads it in columns — which fields, which keys, which status — and the sentences the
+ * writer authored above it read in lines. Putting the two in one visual voice would lose the
+ * difference between what a person explained and what the code guarantees, so the card is a panel:
+ * bounded, quiet, and impossible to mistake for the paragraph above it.
+ */
+.endpoint-card {
+  margin: 0 0 2rem;
+  padding: 1rem 1.125rem 1.125rem;
+  border: 1px solid var(--color-line);
+  border-radius: var(--radius-card);
+  background: var(--color-surface);
+}
+
+.endpoint-card > :last-child {
+  margin-bottom: 0;
+}
+
+.endpoint-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 2.5rem;
+  margin: 0 0 1.125rem;
+  padding-bottom: 0.875rem;
+  border-bottom: 1px solid var(--color-line);
+}
+
+.endpoint-facts dt {
+  font-size: 0.6875rem;
+  font-weight: var(--text-label--font-weight);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.endpoint-facts dd {
+  margin: 0.25rem 0 0;
+  font-size: 0.875rem;
+  color: var(--color-ink-strong);
+}
+
+.endpoint-fields {
+  margin: 0 0 1.125rem;
+}
+
+.endpoint-fields caption {
+  caption-side: top;
+  padding-bottom: 0.5rem;
+  font-size: 0.6875rem;
+  font-weight: var(--text-label--font-weight);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  text-align: left;
+  color: var(--color-ink-muted);
+}
+
+.endpoint-fields code {
+  /* A key name is read, not copied, so it loses the box the inline code carries elsewhere. */
+  padding: 0;
+  border: 0;
+  background: none;
+  font-size: 0.8125rem;
+}
+
+.endpoint-flag {
+  margin-left: 0.375rem;
+  padding: 0.0625rem 0.4375rem;
+  border: 1px solid var(--color-line-strong);
+  border-radius: var(--radius-pill);
+  font-size: 0.6875rem;
+  white-space: nowrap;
+  color: var(--color-ink-muted);
+}
+
+.endpoint-empty,
+.endpoint-source {
+  margin: 0 0 1rem;
+  font-size: 0.8125rem;
+  color: var(--color-ink-muted);
+}
+
+.endpoint-note {
+  margin: -0.625rem 0 1rem;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  color: var(--color-ink-muted);
+}
+
+.endpoint-source {
+  margin: 0;
+  padding-top: 0.875rem;
+  border-top: 1px solid var(--color-line);
+}
+
+/* The nested keys are the ones a reader wants second, so they are folded: the type name stays on the
+ * card and its columns arrive when the row underneath it is asked for. */
+.endpoint-nested {
+  margin: 0 0 0.875rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--color-line);
+}
+
+.endpoint-nested summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  cursor: pointer;
+  font-size: 0.875rem;
+  color: var(--color-ink-strong);
+  list-style: none;
+}
+
+.endpoint-nested summary::-webkit-details-marker {
+  display: none;
+}
+
+.endpoint-nested summary span {
+  font-size: 0.6875rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-ink-muted);
+}
+
+.endpoint-nested[open] summary {
+  margin-bottom: 0.75rem;
+}
+
+.endpoint-nested .endpoint-fields:last-child {
+  margin-bottom: 0;
+}

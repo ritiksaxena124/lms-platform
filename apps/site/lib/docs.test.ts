@@ -7,8 +7,10 @@ import {
   docGroups,
   docRoutes,
   docSlugs,
+  explainEndpoints,
   readDoc,
   type DataModelFile,
+  type EndpointDoc,
   type EndpointsFile,
 } from './docs';
 
@@ -21,6 +23,15 @@ function filesOnDisk(): string[] {
     .filter((name) => name.endsWith('.md'))
     .map((name) => name.replace(/\.md$/, ''))
     .sort();
+}
+
+/** Every route the API exported, by the pair a reader writes when they search for one. */
+function exportedEndpoints(): EndpointDoc[] {
+  return (
+    JSON.parse(
+      readFileSync(resolve(CONTENT_DIR, 'endpoints.json'), 'utf8'),
+    ) as unknown as EndpointsFile
+  ).endpoints;
 }
 
 /**
@@ -246,6 +257,86 @@ describe('the route table the API exports', () => {
   });
 });
 
+describe('an endpoint explained section by section', () => {
+  const page = readDoc('api-auth');
+
+  function route(method: string, path: string): EndpointDoc {
+    const found = exportedEndpoints().find(
+      (endpoint) => endpoint.method === method && endpoint.path === path,
+    );
+
+    if (!found) throw new Error(`${method} ${path} is not in the export`);
+
+    return found;
+  }
+
+  /** One card's markup: from its own heading to the next section, where the prose stops. */
+  function cardFor(id: string): string {
+    const html = readDoc('api-auth').html;
+    const start = html.indexOf(`<h2 id="${id}">`);
+
+    if (start === -1) throw new Error(`No section on the page carries the id "${id}"`);
+
+    const next = html.indexOf('<h2 id=', start + 1);
+
+    return next === -1 ? html.slice(start) : html.slice(start, next);
+  }
+
+  it('hangs the contract the code holds under the prose that explains it', () => {
+    // The heading is authored; the fields under it are generated, so the names a reader meets and
+    // the sentences beside them are the ones the route itself answers with.
+    const card = cardFor('post-auth-register');
+
+    for (const field of route('POST', '/api/v1/auth/register').request.body) {
+      expect(card, `${field.name} is not shown on the card`).toContain(
+        `<code>${field.name}</code>`,
+      );
+    }
+
+    expect(card).toContain('between 12 and 200 characters');
+  });
+
+  it('shows what a route answers with, key by key', () => {
+    const card = cardFor('post-auth-login');
+
+    for (const field of route('POST', '/api/v1/auth/login').response.fields) {
+      expect(card, `${field.name} is not on the card`).toContain(`<code>${field.name}</code>`);
+    }
+
+    // The line above a field in the shared contract is the reason the key exists, and it is the
+    // part a caller cannot work out from the name.
+    expect(card).toContain('a portal refreshes inside this window');
+  });
+
+  it('names the closed set an enumerated field accepts, and the field that may be left out', () => {
+    expect(page.html).toContain('<code>student</code>');
+    expect(page.html).toContain('<code>teacher</code>');
+    expect(page.html).toContain('may be left out');
+  });
+
+  it('says what a route that asks for nothing and returns nothing does instead', () => {
+    // A `204` has no body to document, and an empty table would read as the export having nothing to
+    // say about it rather than as the route having nothing to send.
+    expect(cardFor('post-auth-logout')).toContain('no body');
+  });
+
+  it('tells the reader which class serves the route', () => {
+    expect(page.html).toContain('AuthController.login');
+  });
+
+  it('refuses to explain a route the API does not answer', () => {
+    // The other half of the drift guard from 13c: a renamed path leaves an explanation behind, and
+    // a page that printed it as though it were current is worse than one that fails to build.
+    expect(() => explainEndpoints('## GET /api/v1/never-built\n\nProse.')).toThrow(/never-built/);
+  });
+
+  it('leaves a heading that is not a route to the prose', () => {
+    const markdown = '## Getting a session\n\nProse.';
+
+    expect(explainEndpoints(markdown)).toBe(markdown);
+  });
+});
+
 describe('the data model the API exports', () => {
   // Read from the file rather than from `lib/docs`, because a renderer that dropped four of the
   // sixteen tables would still print a page that looks like a schema.
@@ -371,7 +462,7 @@ describe('the phase record', () => {
   it('publishes the table the repository keeps instead of restating it', () => {
     // Parsed from the README by the test as well as by the page, so the guard proves the renderer
     // emitted every row — not that two hand-kept copies happen to agree today.
-    expect(rows).toHaveLength(13);
+    expect(rows).toHaveLength(14);
 
     for (const row of rows) {
       expect(page.html, `phase ${row.phase} lost its number`).toContain(`<td>${row.phase}</td>`);
@@ -384,6 +475,36 @@ describe('the phase record', () => {
     const numbers = [...page.html.matchAll(/<td>(\d+)<\/td>/g)].map((match) => match[1]);
 
     expect(numbers).toEqual(rows.map((row) => row.phase));
+  });
+});
+
+describe('every exported route has a section somewhere', () => {
+  const exported = exportedEndpoints();
+
+  it('finds a ## METHOD /path heading for each endpoint', () => {
+    // A route without prose is a contract nobody can read. The drift guard runs across all pages
+    // so a renamed path or moved section fails the build rather than leaving an orphan card.
+    const headingsByPage = new Map<string, string[]>();
+
+    for (const slug of docSlugs()) {
+      const html = readDoc(slug).html;
+      const matches = [...html.matchAll(/<h2 id="[^"]*">((?:GET|POST|PUT|PATCH|DELETE)\s+\/[^<]+)<\/h2>/g)];
+      headingsByPage.set(slug, matches.map((m) => m[1] ?? ''));
+    }
+
+    for (const endpoint of exported) {
+      const label = `${endpoint.method} ${endpoint.path}`;
+      let found = false;
+
+      for (const [, headings] of headingsByPage) {
+        if (headings.includes(label)) {
+          found = true;
+          break;
+        }
+      }
+
+      expect(found, `${label} has no ## heading on any docs page`).toBe(true);
+    }
   });
 });
 
