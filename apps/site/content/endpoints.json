@@ -192,6 +192,98 @@
             "type": "number",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "ActionLogEntry",
+            "note": "One row of the ledger, read. Nine answers and no translation: the columns are named what `action_log` names them, so a person comparing a row here with the table it came from is not reconciling two vocabularies. Two of them are worth saying why they are here at all: - `requestId` is the link to the access-log line of the same name, and it is null for a scheduler's work because a sweep has no request to point back to. - `actor` is null in exactly those rows, and only there — the split an operator reads as \"how much of this was the machine\". `targetId` is a uuid with no promise it still resolves, which is the point of keeping the record: a course archived next year was published in September, and the row says so either way.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "actionCode",
+                "optional": false,
+                "type": "ActionCode",
+                "note": ""
+              },
+              {
+                "name": "sectionCode",
+                "optional": false,
+                "type": "ActionSectionCode",
+                "note": ""
+              },
+              {
+                "name": "actorKind",
+                "optional": false,
+                "type": "ActionActorKindCode",
+                "note": ""
+              },
+              {
+                "name": "targetTable",
+                "optional": false,
+                "type": "ActionTargetTableCode",
+                "note": ""
+              },
+              {
+                "name": "targetId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "detail",
+                "optional": false,
+                "type": "ActionDetail",
+                "note": ""
+              },
+              {
+                "name": "actor",
+                "optional": false,
+                "type": "ActionLogActor | null",
+                "note": ""
+              },
+              {
+                "name": "requestId",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": "When the action happened, as the transaction that wrote it timed it — UTC on the wire, and the portal that draws it decides the zone it shows."
+              }
+            ]
+          },
+          {
+            "name": "ActionLogActor",
+            "note": "The person the row credits, as the read side answers it. A name and an id, which is the same line the teacher's roster draws: an email address never arrives here, because a log row outlives both the correction a person makes to their account and the deletion they ask for, and an address in a ledger is an address kept forever. `roleCode` is the role as the row stored it — what this person was allowed to do at the time — so a promotion does not rewrite what they did before it. Their current role is readable from the account, and is a different question. It is null only on a row written with no role to read, which the recorder reports rather than invents.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "roleCode",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "ActionLogController",
@@ -260,7 +352,69 @@
             "name": "expiresIn",
             "optional": false,
             "type": "number",
-            "note": ""
+            "note": "Seconds until the access token dies; a portal refreshes inside this window."
+          }
+        ],
+        "types": [
+          {
+            "name": "AuthUser",
+            "note": "The account as a portal is allowed to see it. Every date is already an ISO string: these types cross the HTTP boundary in JSON, so a `Date` here would be a lie about what the browser actually receives.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "email",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "role",
+                "optional": false,
+                "type": "RoleCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "timezone",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "emailVerifiedAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "lastLoginAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -284,7 +438,8 @@
         "kind": "none",
         "declared": "none",
         "note": "",
-        "fields": []
+        "fields": [],
+        "types": []
       },
       "controller": "AuthController",
       "handler": "logout"
@@ -312,6 +467,68 @@
             "optional": false,
             "type": "AuthUser",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "AuthUser",
+            "note": "The account as a portal is allowed to see it. Every date is already an ISO string: these types cross the HTTP boundary in JSON, so a `Date` here would be a lie about what the browser actually receives.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "email",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "role",
+                "optional": false,
+                "type": "RoleCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "timezone",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "emailVerifiedAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "lastLoginAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -358,7 +575,69 @@
             "name": "expiresIn",
             "optional": false,
             "type": "number",
-            "note": ""
+            "note": "Seconds until the access token dies; a portal refreshes inside this window."
+          }
+        ],
+        "types": [
+          {
+            "name": "AuthUser",
+            "note": "The account as a portal is allowed to see it. Every date is already an ISO string: these types cross the HTTP boundary in JSON, so a `Date` here would be a lie about what the browser actually receives.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "email",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "role",
+                "optional": false,
+                "type": "RoleCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "timezone",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "emailVerifiedAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "lastLoginAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -446,6 +725,68 @@
             "type": "AuthUser",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "AuthUser",
+            "note": "The account as a portal is allowed to see it. Every date is already an ISO string: these types cross the HTTP boundary in JSON, so a `Date` here would be a lie about what the browser actually receives.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "email",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "role",
+                "optional": false,
+                "type": "RoleCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "timezone",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "emailVerifiedAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "lastLoginAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "AuthController",
@@ -476,6 +817,56 @@
             "optional": false,
             "type": "AvailabilityRule[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "AvailabilityRule",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": "Minutes from local midnight, matching the columns. A portal that wants `09:00` renders it from the number the way it renders ₹1,000 from paise — printing is not arithmetic."
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "slotMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -556,6 +947,56 @@
             "optional": false,
             "type": "AvailabilityRule",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "AvailabilityRule",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": "Minutes from local midnight, matching the columns. A portal that wants `09:00` renders it from the number the way it renders ₹1,000 from paise — printing is not arithmetic."
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "slotMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -639,6 +1080,56 @@
             "type": "AvailabilityRule",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "AvailabilityRule",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": "Minutes from local midnight, matching the columns. A portal that wants `09:00` renders it from the number the way it renders ₹1,000 from paise — printing is not arithmetic."
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "slotMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "AvailabilityController",
@@ -672,6 +1163,56 @@
             "type": "AvailabilityRule",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "AvailabilityRule",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "weekday",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "startMinutes",
+                "optional": false,
+                "type": "number",
+                "note": "Minutes from local midnight, matching the columns. A portal that wants `09:00` renders it from the number the way it renders ₹1,000 from paise — printing is not arithmetic."
+              },
+              {
+                "name": "endMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "slotMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "AvailabilityController",
@@ -702,6 +1243,92 @@
             "optional": false,
             "type": "Booking[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Booking",
+            "note": "A class a student has asked for. `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a calendar square has to say when the class is over, and making three portals add sixty minutes in three slightly different ways is how a lesson ends up finishing at two times. There is no student on it and no teacher either. A request is read from the door that owns it: a student's own list needs no names on its rows, and the teacher's list of requests is a separate shape that adds the student back, because that is the fact they are asking about.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": "Named rather than id-only, because the list a student reads is one row per course and a screen that had to look the title up per row would be doing the join the query already has."
+              },
+              {
+                "name": "type",
+                "optional": false,
+                "type": "BookingTypeCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "BookingStatusCode",
+                "note": ""
+              },
+              {
+                "name": "live",
+                "optional": false,
+                "type": "LiveClassDoor | null",
+                "note": "The hours this class can be entered, or null when there is no door to open: an unconfirmed request has no room, and a cancelled or expired one has no class. Not a URL, on purpose."
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LiveClassDoor",
+            "note": "The span a live class can be entered: the door a few minutes before the first minute, and a grace after the last. Only the window travels. A Jitsi room has no password — its name is the lock — so the address is handed out by the join endpoint, to one person who has just been checked, rather than riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads this to decide whether to draw a door at all and when to say \"it opens at 09:25\"; it gets the key by asking.",
+            "fields": [
+              {
+                "name": "opensAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "closesAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -757,6 +1384,92 @@
             "type": "Booking",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Booking",
+            "note": "A class a student has asked for. `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a calendar square has to say when the class is over, and making three portals add sixty minutes in three slightly different ways is how a lesson ends up finishing at two times. There is no student on it and no teacher either. A request is read from the door that owns it: a student's own list needs no names on its rows, and the teacher's list of requests is a separate shape that adds the student back, because that is the fact they are asking about.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": "Named rather than id-only, because the list a student reads is one row per course and a screen that had to look the title up per row would be doing the join the query already has."
+              },
+              {
+                "name": "type",
+                "optional": false,
+                "type": "BookingTypeCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "BookingStatusCode",
+                "note": ""
+              },
+              {
+                "name": "live",
+                "optional": false,
+                "type": "LiveClassDoor | null",
+                "note": "The hours this class can be entered, or null when there is no door to open: an unconfirmed request has no room, and a cancelled or expired one has no class. Not a URL, on purpose."
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LiveClassDoor",
+            "note": "The span a live class can be entered: the door a few minutes before the first minute, and a grace after the last. Only the window travels. A Jitsi room has no password — its name is the lock — so the address is handed out by the join endpoint, to one person who has just been checked, rather than riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads this to decide whether to draw a door at all and when to say \"it opens at 09:25\"; it gets the key by asking.",
+            "fields": [
+              {
+                "name": "opensAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "closesAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "BookingsController",
@@ -789,6 +1502,92 @@
             "optional": false,
             "type": "Booking",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Booking",
+            "note": "A class a student has asked for. `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a calendar square has to say when the class is over, and making three portals add sixty minutes in three slightly different ways is how a lesson ends up finishing at two times. There is no student on it and no teacher either. A request is read from the door that owns it: a student's own list needs no names on its rows, and the teacher's list of requests is a separate shape that adds the student back, because that is the fact they are asking about.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": "Named rather than id-only, because the list a student reads is one row per course and a screen that had to look the title up per row would be doing the join the query already has."
+              },
+              {
+                "name": "type",
+                "optional": false,
+                "type": "BookingTypeCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "BookingStatusCode",
+                "note": ""
+              },
+              {
+                "name": "live",
+                "optional": false,
+                "type": "LiveClassDoor | null",
+                "note": "The hours this class can be entered, or null when there is no door to open: an unconfirmed request has no room, and a cancelled or expired one has no class. Not a URL, on purpose."
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LiveClassDoor",
+            "note": "The span a live class can be entered: the door a few minutes before the first minute, and a grace after the last. Only the window travels. A Jitsi room has no password — its name is the lock — so the address is handed out by the join endpoint, to one person who has just been checked, rather than riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads this to decide whether to draw a door at all and when to say \"it opens at 09:25\"; it gets the key by asking.",
+            "fields": [
+              {
+                "name": "opensAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "closesAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -823,6 +1622,92 @@
             "type": "Booking",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Booking",
+            "note": "A class a student has asked for. `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a calendar square has to say when the class is over, and making three portals add sixty minutes in three slightly different ways is how a lesson ends up finishing at two times. There is no student on it and no teacher either. A request is read from the door that owns it: a student's own list needs no names on its rows, and the teacher's list of requests is a separate shape that adds the student back, because that is the fact they are asking about.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": "Named rather than id-only, because the list a student reads is one row per course and a screen that had to look the title up per row would be doing the join the query already has."
+              },
+              {
+                "name": "type",
+                "optional": false,
+                "type": "BookingTypeCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "BookingStatusCode",
+                "note": ""
+              },
+              {
+                "name": "live",
+                "optional": false,
+                "type": "LiveClassDoor | null",
+                "note": "The hours this class can be entered, or null when there is no door to open: an unconfirmed request has no room, and a cancelled or expired one has no class. Not a URL, on purpose."
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LiveClassDoor",
+            "note": "The span a live class can be entered: the door a few minutes before the first minute, and a grace after the last. Only the window travels. A Jitsi room has no password — its name is the lock — so the address is handed out by the join endpoint, to one person who has just been checked, rather than riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads this to decide whether to draw a door at all and when to say \"it opens at 09:25\"; it gets the key by asking.",
+            "fields": [
+              {
+                "name": "opensAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "closesAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "BookingsController",
@@ -856,6 +1741,92 @@
             "type": "Booking",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Booking",
+            "note": "A class a student has asked for. `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a calendar square has to say when the class is over, and making three portals add sixty minutes in three slightly different ways is how a lesson ends up finishing at two times. There is no student on it and no teacher either. A request is read from the door that owns it: a student's own list needs no names on its rows, and the teacher's list of requests is a separate shape that adds the student back, because that is the fact they are asking about.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": "Named rather than id-only, because the list a student reads is one row per course and a screen that had to look the title up per row would be doing the join the query already has."
+              },
+              {
+                "name": "type",
+                "optional": false,
+                "type": "BookingTypeCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "BookingStatusCode",
+                "note": ""
+              },
+              {
+                "name": "live",
+                "optional": false,
+                "type": "LiveClassDoor | null",
+                "note": "The hours this class can be entered, or null when there is no door to open: an unconfirmed request has no room, and a cancelled or expired one has no class. Not a URL, on purpose."
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LiveClassDoor",
+            "note": "The span a live class can be entered: the door a few minutes before the first minute, and a grace after the last. Only the window travels. A Jitsi room has no password — its name is the lock — so the address is handed out by the join endpoint, to one person who has just been checked, rather than riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads this to decide whether to draw a door at all and when to say \"it opens at 09:25\"; it gets the key by asking.",
+            "fields": [
+              {
+                "name": "opensAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "closesAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "BookingsController",
@@ -886,6 +1857,20 @@
             "optional": false,
             "type": "BookingRoom",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "BookingRoom",
+            "note": "What the join endpoint hands to a person it has just checked: the address, and nothing else. No room name, no window, no id — a portal that asked has already been told which class this is, and every extra field on this response is another copy of a secret whose only lock is being hard to guess. This is the shape the booking list deliberately does not carry.",
+            "fields": [
+              {
+                "name": "url",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -918,6 +1903,20 @@
             "type": "BookingRequest[]",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "BookingRequest",
+            "note": "A booking as the teacher reads it: the same class, plus the person asking. The name is the whole difference between this and `Booking`. A student deciding whether to keep a class is reading their own calendar; a teacher deciding whether they can teach Thursday evening is deciding about somebody, and a list of uuids would send them off to another screen to find out who. It comes from the account rather than from a student-profile table because that is the name the platform already shows a teacher, and it is stored on the booking's student rather than copied onto the row — a person who changes their name is not a class that changed. Both teacher reads carry it. The queue of requests is the obvious one, and the class list is the same fact a day later: six o'clock is somebody's lesson whether or not the answer to it is still unwritten.",
+            "fields": [
+              {
+                "name": "student",
+                "optional": false,
+                "type": "{ id: string; displayName: string }",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "BookingsController",
@@ -948,6 +1947,20 @@
             "optional": false,
             "type": "BookingRequest[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "BookingRequest",
+            "note": "A booking as the teacher reads it: the same class, plus the person asking. The name is the whole difference between this and `Booking`. A student deciding whether to keep a class is reading their own calendar; a teacher deciding whether they can teach Thursday evening is deciding about somebody, and a list of uuids would send them off to another screen to find out who. It comes from the account rather than from a student-profile table because that is the name the platform already shows a teacher, and it is stored on the booking's student rather than copied onto the row — a person who changes their name is not a class that changed. Both teacher reads carry it. The queue of requests is the obvious one, and the class list is the same fact a day later: six o'clock is somebody's lesson whether or not the answer to it is still unwritten.",
+            "fields": [
+              {
+                "name": "student",
+                "optional": false,
+                "type": "{ id: string; displayName: string }",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -997,7 +2010,7 @@
             "name": "teacher",
             "optional": false,
             "type": "{ id: string; timezone: string }",
-            "note": ""
+            "note": "The grid is cut in the teacher's clock, so a student is told whose time they are reading."
           },
           {
             "name": "entitlement",
@@ -1015,7 +2028,7 @@
             "name": "from",
             "optional": false,
             "type": "string",
-            "note": ""
+            "note": "The range searched. A student who reloads an hour later gets a different list, and the two bounds say which slice of the week this one is rather than pretending it is fixed."
           },
           {
             "name": "to",
@@ -1028,6 +2041,26 @@
             "optional": false,
             "type": "OpenSlot[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "OpenSlot",
+            "note": "One class a student could take. Instants are UTC; the zone they read in is on the response.",
+            "fields": [
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1122,6 +2155,122 @@
             "type": "number",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "CatalogCourse",
+            "note": "One course, as it sits in a list.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "teacher",
+                "optional": false,
+                "type": "CatalogTeacher",
+                "note": ""
+              },
+              {
+                "name": "moduleCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "lessonCount",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "What the teacher quotes, or `null` because they have not said. A price is a statement made to whoever walks past, so it rides on the public shelf with no session asked for."
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogTeacher",
+            "note": "Who wrote the course, as little of them as a browsing student needs.",
+            "fields": [
+              {
+                "name": "displayName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CatalogController",
@@ -1152,6 +2301,206 @@
             "optional": false,
             "type": "CatalogCourseDetail",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CatalogCourseDetail",
+            "note": "One course as its own page: the card's fields plus the description and the syllabus. The counts a card carries are not repeated here — the syllabus is on the page, so a client that wanted a number could count it.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "teacher",
+                "optional": false,
+                "type": "CatalogTeacher",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "The card's figure and nothing new: the page a student decides on shows the number the shelf showed them."
+              },
+              {
+                "name": "modules",
+                "optional": false,
+                "type": "CatalogModule[]",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogTeacher",
+            "note": "Who wrote the course, as little of them as a browsing student needs.",
+            "fields": [
+              {
+                "name": "displayName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogModule",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "lessons",
+                "optional": false,
+                "type": "CatalogLesson[]",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogLesson",
+            "note": "A page a student may read, named but not opened. Two flags, because they answer different questions: `isFreePreview` is the teacher's statement about the page — worth a badge, and true whether or not anybody is signed in — while `isReadable` is about the reader, and says the endpoint below will hand this row's body over to *them*. For a stranger the two agree; a student holding a place reads every published page of the course either way.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "isReadable",
+                "optional": false,
+                "type": "boolean",
+                "note": "The link rule. Every row on a syllabus is published already, so this is only ever about the door, never about the wall behind it."
+              }
+            ]
           }
         ]
       },
@@ -1185,6 +2534,140 @@
             "type": "CatalogLessonPage",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "CatalogLessonPage",
+            "note": "One page of a published course, opened. Two things let that happen: the teacher marked it free to read, or the caller holds a place in the course. `isFreePreview` says which — and it is `false` for a page that opened because of who asked, because the flag is the teacher's statement about the page, not a description of why the reader got in.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": ""
+              },
+              {
+                "name": "video",
+                "optional": false,
+                "type": "CatalogLessonVideo | null",
+                "note": "The recording, or `null` because there is none — which is the ordinary case, not an error. It is on the page rather than left to be discovered by trying the video route because a screen has to know whether to offer a player *before* it asks for a file: a student told \"no recording\" by a 404 cannot tell that from a door that closed on them mid-read."
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "module",
+                "optional": false,
+                "type": "CatalogLessonModule",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "CatalogLessonCourse",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogLessonVideo",
+            "note": "What a page says about the file standing on it: enough for a reader to decide to draw a player, and nothing that could be turned into an address. The bytes themselves have no URL on this platform (ARCHITECTURE §6), so the two facts a screen can honestly use are what the teacher called the file and how long it is.",
+            "fields": [
+              {
+                "name": "displayName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "bytes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogLessonModule",
+            "note": "The two places a free page hangs from, sent with it because a reader who arrived here from a link has no syllabus on screen and needs both to go back.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CatalogLessonCourse",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CatalogController",
@@ -1210,7 +2693,8 @@
         "kind": "stream",
         "declared": "none",
         "note": "",
-        "fields": []
+        "fields": [],
+        "types": []
       },
       "controller": "CatalogController",
       "handler": "video"
@@ -1238,6 +2722,26 @@
             "optional": false,
             "type": "CourseChoice[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1281,6 +2785,116 @@
             "optional": false,
             "type": "Course[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1377,6 +2991,116 @@
             "type": "Course",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CoursesController",
@@ -1409,6 +3133,62 @@
             "optional": false,
             "type": "CourseModule[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseModule",
+            "note": "The syllabus wire contract: one ordered block inside a course. There is no `position` in an input, in either direction. Order is the API's to assign — a client allowed to name a slot could put two modules in it, and a drag-and-drop portal would be keeping the arithmetic that the unique index exists to do. What a writer sends is a title and optionally two paragraphs; what comes back is where it landed.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1476,6 +3256,62 @@
             "optional": false,
             "type": "CourseModule",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseModule",
+            "note": "The syllabus wire contract: one ordered block inside a course. There is no `position` in an input, in either direction. Order is the API's to assign — a client allowed to name a slot could put two modules in it, and a drag-and-drop portal would be keeping the arithmetic that the unique index exists to do. What a writer sends is a title and optionally two paragraphs; what comes back is where it landed.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1545,6 +3381,62 @@
             "type": "CourseModule",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "CourseModule",
+            "note": "The syllabus wire contract: one ordered block inside a course. There is no `position` in an input, in either direction. Order is the API's to assign — a client allowed to name a slot could put two modules in it, and a drag-and-drop portal would be keeping the arithmetic that the unique index exists to do. What a writer sends is a title and optionally two paragraphs; what comes back is where it landed.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CourseModulesController",
@@ -1578,6 +3470,62 @@
             "optional": false,
             "type": "CourseModule",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseModule",
+            "note": "The syllabus wire contract: one ordered block inside a course. There is no `position` in an input, in either direction. Order is the API's to assign — a client allowed to name a slot could put two modules in it, and a drag-and-drop portal would be keeping the arithmetic that the unique index exists to do. What a writer sends is a title and optionally two paragraphs; what comes back is where it landed.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1626,6 +3574,62 @@
             "optional": false,
             "type": "CourseModule[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseModule",
+            "note": "The syllabus wire contract: one ordered block inside a course. There is no `position` in an input, in either direction. Order is the API's to assign — a client allowed to name a slot could put two modules in it, and a drag-and-drop portal would be keeping the arithmetic that the unique index exists to do. What a writer sends is a title and optionally two paragraphs; what comes back is where it landed.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "courseId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1700,7 +3704,45 @@
             "name": "total",
             "optional": false,
             "type": "number",
-            "note": ""
+            "note": "Every open place in the course, not the ones on this page."
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseRosterEntry",
+            "note": "One open place in a course. There is no enrollment id: a teacher reads this list and does not act on rows in it. Leaving is the student's decision, so giving the roster a primary key would be an invitation to build the route that removes somebody's place for them.",
+            "fields": [
+              {
+                "name": "student",
+                "optional": false,
+                "type": "RosterStudent",
+                "note": ""
+              },
+              {
+                "name": "enrolledAt",
+                "optional": false,
+                "type": "string",
+                "note": "The day the place was first taken, which is not the day a student who left came back."
+              }
+            ]
+          },
+          {
+            "name": "RosterStudent",
+            "note": "A student as a teacher's roster shows them: the name and the id the pair is keyed by. No email address. A roster answers \"who is coming to class\", and an address is the field a list like this gains by convenience and never drops — the student id is here because two people can share a name and the screen needs one of them to be a key.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1734,6 +3776,116 @@
             "optional": false,
             "type": "Course",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1832,6 +3984,116 @@
             "type": "Course",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CoursesController",
@@ -1864,6 +4126,116 @@
             "optional": false,
             "type": "Course",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -1909,6 +4281,116 @@
             "type": "Course",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CoursesController",
@@ -1942,6 +4424,116 @@
             "type": "Course",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CoursesController",
@@ -1972,6 +4564,26 @@
             "optional": false,
             "type": "CourseChoice[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2004,6 +4616,26 @@
             "type": "CourseChoice[]",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "CoursesController",
@@ -2034,6 +4666,68 @@
             "optional": false,
             "type": "Enrollment[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Enrollment",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "EnrollmentCourse",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel."
+              },
+              {
+                "name": "enrolledAt",
+                "optional": false,
+                "type": "string",
+                "note": "When the place was first taken. Returning after leaving does not move it."
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "EnrollmentCourse",
+            "note": "The course a place is in, in the three fields a student needs to recognise it.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2078,6 +4772,68 @@
             "type": "Enrollment",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Enrollment",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "EnrollmentCourse",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel."
+              },
+              {
+                "name": "enrolledAt",
+                "optional": false,
+                "type": "string",
+                "note": "When the place was first taken. Returning after leaving does not move it."
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "EnrollmentCourse",
+            "note": "The course a place is in, in the three fields a student needs to recognise it.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "EnrollmentsController",
@@ -2111,6 +4867,68 @@
             "type": "Enrollment",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Enrollment",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "EnrollmentCourse",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel."
+              },
+              {
+                "name": "enrolledAt",
+                "optional": false,
+                "type": "string",
+                "note": "When the place was first taken. Returning after leaving does not move it."
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "EnrollmentCourse",
+            "note": "The course a place is in, in the three fields a student needs to recognise it.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "EnrollmentsController",
@@ -2132,7 +4950,7 @@
       "response": {
         "kind": "json",
         "declared": "HealthResponse",
-        "note": "Whether the API is up and whether its database is, with the version that answered. Named rather than left inferred: the docs site publishes the shape of every route's answer, and it can only do that for a handler that states one.",
+        "note": "Whether the API is up and whether its database is, with the version that answered. A deployment gate reads `database` rather than `status`: the process being alive says nothing about whether it can reach the rows it serves.",
         "fields": [
           {
             "name": "status",
@@ -2164,7 +4982,8 @@
             "type": "string",
             "note": ""
           }
-        ]
+        ],
+        "types": []
       },
       "controller": "HealthController",
       "handler": "check"
@@ -2196,6 +5015,92 @@
             "optional": false,
             "type": "Lesson[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2264,6 +5169,92 @@
             "optional": false,
             "type": "Lesson",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2354,6 +5345,92 @@
             "type": "Lesson",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "LessonsController",
@@ -2387,6 +5464,92 @@
             "optional": false,
             "type": "Lesson",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2422,6 +5585,92 @@
             "type": "Lesson",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "LessonsController",
@@ -2455,6 +5704,92 @@
             "optional": false,
             "type": "Lesson",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2490,6 +5825,56 @@
             "type": "LessonAsset | null",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "LessonAsset",
+            "note": "The wire contract for a recording a teacher attached to a lesson. What is deliberately not here is where the bytes live. `storedKey` stays in the database: a client that knew it would be looking for a URL to fetch it from, and this design has none — every read of a recording goes through a route that resolved the row, and therefore the person, first (ARCHITECTURE §6). The same reason the payload carries `bytes` but no stream: it is a description of a file, not access to one.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "lessonId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "displayName",
+                "optional": false,
+                "type": "string",
+                "note": "The filename as the teacher sent it, kept for their own page. Display text only — it never chooses a path, and it is allowed to be a duplicate or to make sense to nobody else."
+              },
+              {
+                "name": "contentType",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "bytes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "LessonAssetsController",
@@ -2524,6 +5909,56 @@
             "type": "LessonAsset",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "LessonAsset",
+            "note": "The wire contract for a recording a teacher attached to a lesson. What is deliberately not here is where the bytes live. `storedKey` stays in the database: a client that knew it would be looking for a URL to fetch it from, and this design has none — every read of a recording goes through a route that resolved the row, and therefore the person, first (ARCHITECTURE §6). The same reason the payload carries `bytes` but no stream: it is a description of a file, not access to one.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "lessonId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "displayName",
+                "optional": false,
+                "type": "string",
+                "note": "The filename as the teacher sent it, kept for their own page. Display text only — it never chooses a path, and it is allowed to be a duplicate or to make sense to nobody else."
+              },
+              {
+                "name": "contentType",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "bytes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "LessonAssetsController",
@@ -2551,7 +5986,8 @@
         "kind": "stream",
         "declared": "none",
         "note": "",
-        "fields": []
+        "fields": [],
+        "types": []
       },
       "controller": "LessonAssetsController",
       "handler": "play"
@@ -2598,6 +6034,92 @@
             "optional": false,
             "type": "Lesson[]",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Lesson",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "moduleId",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "body",
+                "optional": false,
+                "type": "string | null",
+                "note": "The page as the teacher wrote it. Markdown is stored unsentenced and rendered by whichever client shows it; the API only ever promises the characters."
+              },
+              {
+                "name": "estimatedMinutes",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "isFreePreview",
+                "optional": false,
+                "type": "boolean",
+                "note": "The teacher's \"read this one without enrolling\". It is a flag on the page, not a door: the catalog only honours it on a published lesson inside a published course, so a draft can carry the intention without leaking anything."
+              },
+              {
+                "name": "position",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "LessonChoice",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LessonChoice",
+            "note": "A reference row as it travels: the code for machines, the label so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2698,6 +6220,80 @@
             "type": "number",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "OutboxEntry",
+            "note": "One row of the queue, as the ops screen reads it. What is deliberately absent is the letter. `payload` holds the answers a template asks for and the one page its button goes to, none of which helps with the only question this screen is for — has this been sent, and if not, why not — and a route that exposed the column would become the place senders put whatever they had to hand. The recipient's address is absent for the reason 6c gave for the column that is not there: the queue names a person so that no copy of an address can outlive the correction they make to it, and a read that resolved the id into an email on the way out would have undone that choice from the other end.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "eventCode",
+                "optional": false,
+                "type": "MailEventCode",
+                "note": ""
+              },
+              {
+                "name": "eventLabel",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "MailOutboxStatusCode",
+                "note": ""
+              },
+              {
+                "name": "statusLabel",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "attempts",
+                "optional": false,
+                "type": "number",
+                "note": "Times the transport has been asked, as the claim left it — so a screen can say \"out of tries\" by comparing this against the curve rather than by guessing from the status."
+              },
+              {
+                "name": "nextAttemptAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "sentAt",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "failureReason",
+                "optional": false,
+                "type": "string | null",
+                "note": "The transport's own short code from the last refusal (`EAUTH`, `smtp 550`), never its message."
+              },
+              {
+                "name": "recipient",
+                "optional": false,
+                "type": "{ id: string; fullName: string }",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "OutboxController",
@@ -2728,6 +6324,56 @@
             "optional": false,
             "type": "TeacherProfileDocument | null",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "TeacherProfileDocument",
+            "note": "",
+            "fields": [
+              {
+                "name": "headline",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "bio",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "subjects",
+                "optional": false,
+                "type": "{ code: string; label: string }[]",
+                "note": ""
+              },
+              {
+                "name": "timezone",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "hourlyRateMinorUnits",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2829,6 +6475,56 @@
             "optional": false,
             "type": "TeacherProfileDocument",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "TeacherProfileDocument",
+            "note": "",
+            "fields": [
+              {
+                "name": "headline",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "bio",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "subjects",
+                "optional": false,
+                "type": "{ code: string; label: string }[]",
+                "note": ""
+              },
+              {
+                "name": "timezone",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "hourlyRateMinorUnits",
+                "optional": false,
+                "type": "number | null",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -2941,6 +6637,68 @@
             "type": "number",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "OpsAccount",
+            "note": "An account as the platform's own operators see it. This is the one read in the system that may name a person by their email address, and the permission is the reason: an operator searching for an account is searching by the address they were given, and the row they land on is the account itself. The ledger made the opposite choice in §18 for a different table — a log row outlives the correction someone makes to their address and the deletion they ask for, so it carries a name and an id and no address. Nothing here copies that record forward either: these are today's columns, read from `users`, and a history of how they got there is `/actions` with the account as its actor or its target. The labels come from the lookup rows rather than from this file. `roleCode` is the word a machine switches on and `roleLabel` is what Ops reads, which is the whole arrangement of the lookup tables: an operator can rename \"Operations\" to \"Support\" on a screen and this response follows it without a release.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "email",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "fullName",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "roleCode",
+                "optional": false,
+                "type": "RoleCode",
+                "note": ""
+              },
+              {
+                "name": "roleLabel",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "statusCode",
+                "optional": false,
+                "type": "AccountStatusCode",
+                "note": ""
+              },
+              {
+                "name": "statusLabel",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "lastLoginAt",
+                "optional": false,
+                "type": "string | null",
+                "note": "When they last got in, which is the answer to \"is this account actually alive\" and the reason a disabled one is worth arguing about."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "AccountsController",
@@ -2973,6 +6731,56 @@
             "optional": false,
             "type": "OpsAccountDetail",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "OpsAccountDetail",
+            "note": "",
+            "fields": [
+              {
+                "name": "counts",
+                "optional": false,
+                "type": "OpsAccountCounts",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "OpsAccountCounts",
+            "note": "What an account is holding, read off the rows that point at it. These five numbers are the reason a detail route exists beside the list: an operator about to disable an account is deciding what goes quiet, and a list row cannot carry a count without reading the whole table. `activeSessions` is the number that says how many signed-in devices the status change will refuse on their next request — the refusal is the guard's, not a retirement of the session rows, and the difference is §18's: nothing here deletes anything.",
+            "fields": [
+              {
+                "name": "courses",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "enrollments",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "bookingsAsStudent",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "bookingsAsTeacher",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "activeSessions",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              }
+            ]
           }
         ]
       },
@@ -3022,6 +6830,56 @@
             "type": "OpsAccountDetail",
             "note": ""
           }
+        ],
+        "types": [
+          {
+            "name": "OpsAccountDetail",
+            "note": "",
+            "fields": [
+              {
+                "name": "counts",
+                "optional": false,
+                "type": "OpsAccountCounts",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "OpsAccountCounts",
+            "note": "What an account is holding, read off the rows that point at it. These five numbers are the reason a detail route exists beside the list: an operator about to disable an account is deciding what goes quiet, and a list row cannot carry a count without reading the whole table. `activeSessions` is the number that says how many signed-in devices the status change will refuse on their next request — the refusal is the guard's, not a retirement of the session rows, and the difference is §18's: nothing here deletes anything.",
+            "fields": [
+              {
+                "name": "courses",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "enrollments",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "bookingsAsStudent",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "bookingsAsTeacher",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "activeSessions",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              }
+            ]
+          }
         ]
       },
       "controller": "AccountsController",
@@ -3068,6 +6926,56 @@
             "optional": false,
             "type": "OpsAccountDetail",
             "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "OpsAccountDetail",
+            "note": "",
+            "fields": [
+              {
+                "name": "counts",
+                "optional": false,
+                "type": "OpsAccountCounts",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "OpsAccountCounts",
+            "note": "What an account is holding, read off the rows that point at it. These five numbers are the reason a detail route exists beside the list: an operator about to disable an account is deciding what goes quiet, and a list row cannot carry a count without reading the whole table. `activeSessions` is the number that says how many signed-in devices the status change will refuse on their next request — the refusal is the guard's, not a retirement of the session rows, and the difference is §18's: nothing here deletes anything.",
+            "fields": [
+              {
+                "name": "courses",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "enrollments",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "bookingsAsStudent",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "bookingsAsTeacher",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "activeSessions",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              }
+            ]
           }
         ]
       },

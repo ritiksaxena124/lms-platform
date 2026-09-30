@@ -21,8 +21,8 @@ const APP_VERSION: string = (() => {
 /**
  * Whether the API is up and whether its database is, with the version that answered.
  *
- * Named rather than left inferred: the docs site publishes the shape of every route's answer, and
- * it can only do that for a handler that states one.
+ * A deployment gate reads `database` rather than `status`: the process being alive says nothing
+ * about whether it can reach the rows it serves.
  */
 interface HealthResponse {
   status: 'ok' | 'degraded';
