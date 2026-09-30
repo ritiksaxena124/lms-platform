@@ -88,7 +88,7 @@ export function EmailWordmark() {
             fontFamily: FONT,
           }}
         >
-          LMS
+          Hourloom
         </td>
       </tr>
     </table>

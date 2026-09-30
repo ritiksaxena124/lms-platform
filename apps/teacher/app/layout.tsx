@@ -10,8 +10,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Teacher · LMS',
-    template: '%s · Teacher · LMS',
+    default: 'Teacher · Hourloom',
+    template: '%s · Teacher · Hourloom',
   },
   description: 'Your courses, bookings and schedule in one place.',
 };

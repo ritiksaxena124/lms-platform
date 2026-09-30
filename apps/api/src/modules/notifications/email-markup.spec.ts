@@ -87,7 +87,7 @@ describe('the rendered document is one a mail client will open', () => {
   });
 
   it('says who the message is from, in words rather than in a logo', () => {
-    expect(html).toContain('LMS');
+    expect(html).toContain('Hourloom');
   });
 
   it('leaves nothing behind that asks the reader to run JavaScript', () => {

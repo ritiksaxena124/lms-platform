@@ -66,10 +66,10 @@ export default function Home() {
             The class you teach is the shop you keep
           </h1>
           <p className="mt-5 max-w-reading text-h3 leading-relaxed text-ink-muted">
-            A marketplace for 1:1 and small-group classes with independent teachers. A teacher
-            writes the course and opens the week they teach; a learner reads it, takes a place, and
-            asks for a minute of that time. What both of them get is the part a calendar and a group
-            call never handled — the asking, the answering, the room, and the record.
+            Hourloom runs 1:1 and small-group classes with independent teachers. A teacher writes
+            the course and opens the week they teach; a learner reads it, takes a place, and asks
+            for a minute of that time. What both of them get is the part a calendar and a group call
+            never handled — the asking, the answering, the room, and the record.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -180,7 +180,7 @@ export default function Home() {
 
       <footer className="border-t border-line bg-surface">
         <div className="mx-auto flex max-w-page flex-wrap items-baseline gap-x-8 gap-y-3 px-5 py-8 lg:px-8">
-          <span className="text-label font-semibold text-ink-strong">Teacher Marketplace</span>
+          <span className="text-label font-semibold text-ink-strong">Hourloom</span>
           <span className="text-label text-ink-faint">
             A working proof: one API, three portals, one component library, one database.
           </span>

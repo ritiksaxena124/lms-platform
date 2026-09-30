@@ -2,6 +2,7 @@
   "name": "@lms/teacher",
   "version": "0.0.0",
   "private": true,
+  "description": "Hourloom's teacher portal — author a course, open the week, answer requests, run the class.",
   "scripts": {
     "dev": "next dev -p 3000",
     "build": "next build",

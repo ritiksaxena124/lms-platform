@@ -76,7 +76,7 @@ const LINE_BREAK = /[\r\n]/;
  * are reached from the portal, and a link that outlives the news it describes is a link to a
  * moment that has passed. */
 const FOOTER_NOTE =
-  'You are getting this because you have an account on LMS. Every page this message points at asks who is calling before it shows anything.';
+  'You are getting this because you have an account on Hourloom. Every page this message points at asks who is calling before it shows anything.';
 
 export interface RenderEmailInput {
   template: EmailTemplateCopy;

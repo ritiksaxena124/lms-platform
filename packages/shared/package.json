@@ -2,6 +2,7 @@
   "name": "@lms/shared",
   "version": "0.0.0",
   "private": true,
+  "description": "Hourloom's shared vocabulary: failure codes, money in integer minor units, IANA timezones and the lookup codes every workspace reads.",
   "type": "commonjs",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

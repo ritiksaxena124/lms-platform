@@ -59,7 +59,7 @@ describe('the site header', () => {
 
     // Below `sm` the words are hidden and only the dot is painted, so the name lives in the label
     // rather than in text a media query can switch off.
-    expect(screen.getByRole('link', { name: 'Teacher Marketplace' })).toHaveAttribute('href', '/');
+    expect(screen.getByRole('link', { name: 'Hourloom' })).toHaveAttribute('href', '/');
   });
 
   it('does not mention the operator, its queue, or its ledger', () => {

@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "lms",
+      "name": "hourloom",
       "devDependencies": {
         "@eslint/js": "^9.35.0",
         "eslint": "^9.35.0",

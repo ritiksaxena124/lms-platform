@@ -70,7 +70,7 @@ jobs:
       - name: Generate the Prisma client
         run: bun run --filter @lms/api db:generate
 
-      # build:shared -> typecheck -> lint -> test, in that order, across all six packages. The
+      # build:shared -> typecheck -> lint -> test, in that order, across all seven packages. The
       # API suite migrates lms_test itself on first contact, so no separate migrate step.
       - name: Verify
         run: bun run verify

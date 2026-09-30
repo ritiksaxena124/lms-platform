@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
-  "description": "Design tokens, primitives and motion shared by the teacher, student and ops portals.",
+  "description": "Hourloom's design tokens, primitives and motion, shared by the teacher, student and ops portals and the public site.",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "exports": {

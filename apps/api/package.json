@@ -2,6 +2,7 @@
   "name": "@lms/api",
   "version": "0.0.0",
   "private": true,
+  "description": "Hourloom's API — the only writer to the database, and the route table the docs are generated from.",
   "type": "commonjs",
   "scripts": {
     "predev": "bun run --filter @lms/shared build",

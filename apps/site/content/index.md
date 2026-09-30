@@ -1,9 +1,9 @@
 # What this is
 
-A marketplace for one-to-one and small-group classes with independent teachers. A teacher writes the
-course and opens the week they teach; a learner reads it, takes a place, and asks for a minute of that
-teacher's time. The software's job is the part a calendar and a group call never handled: the asking,
-the answering, the room, and the record.
+Hourloom is where one-to-one and small-group classes with independent teachers get taught, booked and
+kept. A teacher writes the course and opens the week they teach; a learner reads it, takes a place, and
+asks for a minute of that teacher's time. The software's job is the part a calendar and a group call
+never handled: the asking, the answering, the room, and the record.
 
 These pages describe the system that is actually built. Where something is a plan rather than a
 running screen, it says so.

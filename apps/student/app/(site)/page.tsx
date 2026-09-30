@@ -16,7 +16,7 @@ export default function ShelfPage() {
       <section className="overflow-hidden rounded-card border border-brand-line bg-brand-wash">
         <div className="flex flex-wrap items-end gap-6 px-6 py-9 sm:px-8 sm:py-11">
           <div className="min-w-[18rem] max-w-[44rem] flex-1">
-            <p className="eyebrow text-brand-deep">Teacher marketplace</p>
+            <p className="eyebrow text-brand-deep">Courses by independent teachers</p>
             <h1 className="mt-2 text-h1 text-ink-strong">
               Read the whole syllabus before you commit an evening
             </h1>

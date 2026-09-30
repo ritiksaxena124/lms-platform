@@ -10,8 +10,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Ops · LMS',
-    template: '%s · Ops · LMS',
+    default: 'Ops · Hourloom',
+    template: '%s · Ops · Hourloom',
   },
   description: 'The accounts, the ledger and the notification queue for this platform.',
 };

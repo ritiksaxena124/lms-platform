@@ -7,11 +7,11 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Teacher Marketplace — 1:1 classes with independent teachers',
-    template: '%s · Teacher Marketplace',
+    default: 'Hourloom — 1:1 and small-group classes with independent teachers',
+    template: '%s · Hourloom',
   },
   description:
-    'A marketplace for one-to-one and small-group classes. Teachers write the course and open the week they teach; learners read it, take a place, and book a minute of the teacher’s time.',
+    'Hourloom runs one-to-one and small-group classes with independent teachers. Teachers write the course and open the week they teach; learners read it, take a place, and book a minute of the teacher’s time.',
 };
 
 export const viewport: Viewport = {

@@ -1,6 +1,7 @@
 {
-  "name": "lms",
+  "name": "hourloom",
   "private": true,
+  "description": "Hourloom — one NestJS API, three portals, a public site and its docs, and the shared packages they are built from.",
   "workspaces": [
     "apps/*",
     "packages/*"

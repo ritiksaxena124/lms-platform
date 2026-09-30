@@ -9,7 +9,7 @@ import { SmtpMail } from './smtp-mail.adapter';
 
 const SMTP = {
   SMTP_URL: 'smtp://user:pass@mail.internal.example:587',
-  MAIL_FROM: 'LMS <no-reply@localtest.me>',
+  MAIL_FROM: 'Hourloom <no-reply@localtest.me>',
 };
 
 /**

@@ -23,7 +23,7 @@ export function SiteHeader({ portals }: { portals: PortalUrls }) {
           className="flex items-baseline gap-2 whitespace-nowrap text-h2 text-ink-strong"
         >
           <span aria-hidden="true" className="inline-block size-2 rounded-pill bg-ember" />
-          Teacher Marketplace
+          Hourloom
         </Link>
 
         <nav

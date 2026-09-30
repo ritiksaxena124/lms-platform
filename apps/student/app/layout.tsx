@@ -10,8 +10,8 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'Learn · LMS',
-    template: '%s · Learn · LMS',
+    default: 'Learn · Hourloom',
+    template: '%s · Learn · Hourloom',
   },
   description: 'Browse the courses teachers have published, and see exactly what you would be reading.',
 };

@@ -2,6 +2,7 @@
   "name": "@lms/site",
   "version": "0.0.0",
   "private": true,
+  "description": "Hourloom's public face and docs — a static export generated from what the code already says.",
   "scripts": {
     "dev": "next dev -p 3003",
     "build": "next build",

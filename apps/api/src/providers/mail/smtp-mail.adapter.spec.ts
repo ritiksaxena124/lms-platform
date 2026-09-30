@@ -4,7 +4,7 @@ import { SmtpMail } from './smtp-mail.adapter';
 import { MailDeliveryError, type MailMessage, UnsafeMailMessageError } from './mail.port';
 
 const URL = 'smtp://user:pass@mail.internal.example:587';
-const FROM = 'LMS <no-reply@localtest.me>';
+const FROM = 'Hourloom <no-reply@localtest.me>';
 
 const message: MailMessage = {
   event: 'booking_requested',
