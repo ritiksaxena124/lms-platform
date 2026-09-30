@@ -488,11 +488,14 @@ where it does because of what has to exist before its shape stops moving. 13 was
   published from what the code already says rather than restated into a second copy that drifts.
 - **Phase 13 — the API, explained.** Phase 12 shipped the route table: every path, its access rule and its
   success status, reflected out of the module graph. A table tells a new caller where to knock, not what
-  happens when they do. This phase gives every endpoint a page of its own kind — what it is for, what its
-  body and query fields mean and what the validator refuses, what a successful answer holds, and which
-  conflicts and gates it can hit. The fields come out of the same reflection as the table (the DTOs already
-  carry the sentence each rule tells a 400), and the prose is written by hand, with a guard that turns the
-  build red if a route has no explanation or an explanation has no route.
+  happens when they do. This phase gives every endpoint a section of its own kind — what it is for, what its
+  body and query fields mean and what the validator refuses, and what a successful answer holds. Both halves
+  of that contract are already in code: the request is read off the same DTO decorators the validation pipe
+  checks, in the words each rule tells a `400`, and the answer off the type the handler declares and the
+  `@lms/shared` interfaces behind it. An exporter that cannot name a field or a route's return type throws
+  rather than printing a page that goes quiet about it. The prose between those two — what a route is for,
+  which gates it sits behind, which conflicts it answers with — is written by hand, with a guard that turns
+  the build red if a route has no explanation or an explanation has no route.
 
 **Phases 0 through 8 are closed.** The first four are the ground the product stands on —
 ARCHITECTURE.md carries the reasoning behind each (§6–§14). Phase 5 went one brick at a time, and so

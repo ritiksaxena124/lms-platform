@@ -163,6 +163,37 @@
         ],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "ActionListResponse",
+        "note": "A page of the log, newest first. `total` counts everything the filters matched, not the rows on this page, which is what lets a screen say \"412 sign-ins\" rather than \"25\".",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "ActionLogEntry[]",
+            "note": ""
+          },
+          {
+            "name": "page",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "pageSize",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "total",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
+      },
       "controller": "ActionLogController",
       "handler": "list"
     },
@@ -202,6 +233,37 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "AuthSessionResponse",
+        "note": "What `/auth/login` and `/auth/refresh` answer with. The refresh token is absent on purpose: it travels only as an `HttpOnly` cookie, so no portal can accidentally keep it in a JavaScript-reachable place.",
+        "fields": [
+          {
+            "name": "user",
+            "optional": false,
+            "type": "AuthUser",
+            "note": ""
+          },
+          {
+            "name": "accessToken",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "tokenType",
+            "optional": false,
+            "type": "'Bearer'",
+            "note": ""
+          },
+          {
+            "name": "expiresIn",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AuthController",
       "handler": "login"
     },
@@ -217,6 +279,12 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "none",
+        "declared": "none",
+        "note": "",
+        "fields": []
       },
       "controller": "AuthController",
       "handler": "logout"
@@ -234,6 +302,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "AuthUserResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "user",
+            "optional": false,
+            "type": "AuthUser",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AuthController",
       "handler": "me"
     },
@@ -249,6 +330,37 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "AuthSessionResponse",
+        "note": "What `/auth/login` and `/auth/refresh` answer with. The refresh token is absent on purpose: it travels only as an `HttpOnly` cookie, so no portal can accidentally keep it in a JavaScript-reachable place.",
+        "fields": [
+          {
+            "name": "user",
+            "optional": false,
+            "type": "AuthUser",
+            "note": ""
+          },
+          {
+            "name": "accessToken",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "tokenType",
+            "optional": false,
+            "type": "'Bearer'",
+            "note": ""
+          },
+          {
+            "name": "expiresIn",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
       },
       "controller": "AuthController",
       "handler": "refresh"
@@ -323,6 +435,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "AuthUserResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "user",
+            "optional": false,
+            "type": "AuthUser",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AuthController",
       "handler": "register"
     },
@@ -340,6 +465,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "AvailabilityRuleListResponse",
+        "note": "A week, in the order a teacher reads one: by day, then by the minute each window opens. There is no page because a week has seven days in it, and a control that never appears on a list that cannot grow past a screen is a component nobody maintains.",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "AvailabilityRule[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "AvailabilityController",
       "handler": "list"
@@ -405,6 +543,19 @@
               "A class runs from 5 to 240 minutes."
             ],
             "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "AvailabilityRuleResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "rule",
+            "optional": false,
+            "type": "AvailabilityRule",
+            "note": ""
           }
         ]
       },
@@ -477,6 +628,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "AvailabilityRuleResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "rule",
+            "optional": false,
+            "type": "AvailabilityRule",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AvailabilityController",
       "handler": "update"
     },
@@ -497,6 +661,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "AvailabilityRuleResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "rule",
+            "optional": false,
+            "type": "AvailabilityRule",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AvailabilityController",
       "handler": "retire"
     },
@@ -514,6 +691,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ bookings: Booking[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "bookings",
+            "optional": false,
+            "type": "Booking[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "BookingsController",
       "handler": "mine"
@@ -556,6 +746,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ booking: Booking }",
+        "note": "",
+        "fields": [
+          {
+            "name": "booking",
+            "optional": false,
+            "type": "Booking",
+            "note": ""
+          }
+        ]
+      },
       "controller": "BookingsController",
       "handler": "create"
     },
@@ -575,6 +778,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ booking: Booking }",
+        "note": "",
+        "fields": [
+          {
+            "name": "booking",
+            "optional": false,
+            "type": "Booking",
+            "note": ""
+          }
+        ]
       },
       "controller": "BookingsController",
       "handler": "cancel"
@@ -596,6 +812,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ booking: Booking }",
+        "note": "",
+        "fields": [
+          {
+            "name": "booking",
+            "optional": false,
+            "type": "Booking",
+            "note": ""
+          }
+        ]
+      },
       "controller": "BookingsController",
       "handler": "confirm"
     },
@@ -616,6 +845,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ booking: Booking }",
+        "note": "",
+        "fields": [
+          {
+            "name": "booking",
+            "optional": false,
+            "type": "Booking",
+            "note": ""
+          }
+        ]
+      },
       "controller": "BookingsController",
       "handler": "reject"
     },
@@ -633,6 +875,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "BookingRoomResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "room",
+            "optional": false,
+            "type": "BookingRoom",
+            "note": ""
+          }
+        ]
       },
       "controller": "BookingsController",
       "handler": "room"
@@ -652,6 +907,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ bookings: BookingRequest[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "bookings",
+            "optional": false,
+            "type": "BookingRequest[]",
+            "note": ""
+          }
+        ]
+      },
       "controller": "BookingsController",
       "handler": "classes"
     },
@@ -669,6 +937,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ requests: BookingRequest[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "requests",
+            "optional": false,
+            "type": "BookingRequest[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "BookingsController",
       "handler": "requests"
@@ -700,6 +981,55 @@
           }
         ],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "OpenSlotsResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "{ id: string; slug: string; title: string; demoBookingsEnabled: boolean }",
+            "note": ""
+          },
+          {
+            "name": "teacher",
+            "optional": false,
+            "type": "{ id: string; timezone: string }",
+            "note": ""
+          },
+          {
+            "name": "entitlement",
+            "optional": false,
+            "type": "SlotEntitlementCode",
+            "note": ""
+          },
+          {
+            "name": "denial",
+            "optional": false,
+            "type": "SlotDenialCode | null",
+            "note": ""
+          },
+          {
+            "name": "from",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "to",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "slots",
+            "optional": false,
+            "type": "OpenSlot[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "BookingsController",
       "handler": "slots"
@@ -763,6 +1093,37 @@
         ],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "CatalogCourseListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CatalogCourse[]",
+            "note": ""
+          },
+          {
+            "name": "page",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "pageSize",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "total",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CatalogController",
       "handler": "list"
     },
@@ -780,6 +1141,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CatalogCourseResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "CatalogCourseDetail",
+            "note": ""
+          }
+        ]
       },
       "controller": "CatalogController",
       "handler": "read"
@@ -800,6 +1174,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "CatalogLessonResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "lesson",
+            "optional": false,
+            "type": "CatalogLessonPage",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CatalogController",
       "handler": "lesson"
     },
@@ -819,6 +1206,12 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "stream",
+        "declared": "none",
+        "note": "",
+        "fields": []
+      },
       "controller": "CatalogController",
       "handler": "video"
     },
@@ -834,6 +1227,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ items: CourseChoice[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CourseChoice[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "CatalogController",
       "handler": "levels"
@@ -864,6 +1270,19 @@
           }
         ],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ items: Course[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "Course[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "CoursesController",
       "handler": "list"
@@ -947,6 +1366,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CoursesController",
       "handler": "create"
     },
@@ -966,6 +1398,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CourseModuleListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CourseModule[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "CourseModulesController",
       "handler": "list"
@@ -1018,6 +1463,19 @@
               "text"
             ],
             "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CourseModuleResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "module",
+            "optional": false,
+            "type": "CourseModule",
+            "note": ""
           }
         ]
       },
@@ -1076,6 +1534,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "CourseModuleResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "module",
+            "optional": false,
+            "type": "CourseModule",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CourseModulesController",
       "handler": "update"
     },
@@ -1096,6 +1567,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CourseModuleResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "module",
+            "optional": false,
+            "type": "CourseModule",
+            "note": ""
+          }
+        ]
       },
       "controller": "CourseModulesController",
       "handler": "deactivate"
@@ -1129,6 +1613,19 @@
               "a list"
             ],
             "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "CourseModuleListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CourseModule[]",
+            "note": ""
           }
         ]
       },
@@ -1176,6 +1673,37 @@
         ],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "CourseRosterResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CourseRosterEntry[]",
+            "note": ""
+          },
+          {
+            "name": "page",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "pageSize",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "total",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CourseRosterController",
       "handler": "list"
     },
@@ -1195,6 +1723,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ]
       },
       "controller": "CoursesController",
       "handler": "read"
@@ -1280,6 +1821,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CoursesController",
       "handler": "update"
     },
@@ -1299,6 +1853,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ]
       },
       "controller": "CoursesController",
       "handler": "archive"
@@ -1331,6 +1898,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CoursesController",
       "handler": "setDemoBookings"
     },
@@ -1351,6 +1931,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CoursesController",
       "handler": "publish"
     },
@@ -1368,6 +1961,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ items: CourseChoice[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CourseChoice[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "CoursesController",
       "handler": "currencies"
@@ -1387,6 +1993,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ items: CourseChoice[] }",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "CourseChoice[]",
+            "note": ""
+          }
+        ]
+      },
       "controller": "CoursesController",
       "handler": "levels"
     },
@@ -1404,6 +2023,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "EnrollmentListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "Enrollment[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "EnrollmentsController",
       "handler": "list"
@@ -1435,6 +2067,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "EnrollmentResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "enrollment",
+            "optional": false,
+            "type": "Enrollment",
+            "note": ""
+          }
+        ]
+      },
       "controller": "EnrollmentsController",
       "handler": "enroll"
     },
@@ -1455,6 +2100,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "EnrollmentResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "enrollment",
+            "optional": false,
+            "type": "Enrollment",
+            "note": ""
+          }
+        ]
+      },
       "controller": "EnrollmentsController",
       "handler": "cancel"
     },
@@ -1470,6 +2128,43 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "HealthResponse",
+        "note": "Whether the API is up and whether its database is, with the version that answered. Named rather than left inferred: the docs site publishes the shape of every route's answer, and it can only do that for a handler that states one.",
+        "fields": [
+          {
+            "name": "status",
+            "optional": false,
+            "type": "'ok' | 'degraded'",
+            "note": ""
+          },
+          {
+            "name": "database",
+            "optional": false,
+            "type": "'up' | 'down'",
+            "note": ""
+          },
+          {
+            "name": "version",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "uptimeSeconds",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "timestamp",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          }
+        ]
       },
       "controller": "HealthController",
       "handler": "check"
@@ -1490,6 +2185,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "LessonListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "Lesson[]",
+            "note": ""
+          }
+        ]
       },
       "controller": "LessonsController",
       "handler": "list"
@@ -1543,6 +2251,19 @@
               "a whole number"
             ],
             "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "LessonResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "lesson",
+            "optional": false,
+            "type": "Lesson",
+            "note": ""
           }
         ]
       },
@@ -1622,6 +2343,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "LessonResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "lesson",
+            "optional": false,
+            "type": "Lesson",
+            "note": ""
+          }
+        ]
+      },
       "controller": "LessonsController",
       "handler": "update"
     },
@@ -1642,6 +2376,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "LessonResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "lesson",
+            "optional": false,
+            "type": "Lesson",
+            "note": ""
+          }
+        ]
       },
       "controller": "LessonsController",
       "handler": "deactivate"
@@ -1664,6 +2411,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "LessonResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "lesson",
+            "optional": false,
+            "type": "Lesson",
+            "note": ""
+          }
+        ]
+      },
       "controller": "LessonsController",
       "handler": "publish"
     },
@@ -1684,6 +2444,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "LessonResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "lesson",
+            "optional": false,
+            "type": "Lesson",
+            "note": ""
+          }
+        ]
       },
       "controller": "LessonsController",
       "handler": "unpublish"
@@ -1706,6 +2479,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "LessonAssetResponse",
+        "note": "What a page currently has on it. `null` is the ordinary answer for a lesson nobody has recorded, which is why the route that reads state is not the same shape as the one that writes it.",
+        "fields": [
+          {
+            "name": "asset",
+            "optional": false,
+            "type": "LessonAsset | null",
+            "note": ""
+          }
+        ]
+      },
       "controller": "LessonAssetsController",
       "handler": "standing"
     },
@@ -1727,6 +2513,19 @@
         "query": [],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "AttachLessonAssetResponse",
+        "note": "The row a successful upload filed — always the one now standing.",
+        "fields": [
+          {
+            "name": "asset",
+            "optional": false,
+            "type": "LessonAsset",
+            "note": ""
+          }
+        ]
+      },
       "controller": "LessonAssetsController",
       "handler": "attach"
     },
@@ -1747,6 +2546,12 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "stream",
+        "declared": "none",
+        "note": "",
+        "fields": []
       },
       "controller": "LessonAssetsController",
       "handler": "play"
@@ -1780,6 +2585,19 @@
               "a list"
             ],
             "values": []
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "LessonListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "Lesson[]",
+            "note": ""
           }
         ]
       },
@@ -1851,6 +2669,37 @@
         ],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "OutboxListResponse",
+        "note": "",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "OutboxEntry[]",
+            "note": ""
+          },
+          {
+            "name": "page",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "pageSize",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "total",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
+      },
       "controller": "OutboxController",
       "handler": "list"
     },
@@ -1868,6 +2717,19 @@
         "params": [],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ profile: TeacherProfileDocument | null }",
+        "note": "",
+        "fields": [
+          {
+            "name": "profile",
+            "optional": false,
+            "type": "TeacherProfileDocument | null",
+            "note": ""
+          }
+        ]
       },
       "controller": "TeacherProfileController",
       "handler": "read"
@@ -1957,6 +2819,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ profile: TeacherProfileDocument }",
+        "note": "",
+        "fields": [
+          {
+            "name": "profile",
+            "optional": false,
+            "type": "TeacherProfileDocument",
+            "note": ""
+          }
+        ]
+      },
       "controller": "TeacherProfileController",
       "handler": "save"
     },
@@ -2037,6 +2912,37 @@
         ],
         "body": []
       },
+      "response": {
+        "kind": "json",
+        "declared": "OpsAccountListResponse",
+        "note": "A page of accounts, newest first. `total` counts everything the filters matched, so a screen can say \"412 accounts, these 25\" and a search that returns one page can say whether it stopped at the top of the list.",
+        "fields": [
+          {
+            "name": "items",
+            "optional": false,
+            "type": "OpsAccount[]",
+            "note": ""
+          },
+          {
+            "name": "page",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "pageSize",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          },
+          {
+            "name": "total",
+            "optional": false,
+            "type": "number",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AccountsController",
       "handler": "list"
     },
@@ -2056,6 +2962,19 @@
         ],
         "query": [],
         "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ account: OpsAccountDetail }",
+        "note": "",
+        "fields": [
+          {
+            "name": "account",
+            "optional": false,
+            "type": "OpsAccountDetail",
+            "note": ""
+          }
+        ]
       },
       "controller": "AccountsController",
       "handler": "read"
@@ -2092,6 +3011,19 @@
           }
         ]
       },
+      "response": {
+        "kind": "json",
+        "declared": "{ account: OpsAccountDetail }",
+        "note": "",
+        "fields": [
+          {
+            "name": "account",
+            "optional": false,
+            "type": "OpsAccountDetail",
+            "note": ""
+          }
+        ]
+      },
       "controller": "AccountsController",
       "handler": "changeRole"
     },
@@ -2123,6 +3055,19 @@
               "active",
               "disabled"
             ]
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ account: OpsAccountDetail }",
+        "note": "",
+        "fields": [
+          {
+            "name": "account",
+            "optional": false,
+            "type": "OpsAccountDetail",
+            "note": ""
           }
         ]
       },

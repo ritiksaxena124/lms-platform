@@ -16,6 +16,7 @@ import { AppModule } from '../app.module';
 import { IS_PUBLIC } from '../modules/auth/public.decorator';
 import { OPTIONAL_SESSION } from '../modules/auth/optional-session.decorator';
 import { REQUIRED_ROLES } from '../modules/auth/roles.decorator';
+import { resolveResponse, type ResponseRecord } from './response-shape';
 
 /** What a caller has to bring, as `JwtAuthGuard` and `RolesGuard` actually decide it. */
 export interface EndpointAccess {
@@ -38,6 +39,8 @@ export interface EndpointRecord {
   access: EndpointAccess;
   /** What the caller has to send, read off the same decorators the request is checked by. */
   request: EndpointRequest;
+  /** What the route answers with, read off the type the handler declares. */
+  response: ResponseRecord;
   /** Where the route lives, so a reader who wants the rules behind it can find the file. */
   controller: string;
   handler: string;
@@ -77,6 +80,9 @@ interface ValidationMeta {
   message?: string | ((args: never) => string);
   each: boolean;
 }
+
+/** A class as a value, which is what `reflect-metadata` and `class-validator` both key on. */
+type ClassLike = new (...args: never[]) => unknown;
 
 /** A controller class, seen only through the metadata hung on it. */
 interface ClassRef {
@@ -126,9 +132,7 @@ function walk(module: object, seen: Set<object>, out: ClassRef[]): void {
     // passed over rather than awaited for nothing.
     if (typeof imported === 'function' || (imported && typeof imported === 'object')) {
       const candidate =
-        typeof imported === 'function'
-          ? imported
-          : (imported as { module?: unknown }).module;
+        typeof imported === 'function' ? imported : (imported as { module?: unknown }).module;
 
       if (typeof candidate === 'function') walk(candidate, seen, out);
     }
@@ -161,7 +165,8 @@ function accessOf(controller: ClassRef, handler: object): EndpointAccess {
   }
 
   const isPublic =
-    readMeta<boolean>(IS_PUBLIC, handler) === true || readMeta<boolean>(IS_PUBLIC, controller) === true;
+    readMeta<boolean>(IS_PUBLIC, handler) === true ||
+    readMeta<boolean>(IS_PUBLIC, controller) === true;
 
   return { kind: isPublic ? 'public' : 'session', roles };
 }
@@ -222,10 +227,10 @@ for (const [name, value] of Object.entries(RouteParamtypes)) {
 }
 
 /** Every rule a DTO class holds, grouped by the property it guards, in the order the class declares. */
-export function describeRequestFields(dto: Function): RequestField[] {
+export function describeRequestFields(dto: ClassLike): RequestField[] {
   const stored = getMetadataStorage() as unknown as {
     getTargetValidationMetadatas: (
-      target: Function,
+      target: ClassLike,
       schema: string,
       always: boolean,
       strictGroups: boolean,
@@ -260,7 +265,8 @@ export function describeRequestFields(dto: Function): RequestField[] {
     }
 
     const named = meta.name ?? meta.type;
-    const message = typeof meta.message === 'string' && meta.message.length > 0 ? meta.message : null;
+    const message =
+      typeof meta.message === 'string' && meta.message.length > 0 ? meta.message : null;
     const fallback = RULE_SENTENCES[named];
 
     if (!message && !fallback) {
@@ -282,19 +288,13 @@ export function describeRequestFields(dto: Function): RequestField[] {
 }
 
 /** What one handler reads off the request, in the three places a caller can put it. */
-function requestOf(
-  controller: ClassRef,
-  handlerName: string,
-  path: string,
-): EndpointRequest {
+function requestOf(controller: ClassRef, handlerName: string, path: string): EndpointRequest {
   const routeArgs =
     (Reflect.getMetadata(ROUTE_ARGS_METADATA, controller, handlerName) as
-      | Record<string, { index: number; data?: unknown }>
-      | undefined) ?? {};
+      Record<string, { index: number; data?: unknown }> | undefined) ?? {};
   const paramTypes =
     (Reflect.getMetadata('design:paramtypes', controller.prototype, handlerName) as
-      | (Function | undefined)[]
-      | undefined) ?? [];
+      (ClassLike | undefined)[] | undefined) ?? [];
 
   const body: RequestField[] = [];
   const query: RequestField[] = [];
@@ -302,7 +302,7 @@ function requestOf(
   for (const [key, arg] of Object.entries(routeArgs).sort((a, b) => a[0].localeCompare(b[0]))) {
     // A custom param decorator — the one that hands the handler the signed-in account — keys itself
     // with a generated prefix rather than a number, and it reads nothing a caller can send.
-    const [typeRaw] = key.split(':');
+    const [typeRaw = ''] = key.split(':');
     if (!/^\d+$/.test(typeRaw)) continue;
 
     const source = REQUEST_SOURCES[PARAM_TYPE_NAMES.get(Number(typeRaw)) ?? ''];
@@ -328,7 +328,10 @@ function requestOf(
   }
 
   return {
-    params: path.split('/').filter((part) => part.startsWith(':')).map((part) => part.slice(1)),
+    params: path
+      .split('/')
+      .filter((part) => part.startsWith(':'))
+      .map((part) => part.slice(1)),
     query,
     body,
   };
@@ -365,6 +368,7 @@ export function collectEndpoints(): EndpointRecord[] {
           statusCode: statusCodeOf(target, method),
           access: accessOf(controller, target),
           request: requestOf(controller, name, path),
+          response: resolveResponse(controller.name, name),
           controller: controller.name,
           handler: name,
         } satisfies EndpointRecord;

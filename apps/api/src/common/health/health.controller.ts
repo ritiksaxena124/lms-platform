@@ -18,6 +18,20 @@ const APP_VERSION: string = (() => {
   }
 })();
 
+/**
+ * Whether the API is up and whether its database is, with the version that answered.
+ *
+ * Named rather than left inferred: the docs site publishes the shape of every route's answer, and
+ * it can only do that for a handler that states one.
+ */
+interface HealthResponse {
+  status: 'ok' | 'degraded';
+  database: 'up' | 'down';
+  version: string;
+  uptimeSeconds: number;
+  timestamp: string;
+}
+
 /** Liveness for the reverse proxy plus a real dependency check for deployment gates. */
 @Public()
 @Controller('health')
@@ -25,7 +39,7 @@ export class HealthController {
   constructor(private readonly prisma: PrismaService) {}
 
   @Get()
-  async check() {
+  async check(): Promise<HealthResponse> {
     const databaseUp = await this.prisma.isHealthy();
     const body = {
       status: databaseUp ? ('ok' as const) : ('degraded' as const),

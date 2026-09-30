@@ -85,7 +85,10 @@ describe('the endpoint reference', () => {
     // The accounts desk declares `@Roles(OPS)` once on the class. A reader of the reference has to
     // see it on all four routes, because the route that forgets to say it is the least guarded-
     // looking line on the page.
-    expect(find(endpoints, 'GET', '/api/v1/users').access).toEqual({ kind: 'session', roles: ['ops'] });
+    expect(find(endpoints, 'GET', '/api/v1/users').access).toEqual({
+      kind: 'session',
+      roles: ['ops'],
+    });
     expect(find(endpoints, 'PATCH', '/api/v1/users/:id/role').access).toEqual({
       kind: 'session',
       roles: ['ops'],
@@ -121,9 +124,9 @@ describe('the endpoint reference', () => {
     expect(find(endpoints, 'POST', '/api/v1/auth/register').statusCode).toBe(201);
     expect(find(endpoints, 'POST', '/api/v1/auth/login').statusCode).toBe(200);
     expect(find(endpoints, 'POST', '/api/v1/bookings').statusCode).toBe(200);
-    expect(find(endpoints, 'POST', '/api/v1/modules/:moduleId/lessons/:lessonId/asset').statusCode).toBe(
-      201,
-    );
+    expect(
+      find(endpoints, 'POST', '/api/v1/modules/:moduleId/lessons/:lessonId/asset').statusCode,
+    ).toBe(201);
     expect(find(endpoints, 'GET', '/api/v1/courses').statusCode).toBe(200);
     expect(find(endpoints, 'POST', '/api/v1/auth/logout').statusCode).toBe(204);
   });
@@ -167,9 +170,9 @@ describe('the endpoint reference', () => {
     // A path segment is not a field of a DTO, so it is read off the route’s own shape — and the
     // upload route, whose bytes are the body, is all address and no fields.
     expect(find(endpoints, 'PATCH', '/api/v1/users/:id/role').request.params).toEqual(['id']);
-    expect(find(endpoints, 'POST', '/api/v1/modules/:moduleId/lessons/:lessonId/asset').request).toEqual(
-      { params: ['moduleId', 'lessonId'], query: [], body: [] },
-    );
+    expect(
+      find(endpoints, 'POST', '/api/v1/modules/:moduleId/lessons/:lessonId/asset').request,
+    ).toEqual({ params: ['moduleId', 'lessonId'], query: [], body: [] });
   });
 
   it('names the closed set an enumerated field accepts', () => {
@@ -231,6 +234,41 @@ describe('the endpoint reference', () => {
     // A validator the table does not know would otherwise print nothing, and "this field has no
     // rules" is a lie about a field that has one the tool simply cannot read.
     expect(() => describeRequestFields(UnmappedDto)).toThrow(/isUrl/);
+  });
+
+  it('states what a route answers with, beside what it asks for', () => {
+    // The two halves of a contract are read together or not at all: a page that lists a route's
+    // fields but goes quiet about its body teaches a caller to send and never to read.
+    const record = find(endpoints, 'POST', '/api/v1/auth/login');
+
+    expect(record.response.kind).toBe('json');
+    expect(record.response.declared).toBe('AuthSessionResponse');
+    expect(record.response.fields.map((field) => field.name)).toEqual([
+      'user',
+      'accessToken',
+      'tokenType',
+      'expiresIn',
+    ]);
+  });
+
+  it('keeps a route that answers with nothing in particular in one key', () => {
+    // `{ booking: Booking }` is written in the handler rather than named, and the reader is told
+    // the wrapper key they will actually find in the body.
+    const record = find(endpoints, 'POST', '/api/v1/bookings');
+
+    expect(record.response.fields.map((field) => field.name)).toEqual(['booking']);
+    expect(record.response.fields[0]?.type).toBe('Booking');
+  });
+
+  it('says which routes send bytes and which send only a status', () => {
+    const logout = find(endpoints, 'POST', '/api/v1/auth/logout');
+    const video = find(endpoints, 'GET', '/api/v1/modules/:moduleId/lessons/:lessonId/asset/video');
+
+    // A `204` has no body to document, and a recording has a body no list of keys could describe.
+    // Both are answers a caller has to be told about, and neither is the same as a route this
+    // export failed to read.
+    expect(logout.response.kind).toBe('none');
+    expect(video.response.kind).toBe('stream');
   });
 
   it('sorts by resource so the rendered table reads in one order', () => {
