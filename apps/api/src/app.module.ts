@@ -13,6 +13,7 @@ import { ActionLogModule } from './modules/action-log/action-log.module';
 import { AccountsModule } from './modules/accounts/accounts.module';
 import { AvailabilityModule } from './modules/availability/availability.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
+import { CalendarModule } from './modules/calendar/calendar.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
 import { CourseModule } from './modules/course/course.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
@@ -33,6 +34,7 @@ import { ReferenceModule } from './reference/reference.module';
     CatalogModule,
     EnrollmentsModule,
     AvailabilityModule,
+    CalendarModule,
     BookingsModule,
     // The queue a send decision is filed in. Registered so the two modules above can hand their
     // news to it; the sweep that reads it back out arrives with 6e.
