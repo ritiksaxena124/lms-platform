@@ -22,7 +22,7 @@ export class CalendarRepository {
     return this.prisma.classSeries.findMany({
       where: { courseId, isActive: true },
       orderBy: [{ weekday: 'asc' }, { startMinutes: 'asc' }],
-      include: { course: { select: { id: true, title: true, teacherUserId: true } } },
+      include: { course: true },
     });
   }
 
@@ -30,7 +30,7 @@ export class CalendarRepository {
   async findSeriesOwned(courseId: string, id: string): Promise<ClassSeriesRow | null> {
     return this.prisma.classSeries.findFirst({
       where: { id, courseId },
-      include: { course: { select: { id: true, teacherUserId: true } } },
+      include: { course: true },
     });
   }
 
@@ -49,7 +49,7 @@ export class CalendarRepository {
         startMinutes,
         ...(exceptId ? { id: { not: exceptId } } : {}),
       },
-      include: { course: { select: { id: true, teacherUserId: true } } },
+      include: { course: true },
     });
   }
 
