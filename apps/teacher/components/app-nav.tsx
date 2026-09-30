@@ -12,7 +12,6 @@ const ITEMS = [
   { href: '/availability', label: 'Availability' },
   { href: '/requests', label: 'Requests' },
   { href: '/classes', label: 'Classes' },
-  { href: '/toolkit', label: 'Interface kit' },
 ] as const;
 
 /**

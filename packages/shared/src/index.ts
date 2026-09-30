@@ -3,6 +3,7 @@ export * from './accounts';
 export * from './availability';
 export * from './auth';
 export * from './bookings';
+export * from './calendar';
 export * from './catalog';
 export * from './course-modules';
 export * from './courses';

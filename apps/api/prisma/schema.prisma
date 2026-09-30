@@ -130,6 +130,9 @@ model User {
   /// from under it, and a log whose actor resolves to nobody no longer answers "who".
   actions ActionLog[] @relation("action_log_actor")
 
+  /// The days this teacher does not teach — holidays, festivals, personal days off.
+  holidays Holiday[]
+
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
 }
@@ -258,6 +261,9 @@ model Course {
 
   /// The classes booked out of this course's schedule, by enrolled students and by demos.
   bookings Booking[] @relation("course_bookings")
+
+  /// The recurring weekly series of classes for this course.
+  classSeries ClassSeries[]
 
   @@unique([teacherUserId, slug], map: "uk_course_teacher_slug")
   @@index([teacherUserId, isActive, createdAt], map: "ix_course_teacher_created")
@@ -794,4 +800,63 @@ model ActionLog {
   @@index([actionCode, createdAt], map: "ix_action_log_action")
   @@index([createdAt], map: "ix_action_log_recent")
   @@map("action_log")
+}
+
+/// A recurring series of classes a teacher schedules for a course, repeating weekly on the
+/// chosen day. Each row is one slot in the teacher's week — Monday at 09:00–10:00, Thursday
+/// at 14:00–15:00 — and the booking endpoint auto-enrolls students into every instance that
+/// falls within their enrollment window.
+///
+/// The series has no status of its own: `isActive` answers whether it is still running, and
+/// a retired series keeps its rows so past bookings can resolve which plan made them possible.
+/// The timezone is absent because it lives on the teacher's account (§5), and the day-of-week
+/// is stored as an integer matching `AvailabilityRule.weekday`.
+model ClassSeries {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId      String @map("course_id") @db.Uuid
+  weekday       Int    @map("weekday")
+  startMinutes  Int    @map("start_minutes")
+  endMinutes    Int    @map("end_minutes")
+  durationMinutes Int  @map("duration_minutes")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  /// One series may run on a given day at a given time for one course. A second row with the
+  /// same weekday and start would hand a student two bookings for the same minute; the unique
+  /// key prevents that, and retiring a series reopens the slot rather than creating a twin.
+  @@unique([courseId, weekday, startMinutes], map: "uk_class_series_course_slot")
+  @@index([courseId, isActive, weekday], map: "ix_class_series_course_week")
+  @@map("class_series")
+}
+
+/// A day a teacher does not teach: a public holiday, a personal day off, or a festival that
+/// stops all classes. Stored as a date rather than an instant because the whole day is blocked,
+/// and the zone decides when midnight is.
+///
+/// Recurring annually means this date is blocked every year (Diwali, Christmas, New Year), while
+/// a one-off blocks only the stated year. The table is owned by the teacher's account because a
+/// holiday is personal to them — one teacher's festival is another teacher's working day.
+model Holiday {
+  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacherUserId    String @map("teacher_user_id") @db.Uuid
+  date             String @map("date") @db.VarChar(10)
+  reason           String? @map("reason")
+  isRecurringAnnual Boolean @default(false) @map("is_recurring_annually")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  teacher User @relation(fields: [teacherUserId], references: [id], onDelete: Restrict)
+
+  /// One holiday per teacher per date. A second entry for the same day would be redundant, and
+  /// the unique key keeps the list clean. ISO 8601 dates sort lexicographically, which is why
+  /// the column is text rather than date — the format is enforced by validation.
+  @@unique([teacherUserId, date], map: "uk_holiday_teacher_date")
+  @@index([teacherUserId, isActive], map: "ix_holiday_teacher_active")
+  @@map("holiday")
 }
