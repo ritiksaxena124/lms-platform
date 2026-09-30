@@ -53,6 +53,14 @@ trusting a filename, because a filename is not unique across teachers and a less
 Payment is the port that is deliberately still a plan. A course carries a price and nothing is
 charged; `PAYMENT_PROVIDER` defaults to `none` so that no code can pretend otherwise.
 
+**Phase 9 update:** The coupon and payment system is now in place. Teachers can issue discount codes
+per course, each carrying a percentage or fixed-amount discount, validity windows, and usage caps.
+When a student enrolls with a valid coupon code, the enrollment endpoint validates the code against
+the course, calculates the discounted price, creates a payment record linking the enrollment to the
+coupon used, and increments the redemption counter — all within the same database transaction that
+opens the place. The payment provider remains behind its port (currently set to `mock` for development),
+so the financial ledger exists regardless of which vendor processes the actual transaction.
+
 ## One session, four doors
 
 An access token lives in the portal's memory and is sent as a bearer header. The refresh token never

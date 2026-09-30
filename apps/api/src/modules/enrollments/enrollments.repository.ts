@@ -106,6 +106,10 @@ export class EnrollmentsRepository {
     courseId: string,
     notify?: PlaceNotifier,
     record?: WriteRecorder<PlaceRecord>,
+    couponId?: string | null,
+    paymentAmount?: number | null,
+    currencyValueId?: string | null,
+    paymentStatusValueId?: string | null,
   ): Promise<PlaceNewsRow> {
     return this.prisma.$transaction(async (tx) => {
       const standing = await tx.enrollment.findUnique({
@@ -124,6 +128,26 @@ export class EnrollmentsRepository {
             data: { studentUserId, courseId },
             select: PLACE_NEWS_SELECT,
           });
+
+      // If a coupon was used, create a payment record and increment redemption count
+      if (couponId && paymentAmount != null && currencyValueId && paymentStatusValueId) {
+        await tx.payment.create({
+          data: {
+            enrollmentId: place.id,
+            couponId,
+            amountMinorUnits: paymentAmount,
+            currencyValueId,
+            statusValueId: paymentStatusValueId,
+            providerReference: 'mock-payment', // Mock provider for POC
+          },
+        });
+
+        // Increment coupon redemption count
+        await tx.coupon.update({
+          where: { id: couponId },
+          data: { redemptionCount: { increment: 1 } },
+        });
+      }
 
       await notify?.(tx, place);
       await record?.(tx, { place, reopened: standing !== null });
@@ -208,6 +232,14 @@ export class EnrollmentsRepository {
     return this.prisma.course.findFirst({
       where: { id: courseId, teacherUserId, isActive: true },
       select: { id: true },
+    });
+  }
+
+  /** Get the price of a course for coupon validation. Returns null if the course doesn't exist. */
+  async getCoursePrice(courseId: string) {
+    return this.prisma.course.findUnique({
+      where: { id: courseId },
+      select: { priceMinorUnits: true },
     });
   }
 

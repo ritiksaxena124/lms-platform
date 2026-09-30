@@ -6,6 +6,7 @@ export * from './bookings';
 export * from './calendar';
 export * from './catalog';
 export * from './course-modules';
+export * from './coupons';
 export * from './courses';
 export * from './enrollments';
 export * from './error-codes';

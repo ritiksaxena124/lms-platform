@@ -15,8 +15,10 @@ the docs a builder needs, both generated from what the code already says. Every 
 endpoint by endpoint, with purpose, gates, fields and failures documented alongside the contract the
 code enforces. The teacher's recurring calendar is complete: class series auto-enroll students into
 weekly instances, and holidays block slot generation on specified dates. Everything listed under
-[What each portal does](#what-each-portal-does) is shipped, tested and clickable; coupons and payments
-are still ahead, and [Phases](#phases) keeps the ordered record of why.
+[What each portal does](#what-each-portal-does) is shipped, tested and clickable; Phase 9a/9b/9c
+(coupons and payments) is complete with discount codes, validity windows, redemption tracking, and
+payment recording integrated into enrollment; the remaining UI work for coupon management and
+redemption sits in [Phases](#phases).
 
 ## Contents
 

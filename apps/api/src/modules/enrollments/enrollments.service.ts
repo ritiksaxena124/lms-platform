@@ -1,10 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import {
   ACTION_CODES,
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
+  DISCOUNT_TYPE_CODES,
   LKP_TYPE_CODES,
   MAIL_EVENT_CODES,
+  PAYMENT_STATUS_CODES,
   type CourseRosterEntry,
   type CourseRosterResponse,
   type CreateEnrollmentInput,
@@ -14,6 +16,8 @@ import {
 import { ActionRecorder } from '../action-log/action-recorder';
 import { ReferenceService } from '../../reference/reference.service';
 import { MailQueue } from '../notifications/mail-queue.service';
+import { CouponService } from '../coupons/coupon.service';
+import { PrismaService } from '../../common/prisma/prisma.service';
 import type { EnrollmentNews } from '../notifications/mail-queue.service';
 import type { EnrollmentRow, PlaceNewsRow, RosterRow } from './enrollments.repository';
 import { EnrollmentsRepository } from './enrollments.repository';
@@ -90,10 +94,12 @@ function toNews(row: PlaceNewsRow): EnrollmentNews {
 @Injectable()
 export class EnrollmentsService {
   constructor(
+    private readonly prisma: PrismaService,
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
     private readonly mail: MailQueue,
     private readonly actions: ActionRecorder,
+    private readonly coupons: CouponService,
   ) {}
 
   /**
@@ -124,6 +130,71 @@ export class EnrollmentsService {
       });
     }
 
+    // Validate coupon if provided
+    let couponId: string | null = null;
+    let paymentAmount: number | null = null;
+    let currencyValueId: string | null = null;
+    let paymentStatusValueId: string | null = null;
+
+    if (input.couponCode) {
+      // Get the course price from the database
+      const courseWithPrice = await this.enrollments.getCoursePrice(courseId.id);
+      
+      if (!courseWithPrice) {
+        throw new NotFoundException({
+          code: API_ERROR_CODES.NOT_FOUND,
+          message: 'We cannot find that course.',
+        });
+      }
+
+      // Look up currency ID (use the first available for POC)
+      const currencies = await this.prisma.lkpValue.findMany({
+        where: { type: { code: LKP_TYPE_CODES.CURRENCY }, isActive: true },
+        select: { id: true },
+        take: 1,
+      });
+      
+      if (currencies.length === 0 || !currencies[0]) {
+        throw new BadRequestException({
+          code: API_ERROR_CODES.INTERNAL_ERROR,
+          message: 'No currency configured.',
+        });
+      }
+      currencyValueId = currencies[0].id;
+
+      // Look up payment status ID for completed payments
+      paymentStatusValueId = await this.reference.valueId(
+        LKP_TYPE_CODES.PAYMENT_STATUS,
+        PAYMENT_STATUS_CODES.COMPLETED,
+      );
+
+      // Validate coupon and calculate discounted price
+      const validationResult = await this.coupons.validateAndCalculate(
+        input.couponCode,
+        courseId.id,
+        courseWithPrice.priceMinorUnits,
+        currencyValueId,
+      );
+
+      if (!validationResult.isValid) {
+        throw new BadRequestException({
+          code: API_ERROR_CODES.BAD_REQUEST,
+          message: validationResult.error || 'Invalid coupon.',
+        });
+      }
+
+      // TypeScript needs help narrowing the union here
+      if (!('discountedAmount' in validationResult)) {
+        throw new BadRequestException({
+          code: API_ERROR_CODES.INTERNAL_ERROR,
+          message: 'Coupon validation failed to calculate discount.',
+        });
+      }
+
+      couponId = validationResult.coupon!.id;
+      paymentAmount = validationResult.discountedAmount!;
+    }
+
     const place = await this.enrollments.takePlace(
       studentUserId,
       courseId.id,
@@ -138,6 +209,10 @@ export class EnrollmentsService {
           // returning one, and it stops being readable the moment the row says `isActive: true`.
           detail: { reopened: written.reopened },
         }),
+      couponId,
+      paymentAmount,
+      currencyValueId,
+      paymentStatusValueId,
     );
     return toEnrollment(place);
   }

@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { ActionLogModule } from '../action-log/action-log.module';
 import { NotificationsModule } from '../notifications/notifications.module';
+import { CouponModule } from '../coupons/coupon.module';
 import { CourseRosterController } from './course-roster.controller';
 import { EnrollmentsController } from './enrollments.controller';
 import { EnrollmentsRepository } from './enrollments.repository';
@@ -33,7 +34,7 @@ import { EnrollmentsService } from './enrollments.service';
  * happened" is decided twice, once by the write and once afterwards.
  */
 @Module({
-  imports: [ActionLogModule, NotificationsModule],
+  imports: [ActionLogModule, NotificationsModule, CouponModule],
   controllers: [EnrollmentsController, CourseRosterController],
   providers: [EnrollmentsService, EnrollmentsRepository],
   // "Does this student hold a place" is the first question a booking calendar asks, and the row it

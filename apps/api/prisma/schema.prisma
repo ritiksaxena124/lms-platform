@@ -69,6 +69,15 @@ model LkpValue {
   /// Bookings in each stage of their life.
   bookingsAsStatus Booking[] @relation("booking_status")
 
+  /// Coupons that apply this kind of discount (percentage or fixed).
+  couponsAsDiscountType Coupon[] @relation("coupon_discount_type")
+
+  /// Payments quoted in this currency.
+  paymentsAsCurrency Payment[] @relation("payment_currency")
+
+  /// Payments in this stage of their lifecycle.
+  paymentsAsStatus Payment[] @relation("payment_status")
+
   @@unique([typeId, code], map: "uk_lkp_value_type_code")
   @@index([typeId, isActive, position], map: "ix_lkp_value_type_active")
   @@map("lkp_value")
@@ -265,6 +274,9 @@ model Course {
   /// The recurring weekly series of classes for this course.
   classSeries ClassSeries[]
 
+  /// The discount codes a teacher issued for this course.
+  coupons Coupon[]
+
   @@unique([teacherUserId, slug], map: "uk_course_teacher_slug")
   @@index([teacherUserId, isActive, createdAt], map: "ix_course_teacher_created")
   @@map("course")
@@ -423,6 +435,9 @@ model Enrollment {
 
   student User   @relation("enrollment_student", fields: [studentUserId], references: [id], onDelete: Restrict)
   course  Course @relation("course_enrollments", fields: [courseId], references: [id], onDelete: Restrict)
+
+  /// The payments made for this enrollment.
+  payments Payment[]
 
   /// The pair, not the student: one place per course, and a second course is a second
   /// decision. Reserved after a leave, exactly as a slug is reserved after an archive.
@@ -859,4 +874,99 @@ model Holiday {
   @@unique([teacherUserId, date], map: "uk_holiday_teacher_date")
   @@index([teacherUserId, isActive], map: "ix_holiday_teacher_active")
   @@map("holiday")
+}
+
+/// A discount code a teacher issues for one of their courses. Each coupon carries its own
+/// discount amount (percentage or fixed), validity window, and usage cap. Redeemed at
+/// enrollment time, not stored on the enrollment row itself — a payment record links the two.
+///
+/// The code is unique per course, so two teachers may both use "WELCOME20" but one teacher
+/// cannot reuse a code on the same course. Deactivation (`isActive = false`) stops redemptions
+/// without deleting history.
+model Coupon {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId      String @map("course_id") @db.Uuid
+  code          String @map("code")
+
+  /// What kind of discount this coupon applies. Lookup row so Ops can add "buy-one-get-one"
+  /// or other schemes without a migration.
+  discountTypeValueId String @map("discount_type_value_id") @db.Uuid
+
+  /// The discount amount. For percentage discounts, this is an integer 0–100. For fixed-amount
+  /// discounts, this is in minor units (same as `priceMinorUnits` on Course).
+  discountAmount Int @map("discount_amount")
+
+  /// When the coupon becomes valid. Nullable means "immediately upon creation".
+  validFrom DateTime? @map("valid_from") @db.Timestamptz(6)
+
+  /// When the coupon expires. Nullable means "never expires" (subject to usage limits).
+  validUntil DateTime? @map("valid_until") @db.Timestamptz(6)
+
+  /// Maximum number of times this coupon can be redeemed across all students. Null means unlimited.
+  maxRedemptions Int? @map("max_redemptions")
+
+  /// How many times this coupon has been redeemed. Maintained by the enrollment endpoint, not
+  /// by a trigger, because the redemption happens inside a transaction that also creates the
+  /// enrollment and payment rows.
+  redemptionCount Int @default(0) @map("redemption_count")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  course Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  discountType LkpValue @relation("coupon_discount_type", fields: [discountTypeValueId], references: [id], onDelete: Restrict)
+
+  /// The payments that used this coupon.
+  payments Payment[]
+
+  /// One active coupon code per course. A retired code may share its name with a new one, but
+  /// two live coupons cannot fight over the same string on the same course.
+  @@unique([courseId, code], map: "uk_coupon_course_code")
+  @@index([courseId, isActive], map: "ix_coupon_course_active")
+  @@map("coupon")
+}
+
+/// A payment attempt tied to an enrollment. Append-only ledger: each enrollment may have
+/// multiple payment rows if retries occur, but only one reaches `completed`. The payment
+/// provider stays behind a port (`PAYMENT_PROVIDER`), so this table records what happened
+/// regardless of which vendor processed it.
+///
+/// No hard deletes: a failed payment is still part of the financial record, and a refund is
+/// a new row pointing at the original.
+model Payment {
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enrollmentId    String @map("enrollment_id") @db.Uuid
+  couponId        String? @map("coupon_id") @db.Uuid
+
+  /// The amount charged, in minor units. Equals the course price minus any coupon discount.
+  amountMinorUnits Int @map("amount_minor_units")
+
+  /// The currency the amount is quoted in. Must match the course's price currency.
+  currencyValueId String @map("currency_value_id") @db.Uuid
+
+  /// Where the payment stands. Lookup row so Ops can add "refunded", "disputed", etc.
+  statusValueId String @map("status_value_id") @db.Uuid
+
+  /// The external reference from the payment provider (e.g., Stripe charge ID). Nullable for
+  /// mock payments or before the provider responds.
+  providerReference String? @map("provider_reference")
+
+  /// Any error message from the provider. Kept separate from the status so a retry can clear
+  /// the error while keeping the history.
+  providerError String? @map("provider_error")
+
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  currency LkpValue @relation("payment_currency", fields: [currencyValueId], references: [id], onDelete: Restrict)
+  status LkpValue @relation("payment_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+
+  /// One payment per enrollment per attempt. Multiple attempts are allowed for retries, but
+  /// only one should reach `completed`. Enforced in code, not by a unique constraint.
+  @@index([enrollmentId, createdAt], map: "ix_payment_enrollment")
+  @@index([statusValueId, createdAt], map: "ix_payment_status")
+  @@map("payment")
 }

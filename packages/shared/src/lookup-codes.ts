@@ -27,6 +27,7 @@ export const LKP_TYPE_CODES = {
   COURSE_LEVEL: 'CourseLevel',
   CURRENCY: 'Currency',
   MODERATION_STATUS: 'ModerationStatus',
+  DISCOUNT_TYPE: 'DiscountType',
 } as const;
 
 export type LkpTypeCode = (typeof LKP_TYPE_CODES)[keyof typeof LKP_TYPE_CODES];
@@ -166,6 +167,33 @@ export const CURRENCY_CODES = {
 } as const;
 
 export type CurrencyCode = (typeof CURRENCY_CODES)[keyof typeof CURRENCY_CODES];
+
+/**
+ * How a coupon applies its discount. `percentage` is an integer 0–100 off the course price;
+ * `fixed` is a flat amount in minor units subtracted from the price. Lookup rows so Ops can
+ * add "buy-one-get-one" or other schemes without a migration.
+ */
+export const DISCOUNT_TYPE_CODES = {
+  PERCENTAGE: 'percentage',
+  FIXED: 'fixed',
+} as const;
+
+export type DiscountTypeCode = (typeof DISCOUNT_TYPE_CODES)[keyof typeof DISCOUNT_TYPE_CODES];
+
+/**
+ * Where a payment stands in its lifecycle. `pending` means the provider has not responded;
+ * `completed` means the money moved; `failed` means the attempt was refused; `refunded` is
+ * a reversal after completion. Append-only: a refund is a new row, not a status change on
+ * the original.
+ */
+export const PAYMENT_STATUS_CODES = {
+  PENDING: 'pending',
+  COMPLETED: 'completed',
+  FAILED: 'failed',
+  REFUNDED: 'refunded',
+} as const;
+
+export type PaymentStatusCode = (typeof PAYMENT_STATUS_CODES)[keyof typeof PAYMENT_STATUS_CODES];
 
 /**
  * Where a lesson is in its own life — one stage shorter than a course's, because a lesson

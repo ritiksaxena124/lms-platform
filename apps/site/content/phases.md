@@ -31,6 +31,15 @@ repository's own record, so it says Done for the same reason the record does.
 What remains genuinely unbuilt is the part involving money: coupons and payments (Phase 9), and the
 teacher's repeating calendar (Phase 10). A course carries a price today and nothing is charged for it.
 
+**Update:** Phase 9a, 9b, and 9c are now complete — the database tables for coupons and payments exist,
+the API endpoints for managing teacher-issued discount codes are live at `/courses/:courseId/coupons`,
+the shared vocabulary for discount types (percentage/fixed) and payment statuses is in place, and
+coupon validation with payment recording is fully integrated into the enrollment flow. When a student
+enrolls with a valid coupon code, the system validates the code, calculates the discounted price,
+creates a payment record linking the enrollment to the coupon, and increments the redemption counter —
+all within the same transaction that opens the place. The UI work (teacher portal coupon management
+and student portal redemption interface) remains as Phases 9d and 9e.
+
 ## Where the reasoning lives
 
 Each phase has a section in `ARCHITECTURE.md` in the repository, numbered so a line of code can cite

@@ -15,6 +15,7 @@ import { AvailabilityModule } from './modules/availability/availability.module';
 import { BookingsModule } from './modules/bookings/bookings.module';
 import { CalendarModule } from './modules/calendar/calendar.module';
 import { CatalogModule } from './modules/catalog/catalog.module';
+import { CouponModule } from './modules/coupons/coupon.module';
 import { CourseModule } from './modules/course/course.module';
 import { EnrollmentsModule } from './modules/enrollments/enrollments.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -32,6 +33,7 @@ import { ReferenceModule } from './reference/reference.module';
     TeacherModule,
     CourseModule,
     CatalogModule,
+    CouponModule,
     EnrollmentsModule,
     AvailabilityModule,
     CalendarModule,

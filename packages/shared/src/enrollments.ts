@@ -38,11 +38,12 @@ export interface EnrollmentListResponse {
   items: Enrollment[];
 }
 
-/** The whole of what it takes to enroll: which course. There is no "as which student" —
- * the session answers that, and a body that could name somebody else would be a way to
- * take a place in a stranger's name. */
+/** The whole of what it takes to enroll: which course, and optionally a discount code. There is no
+ * "as which student" — the session answers that, and a body that could name somebody else would be a
+ * way to take a place in a stranger's name. */
 export interface CreateEnrollmentInput {
   courseId: string;
+  couponCode?: string;
 }
 
 /**

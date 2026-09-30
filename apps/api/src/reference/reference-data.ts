@@ -5,8 +5,10 @@ import {
   COURSE_LEVEL_CODES,
   COURSE_STATUS_CODES,
   CURRENCY_CODES,
+  DISCOUNT_TYPE_CODES,
   LESSON_STATUS_CODES,
   LKP_TYPE_CODES,
+  PAYMENT_STATUS_CODES,
   type LkpTypeCode,
   ROLE_CODES,
   VERIFICATION_STATUS_CODES,
@@ -140,6 +142,30 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at(BOOKING_STATUS_CODES.NO_SHOW, 'No show'),
       at(BOOKING_STATUS_CODES.REJECTED, 'Rejected'),
       at(BOOKING_STATUS_CODES.EXPIRED, 'Expired'),
+    ],
+  },
+  /**
+   * How a coupon applies its discount. `percentage` is an integer 0–100 off the course price;
+   * `fixed` is a flat amount in minor units subtracted from the price.
+   */
+  [LKP_TYPE_CODES.DISCOUNT_TYPE]: {
+    description: 'How a coupon applies its discount',
+    values: [
+      at(DISCOUNT_TYPE_CODES.PERCENTAGE, 'Percentage off'),
+      at(DISCOUNT_TYPE_CODES.FIXED, 'Fixed amount off'),
+    ],
+  },
+  /**
+   * Where a payment stands in its lifecycle. Append-only: a refund is a new row, not a status
+   * change on the original.
+   */
+  [LKP_TYPE_CODES.PAYMENT_STATUS]: {
+    description: 'Where a payment stands in its lifecycle',
+    values: [
+      at(PAYMENT_STATUS_CODES.PENDING, 'Pending'),
+      at(PAYMENT_STATUS_CODES.COMPLETED, 'Completed'),
+      at(PAYMENT_STATUS_CODES.FAILED, 'Failed'),
+      at(PAYMENT_STATUS_CODES.REFUNDED, 'Refunded'),
     ],
   },
 };
