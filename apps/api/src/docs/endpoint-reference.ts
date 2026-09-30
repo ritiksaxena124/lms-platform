@@ -5,8 +5,11 @@ import {
   METHOD_METADATA,
   MODULE_METADATA,
   PATH_METADATA,
+  ROUTE_ARGS_METADATA,
 } from '@nestjs/common/constants';
 import { RequestMethod } from '@nestjs/common/enums/request-method.enum';
+import { RouteParamtypes } from '@nestjs/common/enums/route-paramtypes.enum';
+import { getMetadataStorage } from 'class-validator';
 
 import { API_PREFIX } from '../common/http/api-prefix';
 import { AppModule } from '../app.module';
@@ -33,9 +36,46 @@ export interface EndpointRecord {
   /** What a successful call answers with — `@HttpCode`, or the default Nest picks. */
   statusCode: number;
   access: EndpointAccess;
+  /** What the caller has to send, read off the same decorators the request is checked by. */
+  request: EndpointRequest;
   /** Where the route lives, so a reader who wants the rules behind it can find the file. */
   controller: string;
   handler: string;
+}
+
+/** One field of a body or a query string, as the validator that guards it describes itself. */
+export interface RequestField {
+  /** The property name, which is the key a caller writes. */
+  name: string;
+  /** `@IsOptional`: the field may be left out entirely. */
+  optional: boolean;
+  /** `@ValidateIf`: the rules below bite only when the caller sent something else. A pair half of
+   * which is missing is a mistake the route reports against this field, so the page has to say so. */
+  conditional: boolean;
+  /** `@ValidateNested`: the checks live in another class, which the metadata cannot name back. */
+  nested: boolean;
+  /** What the route answers when this field is wrong — the validator’s own sentence when it has
+   * one, because a page that paraphrased a 400 would be free to be wrong about it. */
+  rules: string[];
+  /** The closed set an enumerated field accepts, empty when the field is not enumerated. */
+  values: string[];
+}
+
+export interface EndpointRequest {
+  /** Names taken from the path, in the order the address offers them. */
+  params: string[];
+  query: RequestField[];
+  body: RequestField[];
+}
+
+/** One `class-validator` rule as it is stored, narrowed to what this export reads. */
+interface ValidationMeta {
+  type: string;
+  name?: string;
+  propertyName: string;
+  constraints: unknown[];
+  message?: string | ((args: never) => string);
+  each: boolean;
 }
 
 /** A controller class, seen only through the metadata hung on it. */
@@ -131,6 +171,169 @@ function statusCodeOf(handler: object, method: string): number {
   return readMeta<number>(HTTP_CODE_METADATA, handler) ?? (method === 'POST' ? 201 : 200);
 }
 
+/**
+ * The sentence a rule tells when the validator itself wrote none.
+ *
+ * Most validators in this API carry their own message — the sentence a form turns red with — and the
+ * export prefers that text, because it is what the route actually answers. This table is the fallback
+ * for the ones that do not, keyed by the `class-validator` name. A name missing from it is an error
+ * rather than an empty list: a field documented as having no rules is a field a caller will get wrong.
+ */
+const RULE_SENTENCES: Record<string, (args: unknown[]) => string> = {
+  isString: () => 'text',
+  isNotEmpty: () => 'not empty',
+  isEmail: () => 'an email address',
+  isUuid: (args) => (args[0] ? `a version-${String(args[0])} uuid` : 'a uuid'),
+  isBoolean: () => 'true or false',
+  isInt: () => 'a whole number',
+  isNumber: () => 'a number',
+  min: (args) => `at least ${String(args[0])}`,
+  max: (args) => `at most ${String(args[0])}`,
+  maxLength: (args) => `at most ${String(args[0])} characters`,
+  minLength: (args) => `at least ${String(args[0])} characters`,
+  isLength: (args) => `between ${String(args[0])} and ${String(args[1])} characters`,
+  isIso8601: () => 'an ISO-8601 instant',
+  isDateString: () => 'a date',
+  isIn: (args) => `one of: ${(args[0] as unknown[]).map(String).join(', ')}`,
+  matches: (args) => `shaped like ${String(args[0])}`,
+  isArray: () => 'a list',
+  arrayMinSize: (args) => `no fewer than ${String(args[0])} entries`,
+  arrayMaxSize: (args) => `no more than ${String(args[0])} entries`,
+  arrayUnique: () => 'no repeats',
+  isDefined: () => 'required',
+  isIanaTimeZone: () => 'an IANA zone like Asia/Kolkata',
+};
+
+/** The three ways a handler’s parameter list says "this part of the request", by enum name. */
+const REQUEST_SOURCES: Record<string, 'body' | 'query' | 'param'> = {
+  BODY: 'body',
+  QUERY: 'query',
+  PARAM: 'param',
+};
+
+/**
+ * `RouteParamtypes` is numeric, so the same read that names HTTP methods names these: built from the
+ * named half and looked up in reverse, rather than writing `3 = body` where an upgrade renumbers it.
+ */
+const PARAM_TYPE_NAMES = new Map<unknown, string>();
+
+for (const [name, value] of Object.entries(RouteParamtypes)) {
+  if (!/^\d+$/.test(name)) PARAM_TYPE_NAMES.set(value, name);
+}
+
+/** Every rule a DTO class holds, grouped by the property it guards, in the order the class declares. */
+export function describeRequestFields(dto: Function): RequestField[] {
+  const stored = getMetadataStorage() as unknown as {
+    getTargetValidationMetadatas: (
+      target: Function,
+      schema: string,
+      always: boolean,
+      strictGroups: boolean,
+    ) => ValidationMeta[];
+  };
+  const fields = new Map<string, RequestField>();
+
+  for (const meta of stored.getTargetValidationMetadatas(dto, dto.name, true, false)) {
+    const field = fields.get(meta.propertyName) ?? {
+      name: meta.propertyName,
+      optional: false,
+      conditional: false,
+      nested: false,
+      rules: [],
+      values: [],
+    };
+    fields.set(meta.propertyName, field);
+
+    // Three decorators describe when the others apply rather than what a value has to look like, and
+    // each one belongs to a flag on the field instead of a line in `rules`.
+    if (meta.type === 'conditionalValidation' && meta.name === 'isOptional') {
+      field.optional = true;
+      continue;
+    }
+    if (meta.type === 'conditionalValidation') {
+      field.conditional = true;
+      continue;
+    }
+    if (meta.type === 'nestedValidation') {
+      field.nested = true;
+      continue;
+    }
+
+    const named = meta.name ?? meta.type;
+    const message = typeof meta.message === 'string' && meta.message.length > 0 ? meta.message : null;
+    const fallback = RULE_SENTENCES[named];
+
+    if (!message && !fallback) {
+      throw new Error(
+        `${dto.name}.${meta.propertyName} is guarded by ${named}, which this export has no sentence for`,
+      );
+    }
+
+    field.rules.push(
+      `${meta.each ? 'each entry: ' : ''}${message ?? fallback?.(meta.constraints) ?? named}`,
+    );
+
+    // An enumerated field states its set, so the page can print the words a caller may send instead
+    // of only the shape of one that is wrong.
+    if (named === 'isIn') field.values = (meta.constraints[0] as unknown[]).map(String);
+  }
+
+  return [...fields.values()];
+}
+
+/** What one handler reads off the request, in the three places a caller can put it. */
+function requestOf(
+  controller: ClassRef,
+  handlerName: string,
+  path: string,
+): EndpointRequest {
+  const routeArgs =
+    (Reflect.getMetadata(ROUTE_ARGS_METADATA, controller, handlerName) as
+      | Record<string, { index: number; data?: unknown }>
+      | undefined) ?? {};
+  const paramTypes =
+    (Reflect.getMetadata('design:paramtypes', controller.prototype, handlerName) as
+      | (Function | undefined)[]
+      | undefined) ?? [];
+
+  const body: RequestField[] = [];
+  const query: RequestField[] = [];
+
+  for (const [key, arg] of Object.entries(routeArgs).sort((a, b) => a[0].localeCompare(b[0]))) {
+    // A custom param decorator — the one that hands the handler the signed-in account — keys itself
+    // with a generated prefix rather than a number, and it reads nothing a caller can send.
+    const [typeRaw] = key.split(':');
+    if (!/^\d+$/.test(typeRaw)) continue;
+
+    const source = REQUEST_SOURCES[PARAM_TYPE_NAMES.get(Number(typeRaw)) ?? ''];
+    if (source === 'param') {
+      const offered = String(arg.data ?? '');
+      if (offered && !path.includes(`:${offered}`)) {
+        throw new Error(
+          `${controller.name}.${handlerName} reads :${offered}, which its address does not offer`,
+        );
+      }
+      continue;
+    }
+    if (!source) continue;
+
+    const dto = paramTypes[arg.index];
+    if (typeof dto !== 'function') {
+      throw new Error(
+        `${controller.name}.${handlerName} takes its ${source} as something other than a DTO class`,
+      );
+    }
+
+    (source === 'body' ? body : query).push(...describeRequestFields(dto));
+  }
+
+  return {
+    params: path.split('/').filter((part) => part.startsWith(':')).map((part) => part.slice(1)),
+    query,
+    body,
+  };
+}
+
 export function collectEndpoints(): EndpointRecord[] {
   const controllers: ClassRef[] = [];
 
@@ -154,11 +357,14 @@ export function collectEndpoints(): EndpointRecord[] {
           );
         }
 
+        const path = joinPath(controllerPath, readMeta<string>(PATH_METADATA, target) ?? '');
+
         return {
           method,
-          path: joinPath(controllerPath, readMeta<string>(PATH_METADATA, target) ?? ''),
+          path,
           statusCode: statusCodeOf(target, method),
           access: accessOf(controller, target),
+          request: requestOf(controller, name, path),
           controller: controller.name,
           handler: name,
         } satisfies EndpointRecord;

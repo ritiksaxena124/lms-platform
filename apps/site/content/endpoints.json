@@ -11,6 +11,158 @@
           "ops"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "section",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: account, teacher_profile, course_authoring, lesson_media, availability, enrollment, booking"
+            ],
+            "values": [
+              "account",
+              "teacher_profile",
+              "course_authoring",
+              "lesson_media",
+              "availability",
+              "enrollment",
+              "booking"
+            ]
+          },
+          {
+            "name": "action",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: account_registered, signed_in, signed_out, session_replay_detected, account_status_changed, account_role_changed, teacher_profile_saved, course_created, course_updated, course_published, course_archived, course_demo_bookings_changed, course_module_created, course_module_updated, course_module_deactivated, course_modules_reordered, lesson_created, lesson_updated, lesson_published, lesson_unpublished, lesson_deactivated, lessons_reordered, lesson_asset_attached, availability_rule_created, availability_rule_updated, availability_rule_retired, enrollment_joined, enrollment_left, booking_requested, booking_confirmed, booking_refused, booking_cancelled, booking_expired"
+            ],
+            "values": [
+              "account_registered",
+              "signed_in",
+              "signed_out",
+              "session_replay_detected",
+              "account_status_changed",
+              "account_role_changed",
+              "teacher_profile_saved",
+              "course_created",
+              "course_updated",
+              "course_published",
+              "course_archived",
+              "course_demo_bookings_changed",
+              "course_module_created",
+              "course_module_updated",
+              "course_module_deactivated",
+              "course_modules_reordered",
+              "lesson_created",
+              "lesson_updated",
+              "lesson_published",
+              "lesson_unpublished",
+              "lesson_deactivated",
+              "lessons_reordered",
+              "lesson_asset_attached",
+              "availability_rule_created",
+              "availability_rule_updated",
+              "availability_rule_retired",
+              "enrollment_joined",
+              "enrollment_left",
+              "booking_requested",
+              "booking_confirmed",
+              "booking_refused",
+              "booking_cancelled",
+              "booking_expired"
+            ]
+          },
+          {
+            "name": "actor",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "a uuid"
+            ],
+            "values": []
+          },
+          {
+            "name": "targetTable",
+            "optional": false,
+            "conditional": true,
+            "nested": false,
+            "rules": [
+              "one of: users, teacher_profile, course, module, lesson, lesson_asset, availability_rule, enrollment, booking",
+              "targetTable must be given together with targetId."
+            ],
+            "values": [
+              "users",
+              "teacher_profile",
+              "course",
+              "module",
+              "lesson",
+              "lesson_asset",
+              "availability_rule",
+              "enrollment",
+              "booking"
+            ]
+          },
+          {
+            "name": "targetId",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "a uuid"
+            ],
+            "values": []
+          },
+          {
+            "name": "from",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "a date"
+            ],
+            "values": []
+          },
+          {
+            "name": "to",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "a date"
+            ],
+            "values": []
+          },
+          {
+            "name": "page",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "pageSize",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 100",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
       "controller": "ActionLogController",
       "handler": "list"
     },
@@ -21,6 +173,34 @@
       "access": {
         "kind": "public",
         "roles": []
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "email",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an email address"
+            ],
+            "values": []
+          },
+          {
+            "name": "password",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 200 characters",
+              "not empty",
+              "text"
+            ],
+            "values": []
+          }
+        ]
       },
       "controller": "AuthController",
       "handler": "login"
@@ -33,6 +213,11 @@
         "kind": "public",
         "roles": []
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "AuthController",
       "handler": "logout"
     },
@@ -43,6 +228,11 @@
       "access": {
         "kind": "session",
         "roles": []
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
       },
       "controller": "AuthController",
       "handler": "me"
@@ -55,6 +245,11 @@
         "kind": "public",
         "roles": []
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "AuthController",
       "handler": "refresh"
     },
@@ -65,6 +260,68 @@
       "access": {
         "kind": "public",
         "roles": []
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "email",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an email address"
+            ],
+            "values": []
+          },
+          {
+            "name": "password",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 12 and 200 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "fullName",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 1 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "role",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: student, teacher"
+            ],
+            "values": [
+              "student",
+              "teacher"
+            ]
+          },
+          {
+            "name": "timezone",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 1 and 64 characters",
+              "text"
+            ],
+            "values": []
+          }
+        ]
       },
       "controller": "AuthController",
       "handler": "register"
@@ -79,6 +336,11 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "AvailabilityController",
       "handler": "list"
     },
@@ -90,6 +352,60 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "weekday",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday."
+            ],
+            "values": []
+          },
+          {
+            "name": "startMinutes",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "endMinutes",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "slotMinutes",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes."
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "AvailabilityController",
@@ -105,6 +421,62 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "weekday",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday.",
+              "A week has seven days, and this one starts counting at Monday."
+            ],
+            "values": []
+          },
+          {
+            "name": "startMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "endMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you.",
+              "Give the time as minutes from midnight, local to you."
+            ],
+            "values": []
+          },
+          {
+            "name": "slotMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes.",
+              "A class runs from 5 to 240 minutes."
+            ],
+            "values": []
+          }
+        ]
+      },
       "controller": "AvailabilityController",
       "handler": "update"
     },
@@ -117,6 +489,13 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "AvailabilityController",
       "handler": "retire"
@@ -131,6 +510,11 @@
           "student"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "BookingsController",
       "handler": "mine"
     },
@@ -142,6 +526,34 @@
         "kind": "session",
         "roles": [
           "student"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "course",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 200 characters",
+              "not empty",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "startsAt",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Pick a class from the calendar."
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "BookingsController",
@@ -157,6 +569,13 @@
           "student"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "BookingsController",
       "handler": "cancel"
     },
@@ -169,6 +588,13 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "BookingsController",
       "handler": "confirm"
@@ -183,6 +609,13 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "BookingsController",
       "handler": "reject"
     },
@@ -193,6 +626,13 @@
       "access": {
         "kind": "session",
         "roles": []
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "BookingsController",
       "handler": "room"
@@ -207,6 +647,11 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "BookingsController",
       "handler": "classes"
     },
@@ -219,6 +664,11 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
       },
       "controller": "BookingsController",
       "handler": "requests"
@@ -233,6 +683,24 @@
           "student"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "course",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 200 characters",
+              "not empty",
+              "text"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
       "controller": "BookingsController",
       "handler": "slots"
     },
@@ -243,6 +711,57 @@
       "access": {
         "kind": "public",
         "roles": []
+      },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "level",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 2 and 64 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "q",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 2 and 80 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "page",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "pageSize",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 24",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
       },
       "controller": "CatalogController",
       "handler": "list"
@@ -255,6 +774,13 @@
         "kind": "optional-session",
         "roles": []
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CatalogController",
       "handler": "read"
     },
@@ -265,6 +791,14 @@
       "access": {
         "kind": "optional-session",
         "roles": []
+      },
+      "request": {
+        "params": [
+          "id",
+          "lessonId"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "CatalogController",
       "handler": "lesson"
@@ -277,6 +811,14 @@
         "kind": "optional-session",
         "roles": []
       },
+      "request": {
+        "params": [
+          "id",
+          "lessonId"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CatalogController",
       "handler": "video"
     },
@@ -287,6 +829,11 @@
       "access": {
         "kind": "public",
         "roles": []
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
       },
       "controller": "CatalogController",
       "handler": "levels"
@@ -301,6 +848,23 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "status",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 2 and 32 characters",
+              "text"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
       "controller": "CoursesController",
       "handler": "list"
     },
@@ -312,6 +876,75 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "title",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 4 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "slug",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Use lowercase letters, numbers and hyphens, 3 to 80 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "summary",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 180 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "description",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 5000 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "level",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 2 and 64 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "price",
+            "optional": true,
+            "conditional": false,
+            "nested": true,
+            "rules": [],
+            "values": []
+          }
         ]
       },
       "controller": "CoursesController",
@@ -327,6 +960,13 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CourseModulesController",
       "handler": "list"
     },
@@ -338,6 +978,47 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "title",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 3 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "summary",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 180 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "description",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 5000 characters",
+              "text"
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "CourseModulesController",
@@ -353,6 +1034,48 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "title",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 3 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "summary",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 180 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "description",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 5000 characters",
+              "text"
+            ],
+            "values": []
+          }
+        ]
+      },
       "controller": "CourseModulesController",
       "handler": "update"
     },
@@ -366,6 +1089,14 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "courseId",
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CourseModulesController",
       "handler": "deactivate"
     },
@@ -377,6 +1108,28 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "moduleIds",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "each entry: a version-4 uuid",
+              "no repeats",
+              "no more than 200 entries",
+              "no fewer than 1 entries",
+              "a list"
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "CourseModulesController",
@@ -392,6 +1145,37 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "courseId"
+        ],
+        "query": [
+          {
+            "name": "page",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "pageSize",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 100",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
       "controller": "CourseRosterController",
       "handler": "list"
     },
@@ -405,6 +1189,13 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CoursesController",
       "handler": "read"
     },
@@ -416,6 +1207,77 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "title",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 4 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "slug",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Use lowercase letters, numbers and hyphens, 3 to 80 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "summary",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 180 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "description",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 5000 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "level",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 2 and 64 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "price",
+            "optional": true,
+            "conditional": false,
+            "nested": true,
+            "rules": [],
+            "values": []
+          }
         ]
       },
       "controller": "CoursesController",
@@ -431,6 +1293,13 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CoursesController",
       "handler": "archive"
     },
@@ -442,6 +1311,24 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "enabled",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Say true to open this course to a trial call, false to close it."
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "CoursesController",
@@ -457,6 +1344,13 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "CoursesController",
       "handler": "publish"
     },
@@ -469,6 +1363,11 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
       },
       "controller": "CoursesController",
       "handler": "currencies"
@@ -483,6 +1382,11 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "CoursesController",
       "handler": "levels"
     },
@@ -496,6 +1400,11 @@
           "student"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "EnrollmentsController",
       "handler": "list"
     },
@@ -507,6 +1416,23 @@
         "kind": "session",
         "roles": [
           "student"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "courseId",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 1 and 120 characters",
+              "text"
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "EnrollmentsController",
@@ -522,6 +1448,13 @@
           "student"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "EnrollmentsController",
       "handler": "cancel"
     },
@@ -532,6 +1465,11 @@
       "access": {
         "kind": "public",
         "roles": []
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
       },
       "controller": "HealthController",
       "handler": "check"
@@ -546,6 +1484,13 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "moduleId"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "LessonsController",
       "handler": "list"
     },
@@ -557,6 +1502,48 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "moduleId"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "title",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 3 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "body",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 20000 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "estimatedMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 600",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "LessonsController",
@@ -572,6 +1559,69 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "moduleId",
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "title",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 3 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "body",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 20000 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "estimatedMinutes",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 600",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "isFreePreview",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "true or false"
+            ],
+            "values": []
+          },
+          {
+            "name": "moduleId",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "a version-4 uuid"
+            ],
+            "values": []
+          }
+        ]
+      },
       "controller": "LessonsController",
       "handler": "update"
     },
@@ -584,6 +1634,14 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [
+          "moduleId",
+          "id"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "LessonsController",
       "handler": "deactivate"
@@ -598,6 +1656,14 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "moduleId",
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "LessonsController",
       "handler": "publish"
     },
@@ -610,6 +1676,14 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [
+          "moduleId",
+          "id"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "LessonsController",
       "handler": "unpublish"
@@ -624,6 +1698,14 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "moduleId",
+          "lessonId"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "LessonAssetsController",
       "handler": "standing"
     },
@@ -636,6 +1718,14 @@
         "roles": [
           "teacher"
         ]
+      },
+      "request": {
+        "params": [
+          "moduleId",
+          "lessonId"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "LessonAssetsController",
       "handler": "attach"
@@ -650,6 +1740,14 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [
+          "moduleId",
+          "lessonId"
+        ],
+        "query": [],
+        "body": []
+      },
       "controller": "LessonAssetsController",
       "handler": "play"
     },
@@ -661,6 +1759,28 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "moduleId"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "lessonIds",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "each entry: a version-4 uuid",
+              "no repeats",
+              "no more than 200 entries",
+              "no fewer than 1 entries",
+              "a list"
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "LessonsController",
@@ -676,6 +1796,61 @@
           "ops"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "status",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: queued, sending, sent, failed, dropped"
+            ],
+            "values": [
+              "queued",
+              "sending",
+              "sent",
+              "failed",
+              "dropped"
+            ]
+          },
+          {
+            "name": "recipient",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "a uuid"
+            ],
+            "values": []
+          },
+          {
+            "name": "page",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "pageSize",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 100",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
       "controller": "OutboxController",
       "handler": "list"
     },
@@ -689,6 +1864,11 @@
           "teacher"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": []
+      },
       "controller": "TeacherProfileController",
       "handler": "read"
     },
@@ -700,6 +1880,81 @@
         "kind": "session",
         "roles": [
           "teacher"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [],
+        "body": [
+          {
+            "name": "headline",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 3 and 140 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "bio",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 0 and 5000 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "subjects",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "each entry: between 1 and 64 characters",
+              "each entry: text",
+              "no more than 12 entries",
+              "no fewer than 1 entries",
+              "a list"
+            ],
+            "values": []
+          },
+          {
+            "name": "timezone",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "an IANA zone like Asia/Kolkata"
+            ],
+            "values": []
+          },
+          {
+            "name": "hourlyRateMinorUnits",
+            "optional": false,
+            "conditional": true,
+            "nested": false,
+            "rules": [
+              "at most 100000000",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "currency",
+            "optional": false,
+            "conditional": true,
+            "nested": false,
+            "rules": [
+              "currency must be a 3-letter code like INR",
+              "text"
+            ],
+            "values": []
+          }
         ]
       },
       "controller": "TeacherProfileController",
@@ -715,6 +1970,73 @@
           "ops"
         ]
       },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "q",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "between 2 and 120 characters",
+              "text"
+            ],
+            "values": []
+          },
+          {
+            "name": "role",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: student, teacher, ops"
+            ],
+            "values": [
+              "student",
+              "teacher",
+              "ops"
+            ]
+          },
+          {
+            "name": "status",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: active, disabled"
+            ],
+            "values": [
+              "active",
+              "disabled"
+            ]
+          },
+          {
+            "name": "page",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          },
+          {
+            "name": "pageSize",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "at most 100",
+              "at least 1",
+              "a whole number"
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
       "controller": "AccountsController",
       "handler": "list"
     },
@@ -727,6 +2049,13 @@
         "roles": [
           "ops"
         ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
       },
       "controller": "AccountsController",
       "handler": "read"
@@ -741,6 +2070,28 @@
           "ops"
         ]
       },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "role",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: student, teacher, ops"
+            ],
+            "values": [
+              "student",
+              "teacher",
+              "ops"
+            ]
+          }
+        ]
+      },
       "controller": "AccountsController",
       "handler": "changeRole"
     },
@@ -752,6 +2103,27 @@
         "kind": "session",
         "roles": [
           "ops"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "status",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "one of: active, disabled"
+            ],
+            "values": [
+              "active",
+              "disabled"
+            ]
+          }
         ]
       },
       "controller": "AccountsController",

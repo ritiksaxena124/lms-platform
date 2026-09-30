@@ -1,9 +1,17 @@
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
+import { IsUrl } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
-import { collectEndpoints, renderEndpoints, type EndpointRecord } from './endpoint-reference';
+import { ACTION_TARGET_TABLE_CODES, ROLE_CODES } from '@lms/shared';
+
+import {
+  collectEndpoints,
+  describeRequestFields,
+  renderEndpoints,
+  type EndpointRecord,
+} from './endpoint-reference';
 
 const COMMITTED = resolve(process.cwd(), '../site/content/endpoints.json');
 
@@ -12,6 +20,15 @@ function find(records: EndpointRecord[], method: string, path: string): Endpoint
 
   if (!found) {
     throw new Error(`${method} ${path} is not in the export`);
+  }
+  return found;
+}
+
+function field(record: EndpointRecord, source: 'body' | 'query', name: string) {
+  const found = record.request[source].find((candidate) => candidate.name === name);
+
+  if (!found) {
+    throw new Error(`${record.method} ${record.path} sends no ${source} field named ${name}`);
   }
   return found;
 }
@@ -109,6 +126,111 @@ describe('the endpoint reference', () => {
     );
     expect(find(endpoints, 'GET', '/api/v1/courses').statusCode).toBe(200);
     expect(find(endpoints, 'POST', '/api/v1/auth/logout').statusCode).toBe(204);
+  });
+
+  it('reflects the fields a caller sends, in the API’s own words', () => {
+    const booking = find(endpoints, 'POST', '/api/v1/bookings');
+
+    expect(booking.request.body.map((entry) => entry.name)).toEqual(['course', 'startsAt']);
+    // The sentence belongs to the validator, not to the docs: this is what the route answers a
+    // student who sends a clock face instead of an instant, so the page and the 400 cannot disagree.
+    expect(field(booking, 'body', 'startsAt').rules).toEqual(['Pick a class from the calendar.']);
+    // Bottom-up, which is the order TypeScript runs decorators in — the same order the metadata
+    // holds them, so the export reports what the validator holds rather than pretending to sort it.
+    expect(field(booking, 'body', 'course').rules).toEqual([
+      'at most 200 characters',
+      'not empty',
+      'text',
+    ]);
+    expect(field(booking, 'body', 'course').optional).toBe(false);
+    // Nothing in this address is a parameter, and nothing is a query string: the whole ask is a body.
+    expect(booking.request.params).toEqual([]);
+    expect(booking.request.query).toEqual([]);
+  });
+
+  it('splits the address apart from the question', () => {
+    expect(find(endpoints, 'GET', '/api/v1/bookings/slots').request).toEqual({
+      params: [],
+      query: [
+        {
+          name: 'course',
+          optional: false,
+          conditional: false,
+          nested: false,
+          rules: ['at most 200 characters', 'not empty', 'text'],
+          values: [],
+        },
+      ],
+      body: [],
+    });
+
+    // A path segment is not a field of a DTO, so it is read off the route’s own shape — and the
+    // upload route, whose bytes are the body, is all address and no fields.
+    expect(find(endpoints, 'PATCH', '/api/v1/users/:id/role').request.params).toEqual(['id']);
+    expect(find(endpoints, 'POST', '/api/v1/modules/:moduleId/lessons/:lessonId/asset').request).toEqual(
+      { params: ['moduleId', 'lessonId'], query: [], body: [] },
+    );
+  });
+
+  it('names the closed set an enumerated field accepts', () => {
+    const role = field(find(endpoints, 'PATCH', '/api/v1/users/:id/role'), 'body', 'role');
+
+    // Which roles exist is `@lms/shared`’s answer, read here rather than retyped: a new role would
+    // otherwise join the API and not the docs.
+    expect(role.values).toEqual(Object.values(ROLE_CODES));
+    expect(role.rules).toEqual([`one of: ${Object.values(ROLE_CODES).join(', ')}`]);
+  });
+
+  it('marks the field that only counts beside its partner', () => {
+    const query = find(endpoints, 'GET', '/api/v1/actions').request.query;
+
+    // `@IsOptional` and `@ValidateIf` are both conditional metadata and neither is a rule about the
+    // value: the first says a field may be left out, the second says its rules only bite when
+    // something else was sent. Only the second is worth a flag, because the prose has to explain it.
+    const optional = query.find((entry) => entry.name === 'page');
+    const paired = query.find((entry) => entry.name === 'targetTable');
+
+    expect(optional).toMatchObject({ optional: true, conditional: false });
+    expect(optional?.rules).toEqual(['at least 1', 'a whole number']);
+    expect(paired).toMatchObject({ optional: false, conditional: true });
+    expect(paired?.rules).toEqual([
+      `one of: ${Object.values(ACTION_TARGET_TABLE_CODES).join(', ')}`,
+      'targetTable must be given together with targetId.',
+    ]);
+  });
+
+  it('says plainly that a route asks for nothing', () => {
+    for (const [method, path] of [
+      ['POST', '/api/v1/auth/logout'],
+      ['GET', '/api/v1/health'],
+    ] as const) {
+      expect(find(endpoints, method, path).request).toEqual({
+        params: [],
+        query: [],
+        body: [],
+      });
+    }
+  });
+
+  it('carries a nested object as one field, because its rules live in another class', () => {
+    const price = field(find(endpoints, 'POST', '/api/v1/courses'), 'body', 'price');
+
+    // `@ValidateNested` hands the checks to `CoursePriceDto`, and which class is not in the metadata
+    // TypeScript keeps for a nullable property. So the export says what it can read and the
+    // endpoint’s own explanation names the two halves — an object silently documented as a leaf would
+    // be worse than one that admits it has children.
+    expect(price).toMatchObject({ optional: true, nested: true, rules: [] });
+  });
+
+  it('refuses to invent a sentence for a rule it has never seen', () => {
+    class UnmappedDto {
+      @IsUrl()
+      website!: string;
+    }
+
+    // A validator the table does not know would otherwise print nothing, and "this field has no
+    // rules" is a lie about a field that has one the tool simply cannot read.
+    expect(() => describeRequestFields(UnmappedDto)).toThrow(/isUrl/);
   });
 
   it('sorts by resource so the rendered table reads in one order', () => {
