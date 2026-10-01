@@ -50,16 +50,22 @@ every route: with video set to `none` the platform answers that it does not run 
 caller has to guess. And the caller mints the storage key — an endpoint asks for a uuid rather than
 trusting a filename, because a filename is not unique across teachers and a lesson id is guessable.
 
-Payment is the port that is deliberately still a plan. A course carries a price and nothing is
-charged; `PAYMENT_PROVIDER` defaults to `none` so that no code can pretend otherwise.
+Payment is the [[port]] that was never written. `PAYMENT_PROVIDER` exists in the environment and is read at
+the door by nothing else — there is no `providers/payment` beside `mail`, `storage` and `video`, because
+no route has needed to ask a vendor anything.
 
-**Phase 9 update:** The coupon and payment system is now in place. Teachers can issue discount codes
-per course, each carrying a percentage or fixed-amount discount, validity windows, and usage caps.
-When a student enrolls with a valid coupon code, the enrollment endpoint validates the code against
-the course, calculates the discounted price, creates a payment record linking the enrollment to the
-coupon used, and increments the redemption counter — all within the same database transaction that
-opens the place. The payment provider remains behind its port (currently set to `mock` for development),
-so the financial ledger exists regardless of which vendor processes the actual transaction.
+What Phase 9 built sits in front of that gap rather than across it. A teacher issues discount codes per
+course, each carrying a percentage or fixed-amount discount, a validity window and an optional cap on
+redemptions. When a learner enrolls with a code, the enrollment endpoint checks it against the course,
+works out the discounted price, writes a `payment` row linking the enrollment to the coupon, and
+increments the redemption count — all inside the transaction that opens the place. An expired,
+exhausted or unknown code is refused before the place opens, so a bad code never costs a learner their
+seat.
+
+None of that is a charge. The `payment` row records what the class was priced at; its
+`providerReference` is a literal string, not a receipt, and no money moved anywhere. Wiring a provider
+means building the port the other three were built as — an interface, a `none` adapter that means it
+honestly, and an env switch — and the `payment` table is where that port will hang.
 
 ## One session, four doors
 
@@ -75,7 +81,7 @@ load instead of trusting what it remembered.
 ## The work nobody asked for
 
 Two scheduled jobs do the things a teacher and a student both expect to have happened without either
-of them pressing a button. Every five minutes the outbox is claimed and delivered, with a retry
+of them pressing a button. Every five minutes the [[outbox]] is claimed and delivered, with a retry
 budget and a failure reason kept on the row. Every hour a booking request that nobody answered
 expires, releasing the minute it was holding.
 
@@ -91,7 +97,7 @@ database rather than carried out quietly. The one exception is the ledger, which
 an edit nor a retirement — see [The data model](/docs/data-model).
 
 Two consequences worth knowing before you write a query: a retired row still holds its business key,
-so a slug, an email or a subject pair stays reserved after its owner is archived; and a roster, a
+so a slug, an email or a subject pair stays reserved after its owner is archived; and a [[roster]], a
 class list or a count is read from the rows that survived, never copied onto a parent row that would
 then disagree with them.
 
