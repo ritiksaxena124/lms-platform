@@ -164,6 +164,23 @@ describe('ConfirmDialog', () => {
     );
   });
 
+  it('says the consequence once, since the sheet is asked one question', () => {
+    render(
+      <ConfirmDialog
+        open
+        title="Deactivate this coupon?"
+        message="It can no longer be used for enrollment."
+        confirmLabel="Deactivate"
+        onConfirm={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    );
+
+    // The sentence is both the description and the body, and a reader who sees it twice starts
+    // wondering which half they are meant to act on.
+    expect(screen.getAllByText('It can no longer be used for enrollment.')).toHaveLength(1);
+  });
+
   it('paints a destructive answer as destructive', () => {
     render(
       <ConfirmDialog
