@@ -2,7 +2,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { Coupon } from '@lms/shared';
+import type { Coupon, Course } from '@lms/shared';
 
 import { CouponManager } from './coupon-manager';
 
@@ -14,6 +14,12 @@ const api = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/coupons', () => api);
+
+// A fixed discount is a number of the course's own price units, so the screen has to know that
+// quote to say the amount back in words a teacher can check.
+const courseApi = vi.hoisted(() => ({ readCourse: vi.fn() }));
+
+vi.mock('@/lib/courses', () => courseApi);
 
 // `vi.hoisted`, because the mock factory runs while this file's imports are still resolving: the
 // manager tells a failure through the kit's toast rather than the browser's own alert box.
@@ -41,6 +47,24 @@ function coupon(overrides: Partial<Coupon> = {}): Coupon {
   };
 }
 
+/** The course the codes hang off, quoted in rupees unless a test says otherwise. */
+function course(overrides: Partial<Course> = {}): Course {
+  return {
+    id: 'c1',
+    title: 'Fractions, slowly',
+    slug: 'fractions-slowly',
+    summary: 'A first pass at the topic.',
+    description: 'Start with one pie, end with adding any two fractions.',
+    level: { code: 'beginner', label: 'Beginner' },
+    status: { code: 'published', label: 'Published' },
+    price: { minorUnits: 499900, currency: { code: 'INR', label: 'Indian rupee' } },
+    demoBookingsEnabled: false,
+    createdAt: '2026-09-25T00:00:00.000Z',
+    updatedAt: '2026-09-25T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 beforeEach(() => {
   api.listCoupons.mockReset();
   api.createCoupon.mockReset();
@@ -50,6 +74,8 @@ beforeEach(() => {
   api.updateCoupon.mockResolvedValue(coupon());
   api.deactivateCoupon.mockResolvedValue(coupon({ isActive: false }));
   api.listCoupons.mockResolvedValue([coupon()]);
+  courseApi.readCourse.mockReset();
+  courseApi.readCourse.mockResolvedValue(course());
 });
 
 async function openFormAndTypeCode(code: string) {
@@ -80,7 +106,67 @@ describe('CouponManager', () => {
 
     expect(screen.getByText('FLAT500')).toBeInTheDocument();
     expect(screen.getByText('3 redemptions / 3')).toBeInTheDocument();
-    expect(screen.getByText('Inactive')).toBeInTheDocument();
+    // The read is the codes still on offer — the API's list filters the retired ones out — so a
+    // row that could wear an "Inactive" pill is a state this screen is never shown, and every
+    // row it is shown would say "Active" without meaning anything by it.
+    expect(screen.queryByText('Inactive')).not.toBeInTheDocument();
+    expect(screen.queryByText('Active')).not.toBeInTheDocument();
+    // The number is in the course's own price units, and this course is quoted in rupees.
+    expect(screen.getByText('₹50.00 off')).toBeInTheDocument();
+  });
+
+  it('prices a fixed code in the currency the course is quoted in, not in a default', async () => {
+    courseApi.readCourse.mockResolvedValue(
+      course({ price: { minorUnits: 100000, currency: { code: 'USD', label: 'US dollar' } } }),
+    );
+    api.listCoupons.mockResolvedValue([
+      coupon({ discountType: 'fixed', discountAmount: 5000, code: 'FLAT50' }),
+    ]);
+
+    render(<CouponManager courseId="c1" />);
+
+    expect(await screen.findByText('$50.00 off')).toBeInTheDocument();
+    expect(screen.queryByText('₹50.00 off')).not.toBeInTheDocument();
+  });
+
+  it('leaves a fixed code without a unit when the course carries no price', async () => {
+    courseApi.readCourse.mockResolvedValue(course({ price: null }));
+    api.listCoupons.mockResolvedValue([
+      coupon({ discountType: 'fixed', discountAmount: 5000, code: 'FLAT50' }),
+    ]);
+
+    render(<CouponManager courseId="c1" />);
+
+    // The API will not redeem a fixed discount against a course with no quote, so naming a
+    // currency here would be a promise the enrollment cannot keep.
+    expect(await screen.findByText(/no price/i)).toBeInTheDocument();
+    expect(screen.queryByText(/₹/)).not.toBeInTheDocument();
+  });
+
+  it('tells the teacher what the amount column means, in the course’s currency', async () => {
+    courseApi.readCourse.mockResolvedValue(
+      course({ price: { minorUnits: 100000, currency: { code: 'USD', label: 'US dollar' } } }),
+    );
+
+    render(<CouponManager courseId="c1" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /new coupon/i }));
+    await userEvent.selectOptions(screen.getByLabelText(/^Discount Type/), 'fixed');
+
+    expect(screen.getByText(/2000 = \$20\.00/)).toBeInTheDocument();
+  });
+
+  it('offers a retry when the codes did not arrive, and reads them again on the press', async () => {
+    api.listCoupons.mockRejectedValueOnce(new Error('The read side is having a bad morning.'));
+
+    render(<CouponManager courseId="c1" />);
+
+    await screen.findByRole('heading', { name: /did not (load|arrive)/i });
+    expect(screen.queryByText('SAVE20')).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole('button', { name: /try again/i }));
+
+    expect(await screen.findByText('SAVE20')).toBeInTheDocument();
   });
 
   it('offers a way to write the first code when the course has none', async () => {
@@ -90,7 +176,7 @@ describe('CouponManager', () => {
 
     await openFormAndTypeCode('OPENING');
 
-    expect(screen.getByRole('heading', { name: 'Create Coupon' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: /create coupon/i })).toBeInTheDocument();
   });
 
   it('sends a code in caps and repaints from what the API says is there now', async () => {
