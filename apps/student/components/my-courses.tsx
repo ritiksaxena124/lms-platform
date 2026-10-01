@@ -15,7 +15,7 @@ import {
 } from '@lms/ui';
 import type { Enrollment } from '@lms/shared';
 
-import { NOT_A_LEARNER_MESSAGE, describeFailure, isForbidden } from '@/lib/api';
+import { describeFailure, isForbidden } from '@/lib/api';
 import { formatDay } from '@/lib/dates';
 import { leavePlace, myPlaces } from '@/lib/enrollments';
 
@@ -34,6 +34,9 @@ import { useSession } from './session-provider';
  * costs: nothing that was read is destroyed, and the place can be taken again on the course
  * page — the row the API keeps is the reason the pages already worked through stayed open.
  */
+
+/** The heading on this screen already names the account; this line says what that means here. */
+const NOT_A_LEARNER_NOTE = 'It cannot hold a place, so there is nothing for it to list.';
 
 type ListState =
   | { status: 'loading' }
@@ -62,7 +65,9 @@ export function MyCourses() {
         const notALearner = isForbidden(error);
         setState({
           status: 'failed',
-          message: notALearner ? NOT_A_LEARNER_MESSAGE : describeFailure(error),
+          // The heading already says the account is not a learner's; the line under it carries the
+          // consequence for this screen rather than saying the same thing twice.
+          message: notALearner ? NOT_A_LEARNER_NOTE : describeFailure(error),
           notALearner,
         });
       });
