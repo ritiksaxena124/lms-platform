@@ -19,6 +19,7 @@ import type { Course } from '@lms/shared';
 
 import { describeFailure } from '@/lib/api';
 import { archiveCourse, listCourses, publishCourse, setDemoBookings } from '@/lib/courses';
+import { COURSE_CARD_SCREENS } from '@/components/course-nav';
 
 const TABS = [
   { code: 'all', label: 'All' },
@@ -191,20 +192,16 @@ export function CourseList() {
                   /{course.slug} · updated {UPDATED.format(new Date(course.updatedAt))}
                 </p>
                 <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1">
-                  <Link
-                    href={`/courses/${course.id}/modules`}
-                    transitionTypes={['nav-forward']}
-                    className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
-                  >
-                    Syllabus
-                  </Link>
-                  <Link
-                    href={`/courses/${course.id}/roster`}
-                    transitionTypes={['nav-forward']}
-                    className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
-                  >
-                    Roster
-                  </Link>
+                  {COURSE_CARD_SCREENS.map((screen) => (
+                    <Link
+                      key={screen.key}
+                      href={`/courses/${course.id}/${screen.segment}`}
+                      transitionTypes={['nav-forward']}
+                      className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
+                    >
+                      {screen.label}
+                    </Link>
+                  ))}
                 </div>
               </div>
 

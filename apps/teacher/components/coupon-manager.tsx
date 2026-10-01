@@ -3,35 +3,30 @@
 import { useEffect, useState } from 'react';
 import {
   Button,
+  ConfirmDialog,
   EmptyState,
   ErrorState,
-  Icon,
   Illo,
   SkeletonGroup,
   StatusPill,
+  notify,
   type StatusTone,
 } from '@lms/ui';
-import type { Coupon } from '@lms/shared';
+import { formatMoney, type Coupon } from '@lms/shared';
 
 import { describeFailure } from '@/lib/api';
 import { listCoupons, createCoupon, updateCoupon, deactivateCoupon } from '@/lib/coupons';
 
-const DISCOUNT_TYPE_LABELS: Record<string, string> = {
-  percentage: 'Percentage',
-  fixed: 'Fixed Amount',
-};
-
-const STATUS_TONE: Record<boolean, StatusTone> = {
-  true: 'success',
-  false: 'neutral',
-};
+function statusTone(isActive: boolean): StatusTone {
+  return isActive ? 'success' : 'neutral';
+}
 
 /** Format a discount amount for display */
 function formatDiscount(coupon: Coupon) {
   if (coupon.discountType === 'percentage') {
     return `${coupon.discountAmount}% off`;
   }
-  return `$${(coupon.discountAmount / 100).toFixed(2)} off`;
+  return `${formatMoney({ minorUnits: coupon.discountAmount, currency: 'INR' })} off`;
 }
 
 /** Format validity period */
@@ -47,6 +42,7 @@ export function CouponManager({ courseId }: { courseId: string }) {
   const [error, setError] = useState<{ message: string } | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
 
   // Form state
   const [code, setCode] = useState('');
@@ -58,6 +54,10 @@ export function CouponManager({ courseId }: { courseId: string }) {
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
+  // The row whose retirement is being asked about, and whether the answer is on its way to the API.
+  const [retiring, setRetiring] = useState<Coupon | null>(null);
+  const [retiringBusy, setRetiringBusy] = useState(false);
+
   const loadCoupons = async () => {
     try {
       setLoading(true);
@@ -65,8 +65,7 @@ export function CouponManager({ courseId }: { courseId: string }) {
       setCoupons(data);
       setError(null);
     } catch (err: unknown) {
-      const { message } = describeFailure(err);
-      setError({ message });
+      setError({ message: describeFailure(err) });
     } finally {
       setLoading(false);
     }
@@ -86,10 +85,12 @@ export function CouponManager({ courseId }: { courseId: string }) {
     setFormError(null);
     setShowForm(false);
     setEditingId(null);
+    setEditingCode(null);
   };
 
   const startEdit = (coupon: Coupon) => {
     setEditingId(coupon.id);
+    setEditingCode(coupon.code);
     setCode(coupon.code);
     setDiscountType(coupon.discountType);
     setDiscountAmount(String(coupon.discountAmount));
@@ -125,8 +126,11 @@ export function CouponManager({ courseId }: { courseId: string }) {
       };
 
       if (editingId) {
+        const next = code.toUpperCase();
         await updateCoupon(courseId, editingId, {
-          code: payload.code !== code.toUpperCase() ? payload.code : undefined,
+          // A coupon is found by its code, so the field only goes to the API when the teacher
+          // actually retyped it; leaving it alone must not look like a rename.
+          code: next === editingCode ? undefined : next,
           discountAmount: payload.discountAmount,
           validFrom: payload.validFrom,
           validUntil: payload.validUntil,
@@ -146,29 +150,30 @@ export function CouponManager({ courseId }: { courseId: string }) {
     }
   };
 
-  const handleDeactivate = async (couponId: string) => {
-    if (!confirm('Deactivate this coupon? It can no longer be used for enrollment.')) {
-      return;
-    }
-
+  const retireCoupon = async (coupon: Coupon) => {
+    setRetiringBusy(true);
     try {
-      await deactivateCoupon(courseId, couponId);
+      await deactivateCoupon(courseId, coupon.id);
+      // A form left open on a code that just stopped working would write back to a dead row.
+      if (editingId === coupon.id) resetForm();
       await loadCoupons();
+      setRetiring(null);
     } catch (err: unknown) {
-      const { message } = describeFailure(err);
-      alert(`Failed to deactivate: ${message}`);
+      setRetiring(null);
+      notify.error(describeFailure(err));
+    } finally {
+      setRetiringBusy(false);
     }
   };
 
   if (loading) {
     return (
-      <SkeletonGroup>
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-gray-100" />
-          ))}
-        </div>
-      </SkeletonGroup>
+      <SkeletonGroup
+        rows={3}
+        rowClassName="h-16"
+        label="Loading the course coupons"
+        className="space-y-3"
+      />
     );
   }
 
@@ -177,23 +182,19 @@ export function CouponManager({ courseId }: { courseId: string }) {
       <ErrorState
         title="Could not load coupons"
         message={error.message}
-        action={<Button onClick={loadCoupons}>Try Again</Button>}
+        onRetry={loadCoupons}
       />
     );
   }
 
-  if (!coupons || coupons.length === 0) {
+  if (!coupons || (coupons.length === 0 && !showForm)) {
     return (
       <EmptyState
-        icon={<Illo name="empty-state" />}
+        illustration={<Illo src="/illustrations/peep-standing-11.svg" size="lg" />}
         title="No coupons yet"
         description="Create discount codes to offer reduced pricing for this course."
-        action={
-          <Button onClick={() => setShowForm(true)}>
-            <Icon name="plus" className="mr-2 h-4 w-4" />
-            Create Coupon
-          </Button>
-        }
+        actionLabel="Create a coupon"
+        onAction={() => setShowForm(true)}
       />
     );
   }
@@ -203,10 +204,7 @@ export function CouponManager({ courseId }: { courseId: string }) {
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Coupons</h3>
         {!showForm && (
-          <Button onClick={() => setShowForm(true)}>
-            <Icon name="plus" className="mr-2 h-4 w-4" />
-            New Coupon
-          </Button>
+          <Button onClick={() => setShowForm(true)}>New Coupon</Button>
         )}
       </div>
 
@@ -265,7 +263,7 @@ export function CouponManager({ courseId }: { courseId: string }) {
                 className="w-full rounded-md border px-3 py-2 text-sm"
               />
               <p className="text-xs text-gray-500 mt-1">
-                {discountType === 'percentage' ? '0-100%' : 'In cents (e.g., 2000 = $20.00)'}
+                {discountType === 'percentage' ? '0-100%' : 'Minor units: 2000 = ₹20.00'}
               </p>
             </div>
 
@@ -329,7 +327,7 @@ export function CouponManager({ courseId }: { courseId: string }) {
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="font-mono text-sm font-semibold">{coupon.code}</span>
-                  <StatusPill tone={STATUS_TONE[coupon.isActive]}>
+                  <StatusPill tone={statusTone(coupon.isActive)}>
                     {coupon.isActive ? 'Active' : 'Inactive'}
                   </StatusPill>
                 </div>
@@ -344,13 +342,18 @@ export function CouponManager({ courseId }: { courseId: string }) {
               <div className="flex gap-2">
                 {coupon.isActive && (
                   <>
-                    <Button size="sm" variant="ghost" onClick={() => startEdit(coupon)}>
-                      <Icon name="edit" className="h-4 w-4" />
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-label={`Edit ${coupon.code}`}
+                      onClick={() => startEdit(coupon)}
+                    >
+                      Edit
                     </Button>
                     <Button
                       size="sm"
                       variant="danger"
-                      onClick={() => handleDeactivate(coupon.id)}
+                      onClick={() => setRetiring(coupon)}
                     >
                       Deactivate
                     </Button>
@@ -361,6 +364,20 @@ export function CouponManager({ courseId }: { courseId: string }) {
           </div>
         ))}
       </div>
+
+      <ConfirmDialog
+        open={retiring !== null}
+        busy={retiringBusy}
+        tone="danger"
+        title={retiring ? `Deactivate ${retiring.code}?` : ''}
+        message="It can no longer be used for enrollment."
+        confirmLabel="Deactivate"
+        cancelLabel="Keep it"
+        onConfirm={() => {
+          if (retiring) void retireCoupon(retiring);
+        }}
+        onClose={() => setRetiring(null)}
+      />
     </div>
   );
 }

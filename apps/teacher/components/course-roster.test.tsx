@@ -122,18 +122,13 @@ describe('CourseRoster', () => {
     expect(screen.queryByRole('list')).not.toBeInTheDocument();
   });
 
-  it('names the course the roster belongs to, and links back to the work around it', async () => {
+  it('names the course the roster belongs to', async () => {
     render(<CourseRoster courseId="c1" />);
 
     expect(await screen.findByText('Fractions, slowly')).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Syllabus' })).toHaveAttribute(
-      'href',
-      '/courses/c1/modules',
-    );
-    expect(screen.getByRole('link', { name: 'Course details' })).toHaveAttribute(
-      'href',
-      '/courses/c1/edit',
-    );
+    // The sibling screens are the strip's job, not this table's: a link here would be a second way
+    // to the same place, and the two would drift.
+    expect(screen.queryByRole('link')).not.toBeInTheDocument();
   });
 
   it('shows a refusal with a way to ask again, and asks for the same page it was on', async () => {
