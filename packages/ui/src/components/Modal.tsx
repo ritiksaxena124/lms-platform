@@ -150,7 +150,6 @@ export function Modal({
 
         {children ? <div className="mt-3 text-[0.9375rem] text-ink">{children}</div> : null}
 
-
         {actions ? (
           <div className="mt-5 flex flex-wrap items-center justify-end gap-2">{actions}</div>
         ) : null}
@@ -208,8 +207,6 @@ export function ConfirmDialog({
           </Button>
         </>
       }
-    >
-      {message}
-    </Modal>
+    />
   );
 }
