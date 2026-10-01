@@ -142,4 +142,22 @@ describe('MyCourses', () => {
 
     expect(screen.getByText(/loading your courses/i)).toBeInTheDocument();
   });
+
+  it('names a session that is not a learner, and does not offer a retry of the same answer', async () => {
+    roster.myPlaces.mockRejectedValueOnce(
+      refused(403, 'FORBIDDEN', 'This account is not allowed to do that.'),
+    );
+    render(<MyCourses />);
+
+    await screen.findByText(/not a learner account/i);
+    // The API's own line would leave the reader looking for a permission they never granted.
+    expect(screen.queryByText(/not allowed to do that/i)).not.toBeInTheDocument();
+    // Pressing "try again" asks the same question of the same session and gets the same 403.
+    expect(screen.queryByRole('button', { name: /try again/i })).not.toBeInTheDocument();
+    expect(roster.myPlaces).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('link', { name: /sign in as a learner/i })).toHaveAttribute(
+      'href',
+      '/login?next=%2Fmy-courses',
+    );
+  });
 });
