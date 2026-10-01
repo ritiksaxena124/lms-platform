@@ -205,6 +205,13 @@ without `localhost` CORS hacks. One shared cookie means one signed-in account pe
 profile: open a second profile (or a private window) to watch the same course as the teacher
 who published it.
 
+The same two settings are why a portal opened as `http://localhost:3001` looks dead rather than
+merely unsigned-in: each portal is built to ask the API at `http://api.localtest.me:4000` (a
+`NEXT_PUBLIC_API_URL`, inlined when the dev server starts) and the API answers CORS only to the
+`localtest.me` origins in `CORS_ORIGINS`, so a page on `localhost` has no API it is allowed to
+talk to and cannot hold the `Domain=localtest.me` session cookie either. Its shelf fails to
+load and says so, naming the address it wants. Use the addresses above.
+
 ### Signing in
 
 `db:seed` also creates three accounts. Their password is not a secret — being easy to type

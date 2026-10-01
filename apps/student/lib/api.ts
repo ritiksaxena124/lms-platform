@@ -329,6 +329,13 @@ export function describeFailure(error: unknown): string {
   return message.trim() === '' ? 'Something went wrong. Please try again.' : message.trim();
 }
 
+/** True when the request never got an answer, rather than an answer that refused.
+ * The difference is what a reader can act on: a 500 wants a retry, while no answer at all
+ * usually means this page was opened on an address that has no API behind it. */
+export function isUnreachable(error: unknown): boolean {
+  return error instanceof ApiError && error.code === NETWORK_ERROR_CODE;
+}
+
 /** A 404 is the catalog's answer to "not published" as much as to "not there". */
 export function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.code === API_ERROR_CODES.NOT_FOUND;
