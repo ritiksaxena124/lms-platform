@@ -96,6 +96,32 @@ export class CoursesController {
   }
 
   /**
+   * Take a live course back to a draft.
+   *
+   * Its own verb rather than a field on `PATCH :id` for the reason `publish` is: the edit form is
+   * closed while a course is on the shelf, so the only way to reach the fields is to come off it,
+   * and a body that could write `status` would let any form publish by accident.
+   */
+  @Post(':id/unpublish')
+  @HttpCode(HttpStatus.OK)
+  async unpublish(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<{ course: Course }> {
+    return { course: await this.courses.unpublish(user.id, id) };
+  }
+
+  /** File an archive away again, as a draft rather than onto the shelf. */
+  @Post(':id/unarchive')
+  @HttpCode(HttpStatus.OK)
+  async unarchive(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<{ course: Course }> {
+    return { course: await this.courses.unarchive(user.id, id) };
+  }
+
+  /**
    * Open or close the course to a trial call from a student who has not taken a place.
    *
    * A route rather than a field on `PATCH :id`, because the edit form is closed once a course is

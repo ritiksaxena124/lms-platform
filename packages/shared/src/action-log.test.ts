@@ -150,6 +150,27 @@ describe('the action vocabulary', () => {
     expect(new Set(shared)).toEqual(new Set(Object.values(MAIL_EVENT_CODES)));
   });
 
+  it('records a course coming back off the shelf as its own decision, not a re-publish', () => {
+    // A teacher taking a live course back to a draft, and one bringing an archived course back, are
+    // both answers to "stop showing this" — so they cannot share `course_published`'s row without the
+    // ledger claiming the opposite decision happened. `lesson_unpublished` is the precedent: the
+    // reverse of a publish is its own code, in the same section, about the same target.
+    expect(ACTION_CODES.COURSE_UNPUBLISHED).toBe('course_unpublished');
+    expect(ACTION_CODES.COURSE_UNARCHIVED).toBe('course_unarchived');
+    for (const code of [ACTION_CODES.COURSE_UNPUBLISHED, ACTION_CODES.COURSE_UNARCHIVED]) {
+      expect(actionShapeFor(code)).toEqual({
+        section: ACTION_SECTION_CODES.COURSE_AUTHORING,
+        targetTable: ACTION_TARGET_TABLE_CODES.COURSE,
+        actorKind: ACTION_ACTOR_KIND_CODES.USER,
+      });
+    }
+    expect(actionLabel(ACTION_CODES.COURSE_UNPUBLISHED)).toBe('Course unpublished');
+    expect(actionLabel(ACTION_CODES.COURSE_UNARCHIVED)).toBe('Course unarchived');
+    // Both are a person pressing a button on the course screen, so neither joins the system list.
+    expect(SYSTEM_ACTION_CODES).not.toContain(ACTION_CODES.COURSE_UNPUBLISHED);
+    expect(SYSTEM_ACTION_CODES).not.toContain(ACTION_CODES.COURSE_UNARCHIVED);
+  });
+
   it('refuses an action nobody declared, rather than recording it under no part at all', () => {
     // The recorder calls this before it writes, so a caller that invented a code gets an error in
     // its own spec rather than a row whose section column would have had to be guessed. The message

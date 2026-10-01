@@ -162,9 +162,16 @@ function toLessonPage(
  * published page inside a live course is still invisible until its own flag is open, which
  * is what lets a teacher pull a half-written page out without archiving the course around it.
  *
+ * The outer gate has one exception, and it belongs to a signed-in reader: a student who holds a
+ * place can still open a course their teacher took back to a draft. A place is something the
+ * student already has, so pausing a term changes who else can join it rather than what they were
+ * promised. An archive is not a pause — filing a run away withdraws the teaching from the people
+ * inside it too, which is the contract the enrollment suite keeps. The shelf listing keeps no
+ * branch for either: a course off the shelf appears on nobody's list of things to take a place in.
+ *
  * Neither gate is a permission check. The shelf and the level list have nobody to check at
  * all — this is the surface in the API a browser reads with no session — so the only identity
- * in them is the row's own status.
+ * in them is the row's own status, plus the one enrollment a signed-in reader brings with them.
  *
  * A third flag, `isFreePreview`, is not a gate on this visibility: it decides whether one
  * published page's body can be opened, and never whether the row appears on the syllabus.
@@ -212,11 +219,17 @@ export class CatalogService {
   }
 
   async read(address: string, viewerId?: string): Promise<CatalogCourseDetail> {
-    const course = await this.catalog.findPublished(courseRef(address), await this.filters({}));
+    const course = await this.catalog.findForReader(
+      courseRef(address),
+      await this.filters({}),
+      viewerId,
+    );
 
     if (!course) {
       // One message for "not published", "retired" and "never there": a browser that could
-      // tell them apart has a list of draft courses to work from.
+      // tell them apart has a list of draft courses to work from. A student holding a place gets
+      // their paused course back from this same answer only while it is a draft — an archive is
+      // the teacher withdrawing the teaching, and it says no to them too.
       throw new NotFoundException({
         code: API_ERROR_CODES.NOT_FOUND,
         message: 'We cannot find that course.',
@@ -224,7 +237,9 @@ export class CatalogService {
     }
 
     // Asked for after the course resolves rather than inside its query, so a stranger's page
-    // costs what it always did: one read and no probe for a place nobody holds.
+    // costs what it always did: one read and no probe for a place nobody holds. The gate above
+    // already consulted the same enrollment when it let a paused course through, so this is the
+    // per-row flag rather than a second door.
     const holdsPlace = viewerId ? await this.catalog.holdsPlace(course.id, viewerId) : false;
 
     return toDetail(course, holdsPlace);
@@ -315,16 +330,19 @@ export class CatalogService {
     return lesson;
   }
 
-  /** The two published statuses, plus the level and phrase a caller filtered on. Codes are
-   * resolved at this edge, so the repository only ever sees lookup ids. */
+  /** The published and draft course statuses plus the published lesson status, with the level and
+   * phrase a caller filtered on. Codes are resolved at this edge, so the repository only ever sees
+   * lookup ids — including the draft one, which is the half of the outer gate a place opens. */
   private async filters(input: CatalogListInput): Promise<CatalogFilters> {
-    const [courseStatus, lessonStatus] = await Promise.all([
+    const [courseStatus, draftCourseStatus, lessonStatus] = await Promise.all([
       this.reference.valueId(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.PUBLISHED),
+      this.reference.valueId(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.DRAFT),
       this.reference.valueId(LKP_TYPE_CODES.LESSON_STATUS, LESSON_STATUS_CODES.PUBLISHED),
     ]);
 
     return {
       courseStatusValueId: courseStatus,
+      draftCourseStatusValueId: draftCourseStatus,
       lessonStatusValueId: lessonStatus,
       levelValueId: input.level ? await this.level(input.level) : null,
       search: input.q ?? null,

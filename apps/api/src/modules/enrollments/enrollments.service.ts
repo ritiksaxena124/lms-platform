@@ -3,7 +3,6 @@ import {
   ACTION_CODES,
   API_ERROR_CODES,
   COURSE_STATUS_CODES,
-  DISCOUNT_TYPE_CODES,
   LKP_TYPE_CODES,
   MAIL_EVENT_CODES,
   PAYMENT_STATUS_CODES,
@@ -217,13 +216,14 @@ export class EnrollmentsService {
     return toEnrollment(place);
   }
 
-  /** The caller's own open places, newest first, and only in courses still on the shelf. */
+  /** The caller's own open places, newest first, in the courses that still open for them — the
+   * shelf, and a course their teacher paused while they were partway through it. */
   async list(studentUserId: string): Promise<Enrollment[]> {
-    const published = await this.reference.valueId(
-      LKP_TYPE_CODES.COURSE_STATUS,
-      COURSE_STATUS_CODES.PUBLISHED,
-    );
-    const rows = await this.enrollments.listOpen(studentUserId, published);
+    const [published, draft] = await Promise.all([
+      this.reference.valueId(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.PUBLISHED),
+      this.reference.valueId(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.DRAFT),
+    ]);
+    const rows = await this.enrollments.listOpen(studentUserId, published, draft);
     return rows.map(toEnrollment);
   }
 

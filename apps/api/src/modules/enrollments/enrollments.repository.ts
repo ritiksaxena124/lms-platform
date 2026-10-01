@@ -198,17 +198,33 @@ export class EnrollmentsRepository {
   /**
    * What the student is inside of, newest first.
    *
-   * Only places that are open, and only in a course that is still on the shelf: a list the
-   * portal can render as links has to be a list of things that will open. The enrollment row
-   * of a retired course is untouched by this filter — it stays for the record the pages the
-   * student already read were opened by.
+   * Only places that are open, and only in a course that still opens for them: one on the shelf, or
+   * one its teacher paused as a draft. This is the catalog's outer gate read from the other side —
+   * there it decides whether a course answers, here whether it appears on a list of links — so a
+   * paused term stays in the reading record of the people who are partway through it.
+   *
+   * An archived course is left off, and the two statuses are named rather than written as "not
+   * archived" for that reason: the archive closes the pages on its students too, and a list the
+   * portal renders as links has to be a list of things that will open. The enrollment row of a
+   * retired course is untouched by this filter — it stays for the record the pages the student
+   * already read were opened by.
    */
-  async listOpen(studentUserId: string, courseStatusValueId: string) {
+  async listOpen(
+    studentUserId: string,
+    publishedCourseStatusValueId: string,
+    draftCourseStatusValueId: string,
+  ) {
     return this.prisma.enrollment.findMany({
       where: {
         studentUserId,
         isActive: true,
-        course: { isActive: true, statusValueId: courseStatusValueId },
+        course: {
+          isActive: true,
+          OR: [
+            { statusValueId: publishedCourseStatusValueId },
+            { statusValueId: draftCourseStatusValueId },
+          ],
+        },
       },
       include: WITH_COURSE,
       orderBy: { createdAt: 'desc' },
