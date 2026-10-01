@@ -2,13 +2,14 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AuthUser, CatalogLessonPage } from '@lms/shared';
+import type { AuthUser, CatalogCourseDetail, CatalogLesson, CatalogLessonPage } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { CourseLesson } from './course-lesson';
 
 const api = vi.hoisted(() => ({
   readLessonPage: vi.fn(),
+  readCatalogCourse: vi.fn(),
   lessonVideoBytes: vi.fn(),
 }));
 const session = vi.hoisted(() => ({
@@ -53,6 +54,56 @@ function page(overrides: Partial<CatalogLessonPage> = {}): CatalogLessonPage {
   };
 }
 
+/** One row of the syllabus as the outline endpoint sends it. The pager's whole vocabulary is
+ * these two fields — where the row sits, and whether this reader may open it. */
+function row(id: string, title: string, position: number, isReadable = true): CatalogLesson {
+  return {
+    id,
+    title,
+    position,
+    estimatedMinutes: 10,
+    isFreePreview: false,
+    isReadable,
+  };
+}
+
+/** The course the fixture page belongs to: two modules, three pages then two. */
+function outline(overrides: Partial<CatalogCourseDetail> = {}): CatalogCourseDetail {
+  return {
+    id: 'b2a1',
+    slug: 'algebra-for-the-cbse-boards',
+    title: 'Algebra for the CBSE boards',
+    summary: null,
+    description: null,
+    level: { code: 'cbse-secondary', label: 'CBSE secondary' },
+    teacher: { displayName: 'Rohan Mehta' },
+    price: null,
+    modules: [
+      {
+        id: 'm1',
+        title: 'Arithmetic progressions',
+        summary: null,
+        position: 1,
+        lessons: [
+          row('l1', 'Why the denominator stays put', 1),
+          row('l2', 'Sum of n terms', 2),
+          row('l3', 'Where the middle goes', 3),
+        ],
+      },
+      {
+        id: 'm2',
+        title: 'Quadratics',
+        summary: null,
+        position: 2,
+        lessons: [row('l4', 'Factoring by grouping', 1), row('l5', 'The formula, carefully', 2)],
+      },
+    ],
+    createdAt: '2026-09-25T00:00:00.000Z',
+    updatedAt: '2026-09-25T00:00:00.000Z',
+    ...overrides,
+  };
+}
+
 /** The API's one answer for "locked", "withdrawn" and "never written", which is the answer
  * this screen has to keep. */
 const unreadable = () =>
@@ -61,6 +112,7 @@ const unreadable = () =>
 beforeEach(() => {
   session.value = { status: 'signed-in', user: ROHAN };
   api.readLessonPage.mockReset().mockResolvedValue(page());
+  api.readCatalogCourse.mockReset().mockResolvedValue(outline());
   api.lessonVideoBytes.mockReset().mockResolvedValue(new Blob(['frame'], { type: 'video/mp4' }));
 });
 
@@ -245,5 +297,171 @@ describe('CourseLesson', () => {
     await screen.findByRole('heading', { name: 'Sum of n terms' });
     expect(api.readLessonPage).toHaveBeenCalledTimes(2);
     expect(screen.getByText(/you hold a place in this course/i)).toBeInTheDocument();
+  });
+
+  describe('the pager', () => {
+    it('links the page before this one and the page after it', async () => {
+      render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+      const previous = await screen.findByRole('link', { name: /why the denominator stays put/i });
+      expect(previous.getAttribute('href')).toBe('/courses/b2a1/lessons/l1');
+      expect(
+        screen.getByRole('link', { name: /where the middle goes/i }).getAttribute('href'),
+      ).toBe('/courses/b2a1/lessons/l3');
+    });
+
+    it('follows the positions, not the order the rows happened to arrive in', async () => {
+      // The second module listed first, and its pages shuffled: what a reader walks is module
+      // position then page position, which is the numbering printed in the header.
+      api.readLessonPage.mockResolvedValue(page({ id: 'l3', position: 3 }));
+      api.readCatalogCourse.mockResolvedValue(
+        outline({
+          modules: [
+            {
+              id: 'm2',
+              title: 'Quadratics',
+              summary: null,
+              position: 2,
+              lessons: [
+                row('l5', 'The formula, carefully', 2),
+                row('l4', 'Factoring by grouping', 1),
+              ],
+            },
+            {
+              id: 'm1',
+              title: 'Arithmetic progressions',
+              summary: null,
+              position: 1,
+              lessons: [
+                row('l2', 'Sum of n terms', 2),
+                row('l3', 'Where the middle goes', 3),
+                row('l1', 'Why the denominator stays put', 1),
+              ],
+            },
+          ],
+        }),
+      );
+      render(<CourseLesson courseId="b2a1" lessonId="l3" />);
+
+      expect(await screen.findByRole('link', { name: /sum of n terms/i })).toHaveAttribute(
+        'href',
+        '/courses/b2a1/lessons/l2',
+      );
+      // Over the module boundary, onto the first page of the next one.
+      expect(screen.getByRole('link', { name: /factoring by grouping/i })).toHaveAttribute(
+        'href',
+        '/courses/b2a1/lessons/l4',
+      );
+      expect(
+        screen.queryByRole('link', { name: /the formula, carefully/i }),
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not offer a locked neighbour as a link', async () => {
+      // The reader is a visitor: the page after this one is behind a place in the course. The
+      // outline already prints that title without a link, so saying the same thing here adds
+      // nothing the API did not already show — but a door that is not one must not look like a
+      // door.
+      api.readCatalogCourse.mockResolvedValue(
+        outline({
+          modules: [
+            {
+              id: 'm1',
+              title: 'Arithmetic progressions',
+              summary: null,
+              position: 1,
+              lessons: [
+                row('l1', 'Why the denominator stays put', 1),
+                row('l2', 'Sum of n terms', 2),
+                row('l3', 'Where the middle goes', 3, false),
+              ],
+            },
+          ],
+        }),
+      );
+      render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+      await screen.findByRole('link', { name: /why the denominator stays put/i });
+      expect(
+        screen.queryByRole('link', { name: /where the middle goes/i }),
+      ).not.toBeInTheDocument();
+      expect(screen.getByText('Where the middle goes')).toBeInTheDocument();
+    });
+
+    it('says the first page is the first, and the last is the last', async () => {
+      api.readLessonPage.mockResolvedValue(page({ id: 'l1', position: 1 }));
+      const first = render(<CourseLesson courseId="b2a1" lessonId="l1" />);
+
+      expect(await screen.findByRole('link', { name: /sum of n terms/i })).toBeInTheDocument();
+      expect(screen.getByText(/start of the course/i)).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /previous/i })).not.toBeInTheDocument();
+
+      first.unmount();
+      api.readLessonPage.mockResolvedValue(
+        page({ id: 'l5', position: 2, module: { id: 'm2', title: 'Quadratics', position: 2 } }),
+      );
+      render(<CourseLesson courseId="b2a1" lessonId="l5" />);
+
+      // The last page keeps its previous one and loses its next: what is left to say is that
+      // there is nothing after this, not a link that goes nowhere.
+      expect(
+        await screen.findByRole('link', { name: /factoring by grouping/i }),
+      ).toBeInTheDocument();
+      expect(screen.getByText(/end of the course/i)).toBeInTheDocument();
+      expect(screen.queryByRole('link', { name: /sum of n terms/i })).not.toBeInTheDocument();
+    });
+
+    it('draws no pager at all for a course of one page', async () => {
+      api.readCatalogCourse.mockResolvedValue(
+        outline({
+          modules: [
+            {
+              id: 'm1',
+              title: 'Arithmetic progressions',
+              summary: null,
+              position: 1,
+              lessons: [row('l2', 'Sum of n terms', 2)],
+            },
+          ],
+        }),
+      );
+      render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+      await screen.findByRole('heading', { name: 'Sum of n terms' });
+      await waitFor(() => expect(api.readCatalogCourse).toHaveBeenCalledTimes(1));
+
+      expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+      expect(screen.queryByText(/start of the course|end of the course/i)).not.toBeInTheDocument();
+    });
+
+    it('hands over the page even when the outline does not arrive', async () => {
+      // The body is the product; the pager is a convenience. A failed second read may not take
+      // the first one's answer down with it, and may not show an error over a page that opened.
+      api.readCatalogCourse.mockRejectedValue(
+        new ApiError({ statusCode: 500, code: 'INTERNAL', message: 'Try again shortly.' }),
+      );
+      render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+
+      await screen.findByRole('heading', { name: 'Sum of n terms' });
+      await waitFor(() => expect(api.readCatalogCourse).toHaveBeenCalledTimes(1));
+
+      expect(screen.getByText(/watch the middle vanish/i)).toBeInTheDocument();
+      expect(screen.queryByRole('navigation')).not.toBeInTheDocument();
+      expect(screen.queryByText(/did not load|try again/i)).not.toBeInTheDocument();
+    });
+
+    it('asks for the outline once and keeps it while the reader moves along the pager', async () => {
+      const { rerender } = render(<CourseLesson courseId="b2a1" lessonId="l2" />);
+      await screen.findByRole('link', { name: /where the middle goes/i });
+
+      api.readLessonPage.mockResolvedValue(page({ id: 'l3', position: 3 }));
+      rerender(<CourseLesson courseId="b2a1" lessonId="l3" />);
+      await screen.findByRole('link', { name: /factoring by grouping/i });
+
+      // The syllabus does not change as one walks it, so the second page costs one read less —
+      // while the page itself is a fresh question, answered twice.
+      expect(api.readCatalogCourse).toHaveBeenCalledTimes(1);
+      expect(api.readLessonPage).toHaveBeenCalledTimes(2);
+    });
   });
 });
