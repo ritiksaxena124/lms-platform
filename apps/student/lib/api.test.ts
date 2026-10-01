@@ -10,6 +10,7 @@ import {
   describeFailure,
   fieldErrors,
   isForbidden,
+  isUnreachable,
   NOT_A_LEARNER_MESSAGE,
   NETWORK_ERROR_CODE,
   onSessionLost,
@@ -497,5 +498,23 @@ describe('isForbidden', () => {
     expect(NOT_A_LEARNER_MESSAGE).toMatch(/learner/i);
     expect(NOT_A_LEARNER_MESSAGE).toMatch(/sign in/i);
     expect(NOT_A_LEARNER_MESSAGE).not.toMatch(/example\.test|password/i);
+  });
+});
+
+describe('isUnreachable', () => {
+  it('is the request that never got an answer', () => {
+    expect(
+      isUnreachable(new ApiError({ statusCode: 0, code: NETWORK_ERROR_CODE, message: 'no' })),
+    ).toBe(true);
+  });
+
+  it('is not a server that answered and refused', () => {
+    // A 500 wants a retry. A page that could not ask anything wants a different address, and
+    // telling it "try again" is how a reader concludes the product is dead.
+    expect(isUnreachable(new ApiError({ statusCode: 500, code: 'INTERNAL', message: 'no' }))).toBe(
+      false,
+    );
+    expect(isUnreachable(new Error('boom'))).toBe(false);
+    expect(isUnreachable(undefined)).toBe(false);
   });
 });

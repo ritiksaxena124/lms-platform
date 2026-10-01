@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { CatalogCourse } from '@lms/shared';
 
-import { ApiError } from '@/lib/api';
+import { ApiError, NETWORK_ERROR_CODE } from '@/lib/api';
 import { CatalogShelf } from './catalog-shelf';
 
 // Hoisted: `vi.mock` calls move above the imports, so a factory may only close over values
@@ -314,5 +314,37 @@ describe('CatalogShelf', () => {
 
     expect(screen.queryByRole('heading', { name: /Algebra/ })).not.toBeInTheDocument();
     expect(screen.getByRole('heading', { name: /Verbs/ })).toBeInTheDocument();
+  });
+
+  it('names the address the portal wants when the API could not be reached at all', async () => {
+    api.browseCatalog.mockRejectedValueOnce(
+      new ApiError({
+        statusCode: 0,
+        code: NETWORK_ERROR_CODE,
+        message: 'The API is unreachable. Check your connection and try again.',
+      }),
+    );
+
+    render(<CatalogShelf />);
+    await screen.findByRole('alert');
+
+    // A reader who typed `localhost:3001` is looking at a shelf that could not ask anything,
+    // and "unreachable, check your connection" reads as a dead product. The address is the
+    // whole answer, so it goes where the failure is first seen.
+    expect(screen.getByText(/student\.localtest\.me:3001/)).toBeInTheDocument();
+  });
+
+  it('does not blame the address when the API answered and refused', async () => {
+    api.browseCatalog.mockRejectedValueOnce(
+      new ApiError({ statusCode: 500, code: 'INTERNAL', message: 'Something went wrong.' }),
+    );
+
+    render(<CatalogShelf />);
+    await screen.findByRole('alert');
+
+    // The server was reached, so the host rule would send a student to change a URL that
+    // already works.
+    expect(screen.queryByText(/localtest\.me/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /try again/i })).toBeInTheDocument();
   });
 });
