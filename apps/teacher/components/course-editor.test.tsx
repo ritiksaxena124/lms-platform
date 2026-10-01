@@ -18,6 +18,8 @@ const api = vi.hoisted(() => ({
   updateCourse: vi.fn(),
   publishCourse: vi.fn(),
   archiveCourse: vi.fn(),
+  unpublishCourse: vi.fn(),
+  unarchiveCourse: vi.fn(),
 }));
 
 vi.mock('@/lib/courses', () => api);
@@ -164,7 +166,7 @@ describe('CourseEditor', () => {
     resolveCreate?.(course());
   });
 
-  it('locks a published course and offers to archive it instead of saving it', async () => {
+  it('locks a published course and offers both ways off the shelf', async () => {
     api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
 
     render(<CourseEditor courseId="c1" />);
@@ -172,8 +174,68 @@ describe('CourseEditor', () => {
 
     expect(screen.getByLabelText('Title')).toBeDisabled();
     expect(screen.queryByRole('button', { name: /^save$/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /archive/i })).toBeEnabled();
-    expect(screen.getByText(/archive it to change what a student is reading/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Unpublish' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Archive' })).toBeEnabled();
+    // The gentler of the two is named first in the note, because a teacher who wants the title
+    // box back is not ending the course.
+    expect(
+      screen.getByText(/unpublish to edit — students already enrolled keep reading it/i),
+    ).toBeInTheDocument();
+  });
+
+  it('unpublishing hands the course back to the teacher to edit', async () => {
+    api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
+    api.unpublishCourse.mockResolvedValue(course({ status: { code: 'draft', label: 'Draft' } }));
+
+    render(<CourseEditor courseId="c1" />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Unpublish' }));
+
+    await waitFor(() => expect(api.unpublishCourse).toHaveBeenCalledWith('c1'));
+    // The row the API answered with is what gets painted: a draft, editable, with Publish on
+    // offer again and no Archive — an archive is only ever a step from the shelf.
+    expect(await screen.findByLabelText('Title')).toBeEnabled();
+    expect(screen.getByText('Draft')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Unpublish' })).not.toBeInTheDocument();
+  });
+
+  it('shows what refusing to unpublish said, and keeps the course on the shelf', async () => {
+    api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
+    api.unpublishCourse.mockRejectedValue(
+      new ApiError({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'Only a published course can be unpublished.',
+        details: {},
+      }),
+    );
+
+    render(<CourseEditor courseId="c1" />);
+    await userEvent.click(await screen.findByRole('button', { name: 'Unpublish' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Only a published course can be');
+    expect(screen.getByText('Published')).toBeInTheDocument();
+    expect(screen.getByLabelText('Title')).toBeDisabled();
+  });
+
+  it('brings an archived course back as a draft, not onto the shelf', async () => {
+    api.readCourse.mockResolvedValue(course({ status: { code: 'archived', label: 'Archived' } }));
+    api.unarchiveCourse.mockResolvedValue(course({ status: { code: 'draft', label: 'Draft' } }));
+
+    render(<CourseEditor courseId="c1" />);
+    // A draft is not archived, so there is nothing to bring back; a course on the shelf is not
+    // filed away either. Only the archive offers this move.
+    expect(screen.queryByRole('button', { name: 'Publish' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeInTheDocument();
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Bring it back as a draft' }));
+    await waitFor(() => expect(api.unarchiveCourse).toHaveBeenCalledWith('c1'));
+
+    // Back among the editable courses, and the shelf is still a decision the teacher has to
+    // make on its own.
+    expect(await screen.findByText('Draft')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
   });
 
   it('archiving hands the course back to the teacher to edit', async () => {
@@ -183,7 +245,7 @@ describe('CourseEditor', () => {
     );
 
     render(<CourseEditor courseId="c1" />);
-    await userEvent.click(await screen.findByRole('button', { name: /archive/i }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Archive' }));
 
     await waitFor(() => expect(api.archiveCourse).toHaveBeenCalledWith('c1'));
     expect(await screen.findByLabelText('Title')).toBeEnabled();
@@ -197,7 +259,7 @@ describe('CourseEditor', () => {
     );
 
     render(<CourseEditor courseId="c1" />);
-    await userEvent.click(await screen.findByRole('button', { name: /publish/i }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish' }));
 
     await waitFor(() => expect(api.publishCourse).toHaveBeenCalledWith('c1'));
     expect(await screen.findByText('Published')).toBeInTheDocument();
@@ -210,7 +272,7 @@ describe('CourseEditor', () => {
     );
 
     render(<CourseEditor courseId="c1" />);
-    await userEvent.click(await screen.findByRole('button', { name: /publish/i }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Publish' }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Fill this in before publishing.');
     expect(screen.getByLabelText('Description')).toHaveAttribute('aria-invalid', 'true');
@@ -367,6 +429,81 @@ describe('CourseEditor', () => {
 
       expect(await screen.findByLabelText('Price')).toBeDisabled();
       expect(screen.getByLabelText('Currency')).toBeDisabled();
+    });
+  });
+
+  describe('the sentences beside the lifecycle moves', () => {
+    /** The bubble a mark describes. The sentence is in the document from the first render — that is
+     * what lets a keyboard reach it — so `data-open` is the only thing the pointer changes. */
+    function tipFor(mark: HTMLElement): HTMLElement | null {
+      return document.getElementById(mark.getAttribute('aria-describedby') ?? '');
+    }
+
+    it('says that archiving closes the pages on the students who hold a place', async () => {
+      const user = userEvent.setup({ delay: null });
+      api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
+
+      render(<CourseEditor courseId="c1" />);
+      const archive = await screen.findByRole('button', { name: 'What Archive does' });
+      await screen.findByRole('button', { name: 'What Unpublish does' });
+
+      expect(tipFor(archive)).not.toHaveAttribute('data-open');
+
+      await user.hover(archive);
+      expect(tipFor(archive)).toHaveAttribute('data-open', 'true');
+      expect(tipFor(archive)).toHaveTextContent(
+        'Ends the course for everybody, including the students who hold a place in it.',
+      );
+    });
+
+    it('says that pausing is not the same move, while both are offered together', async () => {
+      const user = userEvent.setup({ delay: null });
+      api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
+
+      render(<CourseEditor courseId="c1" />);
+      const unpublish = await screen.findByRole('button', { name: 'What Unpublish does' });
+
+      await user.hover(unpublish);
+      expect(tipFor(unpublish)).toHaveTextContent(
+        'Off the shelf for strangers, editable again for you, and still open to every student who holds a place.',
+      );
+    });
+
+    it('says what a draft is about to become before the teacher asks', async () => {
+      const user = userEvent.setup({ delay: null });
+      api.readCourse.mockResolvedValue(course());
+
+      render(<CourseEditor courseId="c1" />);
+      const publish = await screen.findByRole('button', { name: 'What Publish does' });
+
+      await user.hover(publish);
+      expect(tipFor(publish)).toHaveTextContent(
+        'Puts the course on the shelf, lets a student take a place, and locks the form.',
+      );
+    });
+
+    it('says that an archive comes back as a draft and not onto the shelf', async () => {
+      const user = userEvent.setup({ delay: null });
+      api.readCourse.mockResolvedValue(course({ status: { code: 'archived', label: 'Archived' } }));
+
+      render(<CourseEditor courseId="c1" />);
+      const unarchive = await screen.findByRole('button', { name: 'What bringing it back does' });
+
+      await user.hover(unarchive);
+      expect(tipFor(unarchive)).toHaveTextContent(
+        'Returns the course to you as a draft, at the address it never lost. Putting it back on the shelf is a separate decision.',
+      );
+    });
+
+    it('describes the move instead of making it, so a curious hover cannot cost a course its shelf', async () => {
+      const user = userEvent.setup({ delay: null });
+      api.readCourse.mockResolvedValue(course({ status: { code: 'published', label: 'Published' } }));
+
+      render(<CourseEditor courseId="c1" />);
+      const archive = await screen.findByRole('button', { name: 'What Archive does' });
+
+      await user.click(archive);
+      expect(api.archiveCourse).not.toHaveBeenCalled();
     });
   });
 });

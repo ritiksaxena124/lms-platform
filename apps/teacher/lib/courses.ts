@@ -79,6 +79,28 @@ export async function archiveCourse(id: string): Promise<Course> {
 }
 
 /**
+ * The two moves back, each named for the shelf it leaves rather than the state it lands on.
+ *
+ * Both land on `draft`, and the portal does not say so in a request: which state a course comes
+ * back to is the API's rule, and a body that carried one would be a second copy of it. Asking by
+ * verb also keeps the refusal where it belongs — a draft cannot be unpublished, and the answer
+ * that says so comes from the same route the success comes from.
+ */
+export async function unpublishCourse(id: string): Promise<Course> {
+  const { course } = await apiJson<{ course: Course }>(`/courses/${id}/unpublish`, {
+    method: 'POST',
+  });
+  return course;
+}
+
+export async function unarchiveCourse(id: string): Promise<Course> {
+  const { course } = await apiJson<{ course: Course }>(`/courses/${id}/unarchive`, {
+    method: 'POST',
+  });
+  return course;
+}
+
+/**
  * The trial-call switch, on a route of its own rather than as a field of the edit form.
  *
  * The form closes when a course is published, and this is the one decision a teacher keeps

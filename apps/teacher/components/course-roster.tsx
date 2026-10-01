@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Link from 'next/link';
 import {
   Button,
   EmptyState,
@@ -103,22 +102,6 @@ export function CourseRoster({ courseId }: { courseId: string }) {
           <StatusPill tone={STATUS_TONE[course.status.code] ?? 'neutral'}>
             {course.status.label}
           </StatusPill>
-        </div>
-        <div className="flex items-center gap-3">
-          <Link
-            href={`/courses/${courseId}/modules`}
-            transitionTypes={['nav-back']}
-            className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
-          >
-            Syllabus
-          </Link>
-          <Link
-            href={`/courses/${courseId}/edit`}
-            transitionTypes={['nav-back']}
-            className="text-[0.8125rem] text-brand underline-offset-4 hover:underline"
-          >
-            Course details
-          </Link>
         </div>
       </div>
 
