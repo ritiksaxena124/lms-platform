@@ -176,7 +176,7 @@ export class CoursesService {
     if (course.status.code === COURSE_STATUS_CODES.PUBLISHED) {
       throw new ConflictException({
         code: API_ERROR_CODES.CONFLICT,
-        message: 'Archive the course to change what a student is reading.',
+        message: 'Unpublish the course to change what a student is reading.',
       });
     }
 
@@ -266,6 +266,72 @@ export class CoursesService {
           action: ACTION_CODES.COURSE_ARCHIVED,
           targetId: course.id,
           detail: { from: course.status.code, to: COURSE_STATUS_CODES.ARCHIVED },
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Take a live course back to a draft.
+   *
+   * The reverse of `publish`, and deliberately not a fourth status: a course that is not on the
+   * shelf is in the same position it started in — editable, unreadable by a stranger — and a
+   * `paused` or `unpublished` code would ask the catalog and the roster which of the three states
+   * a student still holding a place belongs to. Landing in `draft` means the one transition that
+   * checks what a student would read has to be passed again to go back out, and that the fields
+   * the teacher wanted to change are changeable the moment the course is off the shelf.
+   *
+   * Students already enrolled keep reading it. That is the promise a place makes, and an
+   * unpublished page is a decision about who new can join, not a retraction of what somebody
+   * already bought — the same reasoning that keeps an archived course's roster intact.
+   */
+  async unpublish(teacherUserId: string, id: string): Promise<Course> {
+    const course = await this.owned(teacherUserId, id);
+
+    if (course.status.code !== COURSE_STATUS_CODES.PUBLISHED) {
+      throw new ConflictException({
+        code: API_ERROR_CODES.CONFLICT,
+        message: 'Only a published course can be unpublished.',
+      });
+    }
+
+    const draft = await this.status(COURSE_STATUS_CODES.DRAFT);
+    return toDocument(
+      await this.courses.updateStatus(course.id, draft.id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_UNPUBLISHED,
+          targetId: course.id,
+          detail: { from: course.status.code, to: COURSE_STATUS_CODES.DRAFT },
+        }),
+      ),
+    );
+  }
+
+  /**
+   * Bring an archived course back, as a draft.
+   *
+   * A run that ends in November is written up again in January, and the work in between is editing
+   * — so unarchiving goes to the editable state and not onto the shelf. Straight to published would
+   * be the shortcut this lifecycle keeps refusing: it would put a course in front of students that
+   * nobody has re-read since it was filed away, without ever running the check that publish runs.
+   */
+  async unarchive(teacherUserId: string, id: string): Promise<Course> {
+    const course = await this.owned(teacherUserId, id);
+
+    if (course.status.code !== COURSE_STATUS_CODES.ARCHIVED) {
+      throw new ConflictException({
+        code: API_ERROR_CODES.CONFLICT,
+        message: 'Only an archived course can be brought back.',
+      });
+    }
+
+    const draft = await this.status(COURSE_STATUS_CODES.DRAFT);
+    return toDocument(
+      await this.courses.updateStatus(course.id, draft.id, (tx) =>
+        this.actions.record(tx, {
+          action: ACTION_CODES.COURSE_UNARCHIVED,
+          targetId: course.id,
+          detail: { from: course.status.code, to: COURSE_STATUS_CODES.DRAFT },
         }),
       ),
     );

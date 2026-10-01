@@ -101,7 +101,7 @@ export class CalendarService {
       throw new ConflictException('Another series already exists at this time for this course.');
     }
 
-    const updated = await this.prisma.classSeries.update({
+    await this.prisma.classSeries.update({
       where: { id },
       data: { weekday, startMinutes, endMinutes, durationMinutes },
     });
@@ -119,7 +119,7 @@ export class CalendarService {
       throw new NotFoundException('This series does not belong to this course.');
     }
 
-    const retired = await this.prisma.classSeries.update({
+    await this.prisma.classSeries.update({
       where: { id },
       data: { isActive: false },
     });

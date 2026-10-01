@@ -202,10 +202,16 @@ describe('enrollments', () => {
     // Children before parents: the schema restricts every relation, so the order is the
     // only thing that lets the rows leave.
     const userIds = (
-      await prisma.user.findMany({ where: { email: { contains: `.${RUN}@` } }, select: { id: true } })
+      await prisma.user.findMany({
+        where: { email: { contains: `.${RUN}@` } },
+        select: { id: true },
+      })
     ).map((row) => row.id);
     const courseIds = (
-      await prisma.course.findMany({ where: { teacherUserId: { in: userIds } }, select: { id: true } })
+      await prisma.course.findMany({
+        where: { teacherUserId: { in: userIds } },
+        select: { id: true },
+      })
     ).map((row) => row.id);
     const moduleIds = (
       await prisma.module.findMany({ where: { courseId: { in: courseIds } }, select: { id: true } })
@@ -436,7 +442,10 @@ describe('enrollments', () => {
     await readLesson(courseId, lessonId, sam).expect(200);
 
     const cancelled = await cancelEnrollment(sam, placed.body.enrollment.id).expect(200);
-    expect(cancelled.body.enrollment).toMatchObject({ id: placed.body.enrollment.id, isActive: false });
+    expect(cancelled.body.enrollment).toMatchObject({
+      id: placed.body.enrollment.id,
+      isActive: false,
+    });
 
     // The row stayed: what the student read happened, and a roster that forgets it is a
     // record with a hole in it.
@@ -555,9 +564,7 @@ describe('enrollments', () => {
       const { courseId, locked, free, draft } = await courseWithEveryRow();
 
       const stranger = await readCourse(courseId).expect(200);
-      expect(
-        outlineRows(stranger).find((row) => row.id === locked)?.isReadable,
-      ).toBe(false);
+      expect(outlineRows(stranger).find((row) => row.id === locked)?.isReadable).toBe(false);
       expect(outlineRows(stranger).find((row) => row.id === free)?.isReadable).toBe(true);
 
       await enroll(sam, courseId).expect(200);
@@ -645,6 +652,167 @@ describe('enrollments', () => {
       // portal ever being told to sign in again.
       expect(res.body.code).toBe('TOKEN_INVALID');
       await readCourse(courseId).expect(200);
+    });
+  });
+
+  describe('after the course leaves the shelf', () => {
+    /**
+     * A place is bought once and kept, so taking a course back to a draft is the teacher's decision
+     * about who may *join* from now on — not a revision of what somebody who already joined holds.
+     * The catalog's outer gate becomes: published, or a draft the caller holds a place in. The
+     * inner gate is untouched, because a page its teacher pulled back was never part of the bargain
+     * either way.
+     *
+     * An archive is the one move that does not go this far, and it does not because of the test
+     * above this block: filing a run away is the teacher withdrawing the promise, to the people
+     * inside it as much as to the ones outside. The place row survives, which is why bringing the
+     * course back opens the same pages again rather than needing a new enrollment.
+     *
+     * A stranger's answer does not change. A draft is a draft to anyone without a place in it, and
+     * the shelf keeps hiding it — otherwise unpublishing would be a way to sit a course out on the
+     * catalog while still advertising that something is there.
+     */
+    function readCourse(address: string, token?: string): request.Test {
+      const call = request(app.getHttpServer()).get(`/api/v1/catalog/courses/${address}`);
+      return token ? call.set('Authorization', `Bearer ${token}`) : call;
+    }
+
+    function outlineRows(res: request.Response): OutlineRow[] {
+      return (res.body.course.modules as { lessons: OutlineRow[] }[]).flatMap(
+        (module) => module.lessons,
+      );
+    }
+
+    function moveTheCourse(
+      courseId: string,
+      verb: 'publish' | 'unpublish' | 'archive' | 'unarchive',
+    ): request.Test {
+      return request(app.getHttpServer())
+        .post(`/api/v1/courses/${courseId}/${verb}`)
+        .set('Authorization', `Bearer ${teacher}`);
+    }
+
+    /** A live course with one page a place opens, and a student holding a place in it. */
+    async function enrolledCourse(): Promise<{ courseId: string; lessonId: string }> {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const lessonId = await createLockedLesson(moduleId, teacher);
+      await enroll(sam, courseId).expect(200);
+      return { courseId, lessonId };
+    }
+
+    it('keeps a page open to its student when the course goes back to a draft', async () => {
+      const { courseId, lessonId } = await enrolledCourse();
+      await moveTheCourse(courseId, 'unpublish').expect(200);
+
+      const res = await readLesson(courseId, lessonId, sam).expect(200);
+      expect(res.body.lesson.body).toBe('Cut the pie twice. Nothing about the pie changed.');
+
+      const outline = await readCourse(courseId, sam).expect(200);
+      expect(outlineRows(outline).find((row) => row.id === lessonId)?.isReadable).toBe(true);
+    });
+
+    it('closes a draft run on its students, and opens it again when the course comes back', async () => {
+      const { courseId, lessonId } = await enrolledCourse();
+      await moveTheCourse(courseId, 'archive').expect(200);
+
+      // The one door a place does not open. An archive says this teaching is over, and a page that
+      // kept playing for the last cohort would be a promise the teacher has just withdrawn.
+      await readLesson(courseId, lessonId, sam).expect(404);
+      await readCourse(courseId, sam).expect(404);
+
+      // Coming back lands on a draft, and a draft the student still holds a place in is readable
+      // again — the row was never touched, only the course's status.
+      await moveTheCourse(courseId, 'unarchive').expect(200);
+      await readLesson(courseId, lessonId, sam).expect(200);
+      await readCourse(courseId, sam).expect(200);
+    });
+
+    it('answers a stranger with the draft the way it answers one never written', async () => {
+      const { courseId, lessonId } = await enrolledCourse();
+      await moveTheCourse(courseId, 'unpublish').expect(200);
+
+      // Two comparisons rather than one: the two routes answer with two different sentences on
+      // purpose — each names the half of the address that was wrong — so what a stranger cannot
+      // tell apart is a paused course from one that was never there, page by page.
+      const hiddenCourse = await readCourse(courseId).expect(404);
+      const neverCourse = await readCourse('no-such-course-anywhere').expect(404);
+      expect(failureShape(hiddenCourse.body)).toEqual(failureShape(neverCourse.body));
+
+      const hiddenPage = await readLesson(courseId, lessonId).expect(404);
+      const neverPage = await readLesson(courseId, '00000000-0000-4000-8000-000000000000').expect(
+        404,
+      );
+      expect(failureShape(hiddenPage.body)).toEqual(failureShape(neverPage.body));
+
+      // Nobody new can take a place, which is the whole point of leaving the shelf.
+      const offShelf = await enroll(second, courseId).expect(404);
+      expect(offShelf.body.code).toBe('NOT_FOUND');
+      expect(
+        await prisma.enrollment.count({
+          where: { courseId, studentUserId: await userIdFor('nadia') },
+        }),
+      ).toBe(0);
+    });
+
+    it('keeps the course off the shelf list while its student can still open it', async () => {
+      const { courseId, lessonId } = await enrolledCourse();
+      await moveTheCourse(courseId, 'unpublish').expect(200);
+
+      const shelf = await request(app.getHttpServer()).get('/api/v1/catalog/courses').expect(200);
+      expect((shelf.body.items as { id: string }[]).map((item) => item.id)).not.toContain(courseId);
+
+      // The list and the read are two questions. A place answers the second one.
+      await readLesson(courseId, lessonId, sam).expect(200);
+    });
+
+    it('still keeps a page its teacher pulled back out of reach, shelf or no shelf', async () => {
+      const courseId = await createPublishedCourse(teacher);
+      const moduleId = await createModule(courseId, teacher);
+      const draftLesson = await createDraftLesson(moduleId, teacher);
+      await enroll(sam, courseId).expect(200);
+      await moveTheCourse(courseId, 'unpublish').expect(200);
+
+      // Unpublishing the course did not publish the page. The inner gate is a statement about
+      // the page, and a place in the course does not override what its teacher wrote on it.
+      await readLesson(courseId, draftLesson, sam).expect(404);
+    });
+
+    it('keeps a paused course on the student’s own list, and an archived one off it', async () => {
+      const { courseId } = await enrolledCourse();
+      await moveTheCourse(courseId, 'unpublish').expect(200);
+
+      // The list is the student's door to their own reading. A course they can still open has to
+      // be on it — otherwise pausing a term would hide the term from the people in it.
+      const paused = await myEnrollments(sam).expect(200);
+      expect(
+        paused.body.items.map((item: { course: { id: string } }) => item.course.id),
+      ).toContain(courseId);
+
+      // An archive is the other move, and it takes the course off the list for the same reason it
+      // takes it out of the pages: the teaching has ended. A draft cannot be archived — the shelf
+      // is where a run is finished from — so this goes back up first.
+      await moveTheCourse(courseId, 'publish').expect(200);
+      await moveTheCourse(courseId, 'archive').expect(200);
+      const filed = await myEnrollments(sam).expect(200);
+      expect(
+        filed.body.items.map((item: { course: { id: string } }) => item.course.id),
+      ).not.toContain(courseId);
+    });
+
+    it('reopens the shelf for a stranger when the course goes back up', async () => {
+      const { courseId, lessonId } = await enrolledCourse();
+      await moveTheCourse(courseId, 'unpublish').expect(200);
+      await request(app.getHttpServer())
+        .post(`/api/v1/courses/${courseId}/publish`)
+        .set('Authorization', `Bearer ${teacher}`)
+        .expect(200);
+
+      // The place-holder's answer was never dependent on the course being published, so nothing
+      // about their read moves — which is how a pause can be taken without a cohort noticing.
+      await readLesson(courseId, lessonId, sam).expect(200);
+      await readCourse(courseId).expect(200);
+      await enroll(second, courseId).expect(200);
     });
   });
 });
