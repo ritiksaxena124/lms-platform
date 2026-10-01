@@ -327,6 +327,50 @@ describe('the open class times a student is offered', () => {
     // teacher's answer is not the student reading this list's business.
   });
 
+  it('keeps a minute the standing class is still running through off the grid', async () => {
+    // The offer and the write have to run the same arithmetic, or the calendar is a promise the
+    // platform breaks on the click. This teacher tiles a two-hour morning into hours, so 10:00 is
+    // its own square; a 09:00 class that runs ninety minutes is standing inside that square, and
+    // the booking path already refuses it — so the grid may not show it either.
+    const HOUR = 60 * 60 * 1000;
+    const longTeacher = await register('slotlg', 'teacher');
+    const longStudentId = await userIdFor('slotin');
+    await prisma.user.update({
+      where: { id: await userIdFor('slotlg') },
+      data: { timezone: TEACHER_ZONE },
+    });
+    const longCourse = await createPublishedCourse(longTeacher);
+    await openWeek(longTeacher, { startMinutes: 540, endMinutes: 660, slotMinutes: 60 });
+    await enroll(enrolled, longCourse.id);
+
+    const before = await slotsFor(enrolled, longCourse.id);
+    // Two squares a day, and a run that starts between them splits the pair — so the adjacent pair
+    // is found by its own shape rather than by assuming the grid opens today.
+    const starts = before.slots.map((slot) => new Date(slot.startsAt));
+    const at = starts.findIndex(
+      (startsAt, index) => starts[index + 1]?.getTime() === startsAt.getTime() + HOUR,
+    );
+    const nine = starts[at];
+    const ten = starts[at + 1];
+    if (!nine || !ten) throw new Error('No two offers in this grid sit an hour apart.');
+
+    await book({
+      studentId: longStudentId,
+      teacherId: await userIdFor('slotlg'),
+      courseId: longCourse.id,
+      startsAt: nine,
+      status: BOOKING_STATUS_CODES.CONFIRMED,
+      durationMinutes: 90,
+    });
+
+    const after = await slotsFor(enrolled, longCourse.id);
+    const offered = after.slots.map((slot) => slot.startsAt);
+
+    expect(offered).not.toContain(nine.toISOString());
+    expect(offered).not.toContain(ten.toISOString());
+    expect(after.slots).toHaveLength(before.slots.length - 2);
+  });
+
   it('gives a minute back when the class that held it ended, was cancelled or expired', async () => {
     const before = await slotsFor(enrolled, course.id);
     const settled = [
