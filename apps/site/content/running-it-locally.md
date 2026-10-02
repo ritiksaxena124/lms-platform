@@ -49,6 +49,32 @@ One shared cookie has one consequence worth knowing before you start clicking: a
 signed in as one account at a time, across all the portals. To watch the same course as both the
 teacher who published it and the learner who booked it, open a second profile or a private window.
 
+## Or run it in containers
+
+`bun run dev` is the everyday path. For handing the whole product over — same code, one command, no
+setup on the receiving machine — the repository also builds it as six images behind one gateway:
+
+```bash
+cp docker/.env.example docker/.env.docker   # then set JWT_SECRET:  openssl rand -hex 32
+
+bun run docker:build
+bun run docker:up
+bun run docker:seed
+```
+
+The same five things then answer without a port number: `teacher.localtest.me`,
+`student.localtest.me`, `ops.localtest.me`, `site.localtest.me` and `api.localtest.me`, all on the
+plain-HTTP gateway that keeps the cookie domain and the CORS allowlist exactly as the section above
+describes them. The stack's Postgres is not published, so it does not collide with the server your
+host run uses. Nothing here pushes an image to a registry or deploys anywhere; the images live on the
+machine that built them.
+
+Two properties of that shape are easy to get wrong and are guarded by `bun run docker:check`, which
+runs inside `bun run verify`: a `NEXT_PUBLIC_*` value is fixed when the image is built rather than
+when it starts, so a portal reading a new one needs a build argument; and the API listens on
+`127.0.0.1` unless `LISTEN_HOST` says otherwise, which is right on a laptop and unreachable from
+another container.
+
 ## Checking your work
 
 ```bash

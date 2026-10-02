@@ -1,0 +1,37 @@
+# The build context is the whole repository, because a portal compiles the shared packages from
+# source. Everything below is either this machine's state or something that must never become an
+# image layer.
+
+# Dependencies are installed inside the image, from the lockfile. A Windows `node_modules` copied
+# into a Linux image carries the wrong Prisma engines and the wrong native binaries, and the failure
+# looks like a broken build rather than a wrong file.
+**/node_modules
+
+# Builds are produced by the image build.
+**/.next
+**/dist
+**/out
+**/storybook-static
+**/coverage
+**/*.tsbuildinfo
+**/.turbo
+
+# Secrets and machine-local configuration. `bun run verify` reads `apps/api/.env`; an image that
+# baked it would carry a database password and a live SMTP login to every registry it was pushed to.
+**/.env
+**/.env.*
+!**/.env.example
+
+# Uploaded bytes and the local database directory — runtime state, not source.
+apps/api/storage
+pgdata
+
+# Repository machinery an image never runs.
+.git
+.github
+design.md
+HOURLOOM_BUILDING_PLAYBOOK.md
+**/*.md
+!README.md
+!apps/site/content/**/*.md
+!ARCHITECTURE.md
