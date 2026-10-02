@@ -1,6 +1,6 @@
 # Courses, modules and lessons
 
-Twenty-five routes for everything a teacher authors: the course itself, the syllabus blocks inside it, the pages within those blocks, who holds a place in the class, and the recording attached to a lesson. Every route here is gated to `teacher` — a student or operator with a valid token is refused at the door with `403 FORBIDDEN`.
+Twenty-seven routes for everything a teacher authors: the course itself, the syllabus blocks inside it, the pages within those blocks, who holds a [[place]] in the class, and the recording attached to a lesson. Every route here is gated to `teacher` — a student or operator with a valid token is refused at the door with `403 FORBIDDEN`.
 
 The id in each address is a lookup key, never a permission. The service resolves every call against the courses belonging to this session, so "not yours" and "not there" answer `404` with code `NOT_FOUND` and the sentence `We cannot find that course.` (or module, or lesson). That is deliberate: a colleague probing ids learns nothing about what exists on this platform.
 
@@ -34,7 +34,7 @@ Reads one of the calling teacher's courses. The `:id` must be a valid uuid, or t
 
 Updates one of the calling teacher's courses. The body may contain any subset of `title`, `slug`, `summary`, `description`, `level` and `price`. A `price` of `null` clears both columns; omitting it leaves the quote unchanged. A slug change is checked for uniqueness among this teacher's other courses — a duplicate answers `409` with code `CONFLICT` and `details.validation.slug`.
 
-A published course cannot be edited. The call answers `409` with `CONFLICT` and the sentence `Archive the course to change what a student is reading.` A body that sends every field back unchanged writes nothing and returns the course as-is, with its `updatedAt` untouched.
+A published course cannot be edited. The call answers `409` with `CONFLICT` and the sentence `Unpublish the course to change what a student is reading.` A body that sends every field back unchanged writes nothing and returns the course as-is, with its `updatedAt` untouched.
 
 Success answers `200` with `{ course }`.
 
@@ -44,11 +44,29 @@ Moves a draft course to `published`. The call checks two preconditions: the cour
 
 Publishing is the only way a course reaches a student's shelf. Success answers `200` with `{ course }`, now showing `status.code: "published"`.
 
+## POST /api/v1/courses/:id/unpublish
+
+Moves a published course back to `draft`. The course must currently be `published`; a draft or an archived course answers `409` with `CONFLICT` and `Only a published course can be unpublished.`
+
+This is the pause, not the end. A teacher who wants the title box back mid-week takes the course off the shelf rather than filing the run away, and the fields are editable the moment it lands in `draft` — which is why editing a live course is refused instead of half-allowed. Coming back off the shelf is always [publish](/docs/api-courses#post-courses-id-publish)'s own decision again, because putting a course in front of students is the transition that re-checks what a student would actually read.
+
+Students who already hold a place keep reading the course while it is a draft. Success answers `200` with `{ course }`, now showing `status.code: "draft"`, and files a `course_unpublished` row in the [activity log](/docs/api-platform#get-actions).
+
 ## POST /api/v1/courses/:id/archive
 
 Moves a published course to `archived`. The course must currently be `published`; a draft or already-archived course answers `409` with `CONFLICT` and `Only a published course can be archived.`
 
-Archiving takes the course off the student-facing shelf. Success answers `200` with `{ course }`, now showing `status.code: "archived"`.
+Archiving takes the course off the student-facing shelf, and it is the one move off the shelf that closes the door on the students inside it: filing a run away is the teacher withdrawing the teaching, so the catalog answers `404` for its outline and its pages to everyone, place-holders included. The enrollment rows themselves are untouched — a place is a record of what happened, not a switch — and the course's slug stays reserved.
+
+Success answers `200` with `{ course }`, now showing `status.code: "archived"`.
+
+## POST /api/v1/courses/:id/unarchive
+
+Brings an archived course back, as a `draft`. The course must currently be `archived`; a draft or a published course answers `409` with `CONFLICT` and `Only an archived course can be brought back.`
+
+A run that ends in November is written up again in January, and the work in between is editing — so this lands on the editable state rather than on the shelf. Going straight back to `published` would put a course in front of students that nobody has re-read since it was filed away, without running the check that [publish](/docs/api-courses#post-courses-id-publish) runs.
+
+The students who held places here can read the course again as soon as it is a draft, because their places were never taken away — only the shelf was. Success answers `200` with `{ course }`, now showing `status.code: "draft"`, and files a `course_unarchived` row.
 
 ## POST /api/v1/courses/:id/demo-bookings
 
@@ -146,13 +164,13 @@ This route lives on this address and not a public one because the key these byte
 
 ## GET /api/v1/courses/:courseId/roster
 
-Lists the students who hold a place in one of the calling teacher's courses. Optional query parameters `page` and `pageSize` paginate the results (default page size is reasonable for a class list). Success answers `200` with `{ items: CourseRosterEntry[], page, pageSize, total }`, where `total` counts every open place in the course, not just the ones on this page.
+Lists the students who hold a place in one of the calling teacher's courses. Optional query parameters `page` and `pageSize` paginate the results (default page size is reasonable for a class list). Success answers `200` with `{ items: CourseRosterEntry[], page, pageSize, total }`, where `total` counts every [[open place]] in the course, not just the ones on this page.
 
-Each entry shows the student's `id` and `fullName`, plus `enrolledAt` (the day the place was first taken, which is not the day a student who left came back). There is no email address — a roster answers "who is coming to class", and an address is the field a list like this gains by convenience and never drops. There is also no enrollment id: leaving is the student's decision, so giving the roster a primary key would be an invitation to build the route that removes somebody's place for them.
+Each entry shows the student's `id` and `fullName`, plus `enrolledAt` (the day the place was first taken, which is not the day a student who left came back). There is no email address — a [[roster]] answers "who is coming to class", and an address is the field a list like this gains by convenience and never drops. There is also no enrollment id: leaving is the student's decision, so giving the [[roster]] a primary key would be an invitation to build the route that removes somebody's place for them.
 
 ## GET /api/v1/courses/:courseId/series
 
-Lists recurring weekly class series scheduled for a course. Each series defines a recurring weekly slot (weekday, startMinutes, endMinutes, durationMinutes) that generates regular class sessions.
+Lists recurring weekly class series scheduled for a course. Each [[series]] defines a recurring weekly slot (weekday, startMinutes, endMinutes, durationMinutes) that generates regular class sessions.
 
 ## POST /api/v1/courses/:courseId/series
 

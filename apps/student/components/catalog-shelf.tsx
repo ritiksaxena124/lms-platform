@@ -5,9 +5,21 @@ import Link from 'next/link';
 import { Card, EmptyState, ErrorState, Icon, Illo, SkeletonGroup, Stagger, cn } from '@lms/ui';
 import type { CatalogCourseListResponse, CourseChoice } from '@lms/shared';
 
-import { describeFailure } from '@/lib/api';
+import { describeFailure, isUnreachable } from '@/lib/api';
 import { browseCatalog, catalogLevels, type CatalogSearch } from '@/lib/catalog';
 import { priceLabel } from '@/lib/price';
+
+/**
+ * Said when the request never reached the API at all, which on this portal has one common
+ * cause: the page was opened as `localhost:3001`. The API address and the session cookie are
+ * both named for `localtest.me`, so that page has nothing to ask and no cookie to hold, and
+ * "The API is unreachable" reads as a dead product rather than a wrong address. The shelf is
+ * where a reader lands first, so the rule is written where they hit it.
+ */
+const HOST_RULE =
+  'If this page was opened as localhost:3001, that is the reason: this portal asks the API at ' +
+  'http://api.localtest.me:4000 and keeps its session on a localtest.me cookie, so open it at ' +
+  'http://student.localtest.me:3001 instead.';
 
 /**
  * The shelf: every course a stranger is allowed to see, and the two ways to narrow it.
@@ -98,7 +110,13 @@ export function CatalogShelf() {
         if (alive) setSettled({ key, value: result });
       })
       .catch((error: unknown) => {
-        if (alive) setSettled({ key, value: { message: describeFailure(error) } });
+        if (!alive) return;
+        // A server that answered and refused wants a retry; a request that never landed wants
+        // an address, and only one of those two is worth a sentence about the host.
+        const message = isUnreachable(error)
+          ? `${describeFailure(error)} ${HOST_RULE}`
+          : describeFailure(error);
+        setSettled({ key, value: { message } });
       });
 
     return () => {

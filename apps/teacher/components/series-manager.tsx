@@ -43,9 +43,11 @@ interface SeriesManagerProps {
 /**
  * The recurring weekly slots for one course.
  *
- * A series is a plan — Monday at 09:00–10:00 as a 45-minute class — and the booking endpoint
- * will auto-enroll students into every instance. The grid shows what's running; clicking one
- * lets you adjust its times or retire it.
+ * A series is a plan — Monday at 09:00–10:00 as a 45-minute class — written in the teacher's own
+ * timezone, so the slot repeats every week without anyone maintaining a calendar. Nothing here
+ * books a classroom or enrols a student: a series is only a shape the scheduler can offer slots
+ * from. The list shows what's planned; picking one loads it into the form below so you can adjust
+ * its times or retire it.
  */
 export function SeriesManager({ courseId }: SeriesManagerProps) {
   const [attempt, setAttempt] = useState(0);
@@ -155,6 +157,10 @@ export function SeriesManager({ courseId }: SeriesManagerProps) {
     try {
       await retireSeries(courseId, id);
       notify.success('Series retired');
+      // The row leaves the list, so the form it was opened from has nothing left to edit.
+      setSelected(null);
+      setValues(BLANK);
+      setFields({});
       reload();
     } catch (error: unknown) {
       notify.error(describeFailure(error));
@@ -163,23 +169,26 @@ export function SeriesManager({ courseId }: SeriesManagerProps) {
     }
   }
 
-  if (loading) {
+  if (failed) {
     return (
-      <SkeletonGroup>
-        <Card className="p-4">
-          <div className="h-6 w-32 rounded bg-slate-200" />
-          <div className="mt-4 space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-10 rounded bg-slate-100" />
-            ))}
-          </div>
-        </Card>
-      </SkeletonGroup>
+      <ErrorState
+        title="The series did not load"
+        message={failed.message}
+        onRetry={reload}
+        busy={busy !== null}
+      />
     );
   }
 
-  if (failed) {
-    return <ErrorState message={failed.message} onRetry={reload} />;
+  if (loading) {
+    return (
+      <SkeletonGroup
+        rows={3}
+        rowClassName="h-14"
+        label="Loading the course series"
+        className="space-y-3"
+      />
+    );
   }
 
   return (
@@ -217,32 +226,36 @@ export function SeriesManager({ courseId }: SeriesManagerProps) {
       {/* Form */}
       <form onSubmit={save} className="space-y-3">
         <Select
+          id="weekday"
           label="Day"
           value={values.weekday}
-          onChange={(v) => set('weekday', v)}
+          onChange={(event) => set('weekday', event.target.value)}
           options={DAY_OPTIONS}
           error={fields.weekday?.[0]}
         />
         <div className="grid grid-cols-2 gap-3">
           <TextField
+            id="opens"
             label="Opens"
             value={values.opens}
-            onChange={(v) => set('opens', v)}
+            onChange={(event) => set('opens', event.target.value)}
             placeholder="09:00"
             error={fields.opens?.[0]}
           />
           <TextField
+            id="closes"
             label="Closes"
             value={values.closes}
-            onChange={(v) => set('closes', v)}
+            onChange={(event) => set('closes', event.target.value)}
             placeholder="10:00"
             error={fields.closes?.[0]}
           />
         </div>
         <TextField
+          id="length"
           label="Class length (minutes)"
           value={values.length}
-          onChange={(v) => set('length', v)}
+          onChange={(event) => set('length', event.target.value)}
           placeholder="45"
           error={fields.length?.[0]}
         />
@@ -273,7 +286,7 @@ export function SeriesManager({ courseId }: SeriesManagerProps) {
         <div className="border-t border-line pt-3">
           <Button
             type="button"
-            variant="destructive"
+            variant="danger"
             size="sm"
             onClick={() => retire(selected)}
             disabled={busy !== null}
@@ -281,7 +294,7 @@ export function SeriesManager({ courseId }: SeriesManagerProps) {
             Retire this series
           </Button>
           <p className="mt-1 text-xs text-ink-faint">
-            Retired series stop generating new instances but keep their history.
+            A retired series stops offering slots. Its past bookings stay on record.
           </p>
         </div>
       )}

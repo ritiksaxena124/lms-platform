@@ -68,7 +68,11 @@ function patchCourse(id: string, body: object, token: string): request.Test {
     .send(body);
 }
 
-function transition(id: string, verb: 'publish' | 'archive', token: string): request.Test {
+function transition(
+  id: string,
+  verb: 'publish' | 'archive' | 'unpublish' | 'unarchive',
+  token: string,
+): request.Test {
   return request(app.getHttpServer())
     .post(`/api/v1/courses/${id}/${verb}`)
     .set('Authorization', `Bearer ${token}`);
@@ -381,6 +385,88 @@ describe('courses', () => {
 
     // No hard delete: the row is what a later enrollment would have pointed at.
     expect(await prisma.course.count({ where: { id, isActive: true } })).toBe(1);
+  });
+
+  describe('back off the shelf', () => {
+    /**
+     * The two moves that end a course's time on the shelf both land in the same place: a draft.
+     * Unpublishing is the course editor's own unlock — a teacher who changes their mind about a
+     * headline mid-week needs the field, not a support message — and unarchiving is the second
+     * half of that, because a run that ends in November is written up again in January. Neither
+     * hands the shelf position back on its own: putting a course in front of students is always
+     * the one transition that checks what a student would actually read.
+     */
+    it('takes a published course back to a draft, where it can be edited again', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, COMPLETE, teacher).expect(200);
+      await transition(id, 'publish', teacher).expect(200);
+
+      const res = await transition(id, 'unpublish', teacher).expect(200);
+      expect(res.body.course.status).toMatchObject({ code: 'draft', label: 'Draft' });
+
+      const published = await listCourses(teacher, '?status=published').expect(200);
+      expect(published.body.items.map((item: { id: string }) => item.id)).not.toContain(id);
+
+      await patchCourse(id, { title: 'Fractions, second term' }, teacher).expect(200);
+    });
+
+    it('brings an archived course back as a draft rather than onto the shelf', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, COMPLETE, teacher).expect(200);
+      await transition(id, 'publish', teacher).expect(200);
+      await transition(id, 'archive', teacher).expect(200);
+
+      const res = await transition(id, 'unarchive', teacher).expect(200);
+      expect(res.body.course.status).toMatchObject({ code: 'draft', label: 'Draft' });
+
+      const archived = await listCourses(teacher, '?status=archived').expect(200);
+      expect(archived.body.items.map((item: { id: string }) => item.id)).not.toContain(id);
+
+      // The shelf is still a decision: publishing from here re-runs what a student reads.
+      await transition(id, 'publish', teacher).expect(200);
+    });
+
+    it('refuses a move a course is not in a position to make', async () => {
+      const draft = await createDraft(teacher);
+
+      // Nothing on the shelf to take off, and nothing archived to bring back.
+      await transition(draft, 'unpublish', teacher).expect(409);
+      await transition(draft, 'unarchive', teacher).expect(409);
+
+      const publishedId = await createDraft(teacher);
+      await patchCourse(publishedId, COMPLETE, teacher).expect(200);
+      await transition(publishedId, 'publish', teacher).expect(200);
+
+      // Still on the shelf, so still a course to archive rather than one to recover.
+      await transition(publishedId, 'unarchive', teacher).expect(409);
+    });
+
+    it('publishes a course that was unpublished, with its summary still filled', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, COMPLETE, teacher).expect(200);
+      await transition(id, 'publish', teacher).expect(200);
+      await transition(id, 'unpublish', teacher).expect(200);
+
+      // The fields a course needed to go live the first time are still there, so the round
+      // trip is a pause rather than a reset.
+      await transition(id, 'publish', teacher).expect(200);
+      const res = await getCourse(id, teacher).expect(200);
+      expect(res.body.course.status.code).toBe('published');
+    });
+
+    it('will not let a body take a course off the shelf by writing its own status', async () => {
+      const id = await createDraft(teacher);
+      await patchCourse(id, COMPLETE, teacher).expect(200);
+      await transition(id, 'publish', teacher).expect(200);
+
+      // The same refusal that stops a body publishing: `status` is not a field a patch carries,
+      // so unpublishing through the edit route is not possible whether the course is live or not.
+      const res = await patchCourse(id, { status: 'draft' }, teacher).expect(400);
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+
+      const still = await getCourse(id, teacher).expect(200);
+      expect(still.body.course.status.code).toBe('published');
+    });
   });
 
   describe('what a course costs', () => {

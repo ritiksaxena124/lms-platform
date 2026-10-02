@@ -30,13 +30,17 @@ means and can change who actually does it without re-deciding that.
 
 ## What is real today
 
-Courses with modules, lessons and an attached recording. A free page of a paid course. Enrollment. A
+Courses with modules, lessons and an attached recording. A free page of a paid course. Enrollment, with a discount code a teacher issued and a `payment` row recording
+what the place was priced at. A
 teacher's availability drawn on a calendar in their own time zone, and the requests that come out of
 it. A room for the class that opens in its window and not a minute before. Email at each turn of that
 loop. A log of who changed what, and a screen that reads it back.
 
-What is not: payment. A course carries a price and nothing is charged. A repeating schedule — one
-booked minute is a class, a week that repeats itself is not built yet. And discovery: a teacher is
+What is not: a charge. A course carries a price, a coupon lowers it, and nothing is billed — no payment
+provider is connected, so a `payment` row is a record rather than a receipt. A schedule that repeats: a
+teacher can write down a weekly series and mark a holiday, and both are stored and managed on screen,
+but the booking grid still reads only the availability windows, so a series creates no classes and a
+holiday blocks no date. And discovery: a teacher is
 found by a link someone sent you, not by a search that ranks them.
 
 ## Where to go next

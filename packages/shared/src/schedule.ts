@@ -39,6 +39,13 @@ export interface SlotHorizon {
   to: Date;
 }
 
+/** A class as the booking row tells it: the minute it opened and how long it ran from there. The
+ * two facts the grid needs to know whether a square it is about to offer is already spoken for. */
+export interface ClassStretch {
+  startsAt: Date;
+  durationMinutes: number;
+}
+
 export const SLOT_DAYS_PER_WEEK = 7;
 
 /** How far ahead the platform is willing to look for open classes. Not a promise that a teacher
@@ -171,6 +178,19 @@ export function expandWindows(
   }
 
   return [...slots.values()].sort((a, b) => a.startsAt.getTime() - b.startsAt.getTime());
+}
+
+/**
+ * Whether two classes want the same minute.
+ *
+ * One that ends exactly as another begins leaves both deliverable, which is why both ends are
+ * strict. The calendar that offers a class and the write that books one ask this one question, so
+ * a student is never shown a square the platform refuses the moment they click it.
+ */
+export function stretchesOverlap(a: ClassStretch, b: ClassStretch): boolean {
+  const endsAt = (stretch: ClassStretch) =>
+    stretch.startsAt.getTime() + stretch.durationMinutes * MS_PER_MINUTE;
+  return a.startsAt.getTime() < endsAt(b) && b.startsAt.getTime() < endsAt(a);
 }
 
 /**

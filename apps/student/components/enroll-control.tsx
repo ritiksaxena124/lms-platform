@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { Button, Skeleton, buttonClass, notify } from '@lms/ui';
 import type { Enrollment } from '@lms/shared';
 
-import { describeFailure } from '@/lib/api';
+import { NOT_A_LEARNER_MESSAGE, describeFailure, isForbidden } from '@/lib/api';
 import { formatDay } from '@/lib/dates';
 import { myPlaces, takePlace } from '@/lib/enrollments';
 
@@ -27,11 +27,14 @@ import { useSession } from './session-provider';
  *
  * When the roster cannot be read the button stays. `POST /enrollments` is idempotent, so the
  * write is safe without the read; hiding it would strand a student outside a course they can
- * join because of a failure to *ask* about the thing they came to do.
+ * join because of a failure to *ask* about the thing they came to do. One failure is the
+ * exception: a 403 says the session is live and is not a learner's, and the button under it
+ * could only answer 403 again, so that reader is shown the account door instead.
  */
 
-/** What the roster call has answered: nothing yet, a list, or a failure with no list. */
-type Roster = { places: Enrollment[] } | { failed: true } | null;
+/** What the roster call has answered: nothing yet, a list, or a failure with no list. Which
+ * failure it was matters only for the 403 — every other one leaves the button standing. */
+type Roster = { places: Enrollment[] } | { failed: 'not-a-learner' | 'other' } | null;
 
 export function EnrollControl({
   courseId,
@@ -66,11 +69,13 @@ export function EnrollControl({
           return { key, roster: { places: items } };
         });
       })
-      .catch(() => {
-        // Which failure it was makes no difference to what this screen can do: the button
-        // stays either way, so the one thing worth knowing is that there is no list.
+      .catch((error: unknown) => {
+        // A 403 names the session rather than the connection, and the reader can act on it.
+        // Every other failure leaves the button standing: the one thing worth knowing about
+        // those is that there is no list.
+        const reason = isForbidden(error) ? 'not-a-learner' : 'other';
         setSettled((current) =>
-          !alive || current?.key === key ? current : { key, roster: { failed: true } },
+          !alive || current?.key === key ? current : { key, roster: { failed: reason } },
         );
       });
 
@@ -85,6 +90,22 @@ export function EnrollControl({
     return (
       <div role="status" aria-label="Checking whether you hold a place" className="mt-4">
         <Skeleton className="h-16 w-full rounded-card" />
+      </div>
+    );
+  }
+
+  // A session that is not a learner's is not a connection that has not come back, and the
+  // button under it can only answer 403 again. The door here is the account, not the press.
+  if (roster && 'failed' in roster && roster.failed === 'not-a-learner') {
+    return (
+      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-card border border-line bg-surface px-5 py-4">
+        <p className="max-w-[46ch] text-[0.9375rem] text-ink-muted">{NOT_A_LEARNER_MESSAGE}</p>
+        <Link
+          href={`/login?next=${encodeURIComponent(`/courses/${courseId}`)}`}
+          className={buttonClass({ size: 'sm' })}
+        >
+          Sign in as a learner
+        </Link>
       </div>
     );
   }
@@ -106,7 +127,8 @@ export function EnrollControl({
     } catch (error) {
       // The place was not taken, so nothing about this page has changed. A button that
       // disappeared on a refusal would be a lie about the one thing it was for.
-      notify.error(describeFailure(error));
+      // A 403 says which account would have worked; the API's line only says it did not.
+      notify.error(isForbidden(error) ? NOT_A_LEARNER_MESSAGE : describeFailure(error));
     } finally {
       setPending(false);
     }

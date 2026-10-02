@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
+import { stretchesOverlap, type ClassStretch } from '@lms/shared';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import type { WriteRecorder } from '../action-log/action-recorder';
@@ -192,24 +193,34 @@ export class BookingsRepository {
     });
   }
 
-  /** The minutes this teacher cannot offer, because a standing booking holds them. */
-  async heldStarts(
+  /** The standing classes of this teacher that a grid must not offer, as starts plus lengths.
+   *
+   * A stretch rather than a start, because the read used to hide only the exact minute another
+   * booking began and went on offering the squares that class was still running through — which
+   * the write then refused, on the click. The search opens a day before the horizon for the reason
+   * `overlapWithin` gives: a class that started earlier can be unfinished when the first square of
+   * the horizon appears.
+   */
+  async heldStretches(
     teacherUserId: string,
     blockingStatusValueIds: string[],
     from: Date,
     to: Date,
-  ): Promise<Date[]> {
+  ): Promise<ClassStretch[]> {
     if (blockingStatusValueIds.length === 0) return [];
     const rows = await this.prisma.booking.findMany({
       where: {
         teacherUserId,
         isActive: true,
         statusValueId: { in: blockingStatusValueIds },
-        startsAt: { gte: from, lt: to },
+        startsAt: { gte: new Date(from.getTime() - MS_PER_DAY), lt: to },
       },
-      select: { startsAt: true },
+      select: { startsAt: true, durationMinutes: true },
     });
-    return rows.map((row) => row.startsAt);
+    return rows.map((row) => ({
+      startsAt: row.startsAt,
+      durationMinutes: row.durationMinutes,
+    }));
   }
 
   /** Whether this student has ever taken a demo in this course — any demo, in any state. */
@@ -325,11 +336,13 @@ export class BookingsRepository {
       },
       select: { startsAt: true, durationMinutes: true },
     });
-    return candidates.some(
-      (row) =>
-        row.startsAt.getTime() < endsAt.getTime() &&
-        row.startsAt.getTime() + row.durationMinutes * MS_PER_MINUTE > args.startsAt.getTime(),
-    );
+    const asked: ClassStretch = {
+      startsAt: args.startsAt,
+      durationMinutes: (endsAt.getTime() - args.startsAt.getTime()) / MS_PER_MINUTE,
+    };
+    // The same predicate the offered grid is cut with, so the two cannot disagree about which
+    // minute is somebody else's class.
+    return candidates.some((row) => stretchesOverlap(row, asked));
   }
 
   /** The student's standing request for this course and minute, if the failed insert was theirs. */

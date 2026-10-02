@@ -142,6 +142,19 @@ const ENDPOINTS = JSON.parse(
   readFileSync(resolve(CONTENT_DIR, 'endpoints.json'), 'utf8'),
 ) as EndpointsFile;
 
+/** Every term the prose may mark, and the sentence a reader is given for it. */
+export type Glossary = Record<string, string>;
+
+/**
+ * The words a reader would otherwise guess at, and the one sentence each is worth.
+ *
+ * Read like the two generated exports above, so a missing file stops the build: a page that printed
+ * a mark with no sentence behind it would promise an explanation and show nothing.
+ */
+export const glossary = JSON.parse(
+  readFileSync(resolve(CONTENT_DIR, 'glossary.json'), 'utf8'),
+) as Glossary;
+
 const DATA_MODEL = JSON.parse(
   readFileSync(resolve(CONTENT_DIR, 'data-model.json'), 'utf8'),
 ) as DataModelFile;
@@ -518,6 +531,78 @@ export function explainEndpoints(markdown: string): string {
 }
 
 /**
+ * The `info` glyph, drawn here rather than imported.
+ *
+ * These pages are a static export with no client JavaScript, and a docs page that shipped a React
+ * tree to put a bubble on one word would be a second front end to build and to keep warm. The same
+ * strokes the portals draw, inlined, is the same mark a reader meets in the app.
+ */
+const INFO_GLYPH = [
+  '<svg class="doc-term-mark" aria-hidden="true" width="12" height="12" viewBox="0 0 24 24"',
+  ' fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"',
+  ' stroke-linejoin="round">',
+  '<circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/>',
+  '</svg>',
+].join('');
+
+/** The mark an author writes when a word needs a sentence beside it: `[[roster]]`. */
+const TERM_MARK = /\[\[([^\][]+)\]\]/g;
+
+/**
+ * One marked word, with its sentence hung on it.
+ *
+ * The bubble is written into the page rather than fetched on hover: it is in the document the whole
+ * time, bound with `aria-describedby`, and put away by CSS. A reader who tabs to the word hears what
+ * a reader who hovers it sees, and nothing has to arrive over the network to say either.
+ */
+function termMark(term: string, ids: Set<string>): string {
+  const means = glossary[term];
+
+  if (means === undefined) {
+    throw new Error(
+      `"${term}" is marked as a term on a docs page but glossary.json does not define it — ` +
+        'write the sentence or take the mark out',
+    );
+  }
+
+  const id = uniqueId(`term-${slugify(term)}`, ids);
+
+  // The word and its sentence are left as prose rather than pre-escaped: marked reads them as the
+  // text they are and puts the entities on them once, which is what it does to the paragraph around
+  // them. Escaping here would escape the escape and print `&amp;amp;`.
+  return (
+    `<span class="doc-term" tabindex="0" aria-describedby="${id}">${term}` +
+    `${INFO_GLYPH}` +
+    `<span class="doc-term-tip" id="${id}" role="tooltip">${means}</span></span>`
+  );
+}
+
+/**
+ * The glossary marks in the prose, page by page.
+ *
+ * A fenced block is left alone the way `explainEndpoints` leaves one alone: inside a command somebody
+ * is about to copy, the bytes are the contract, and markup injected there would be pasted too.
+ */
+export function explainTerms(markdown: string): string {
+  const lines = markdown.split('\n');
+  const ids = new Set<string>();
+  const out: string[] = [];
+  let inFence = false;
+
+  for (const line of lines) {
+    if (line.trimStart().startsWith('```')) {
+      inFence = !inFence;
+      out.push(line);
+      continue;
+    }
+
+    out.push(inFence ? line : line.replace(TERM_MARK, (mark, term: string) => termMark(term, ids)));
+  }
+
+  return out.join('\n');
+}
+
+/**
  * The record as the repository keeps it: every phase, what it was for, and whether it shipped.
  *
  * The scope text arrives with the emphasis markers the README writes its statuses with, and marked
@@ -663,7 +748,9 @@ export function readDoc(slug: string): DocPage {
   // Newlines are normalised because the marker is matched across one, and a checkout on Windows
   // writes files with the pair.
   const tokens = marked.lexer(
-    explainEndpoints(fillGenerated(readFileSync(path, 'utf8').replace(/\r\n/g, '\n'))),
+    explainTerms(
+      explainEndpoints(fillGenerated(readFileSync(path, 'utf8').replace(/\r\n/g, '\n'))),
+    ),
   );
   const seen = new Set<string>();
   const headings: DocHeading[] = [];

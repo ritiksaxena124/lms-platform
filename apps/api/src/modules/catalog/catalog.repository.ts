@@ -117,7 +117,10 @@ export type StandingVideoRow = Prisma.LessonAssetGetPayload<{
 export type CatalogCourseRef = { id: string } | { slug: string };
 
 export interface CatalogFilters {
+  /** The `published` course status, resolved at the service edge. */
   courseStatusValueId: string;
+  /** The `draft` course status, which the shelf never lists and a place alone can open. */
+  draftCourseStatusValueId: string;
   lessonStatusValueId: string;
   levelValueId: string | null;
   search: string | null;
@@ -126,6 +129,47 @@ export interface CatalogFilters {
 export interface CatalogPage {
   courses: CourseCardRow[];
   total: number;
+}
+
+/**
+ * The outer gate, in the two shapes it is needed in.
+ *
+ * A stranger sees the shelf and nothing else: published, live, and no other answer distinguishes a
+ * draft from a typo. A student who holds a place is not a stranger, and a course their teacher took
+ * back to a draft does not retract what they took a place in — so for them a draft they belong to
+ * opens the same door, and a paused term can be edited without the cohort noticing.
+ *
+ * An archive is the exception, and the branch is written against `draft` rather than as "not
+ * published" so the exception cannot be forgotten by whoever adds a fourth status later. Filing a
+ * run away is the teacher withdrawing the teaching, to the people inside it as much as the ones
+ * outside — the contract the enrollment suite already holds — while a draft is a term between terms,
+ * with its pages still meant to be finished.
+ *
+ * The place is a branch of this `where` and not a check after it for the reason every gate here is
+ * written inside the query: an author who forgot the second half of a two-part rule gets a hole
+ * rather than a compile error. What the branch cannot do is widen the shelf — `page` above keeps
+ * its published-only statement, so a course that came off the shelf stays off every stranger's list
+ * while the students holding places can still open it.
+ */
+function shelfOrPlace(
+  ref: CatalogCourseRef,
+  filters: CatalogFilters,
+  viewerUserId?: string,
+): Prisma.CourseWhereInput {
+  const standing = { ...ref, isActive: true };
+  if (!viewerUserId) {
+    return { ...standing, statusValueId: filters.courseStatusValueId };
+  }
+  return {
+    ...standing,
+    OR: [
+      { statusValueId: filters.courseStatusValueId },
+      {
+        statusValueId: filters.draftCourseStatusValueId,
+        enrollments: { some: { studentUserId: viewerUserId, isActive: true } },
+      },
+    ],
+  };
 }
 
 @Injectable()
@@ -168,11 +212,16 @@ export class CatalogRepository {
     return { courses, total };
   }
 
-  /** A published course, or nothing. Anything else — a draft, an archive, a typo — is the
-   * same answer, which is the point of a catalog that cannot be walked with a list. */
-  async findPublished(ref: CatalogCourseRef, filters: CatalogFilters) {
+  /** A course one reader may open: on the shelf, or paused as a draft they hold a place in. An
+   * archive opens for nobody.
+   *
+   * A stranger meets the shelf exactly as before — a draft, an archive and a typo are the same
+   * answer, which is the point of a catalog that cannot be walked with a list. A student who took a
+   * place is not a stranger: their course coming back off the shelf changes who else can join it,
+   * not what they already have, so a paused term is still theirs to finish. */
+  async findForReader(ref: CatalogCourseRef, filters: CatalogFilters, viewerUserId?: string) {
     const course = await this.prisma.course.findFirst({
-      where: { ...ref, isActive: true, statusValueId: filters.courseStatusValueId },
+      where: shelfOrPlace(ref, filters, viewerUserId),
       include: SYLLABUS_INCLUDE(filters.lessonStatusValueId),
     });
     return course;
@@ -181,11 +230,11 @@ export class CatalogRepository {
   /**
    * Whether this reader holds a place in a course they are already looking at.
    *
-   * A separate probe rather than a branch inside the syllabus query, which is where the page
-   * route put the same fact: there it decides whether a `body` leaves the database at all, so
-   * it has to share the gates' `where` and be impossible to forget. Here it only colours a
-   * flag on rows that are already published and live — no answer this probe gives can reveal
-   * a draft — so the syllabus query stays the single statement of what is on the shelf.
+   * The same fact `shelfOrPlace` puts in a `where`, asked a second time because it answers two
+   * different questions: there it decides whether a course leaves the database at all, here it
+   * colours `isReadable` on each row of the outline that did. The page route keeps its copy inside
+   * its own query for the reason it always did — a `body` is the thing at stake — while the outline
+   * needs the per-row flag, and no row can be marked readable in a course the gate refused.
    */
   async holdsPlace(courseId: string, studentUserId: string) {
     const place = await this.prisma.enrollment.findFirst({
@@ -199,15 +248,17 @@ export class CatalogRepository {
    * One page, with its body — the only query in this app that hands text over.
    *
    * Every gate is in this single query rather than compared after the fact: the row must be
-   * published and live, its module live, its course published and live. On top of those, one
-   * of two doors has to be open — the teacher marked the page free, or the caller holds a
-   * place in the course. A page that fails any of them returns nothing at all, which is what
-   * lets the service give the same 404 for "locked", "draft", "not yours to show" and "never
-   * written".
+   * published and live, its module live, and its course open to this reader — on the shelf, or
+   * paused as a draft they hold a place in. On top of those, one of two doors has to be open —
+   * the teacher marked the page free, or the caller holds a place in the course. A page that fails
+   * any of them returns nothing at all, which is what lets the service give the same 404 for
+   * "locked", "draft", "not yours to show" and "never written".
    *
    * The door is part of the `where` and not a check in the handler for the same reason the
-   * two gates are: a route that honoured the enrollment and forgot the published status
-   * would be reading a teacher's unfinished work to a student who happened to be early.
+   * course gate is: a route that honoured the enrollment and forgot the rest of the wall would be
+   * reading a teacher's unfinished work to a student who happened to be early. A place-holder's own
+   * paused course is the one exception the wall makes, and it is the same exception `findForReader`
+   * makes, so a page and the outline it sits in can never disagree about who this reader is.
    */
   async findReadable(
     ref: CatalogCourseRef,
@@ -237,7 +288,7 @@ export class CatalogRepository {
         statusValueId: filters.lessonStatusValueId,
         module: {
           isActive: true,
-          course: { ...ref, isActive: true, statusValueId: filters.courseStatusValueId },
+          course: shelfOrPlace(ref, filters, viewerUserId),
         },
         ...openTo,
       },

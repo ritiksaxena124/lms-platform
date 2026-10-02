@@ -12,7 +12,7 @@ The answer is a list of `{ code, label }` pairs, where `code` is the stable iden
 
 ## GET /api/v1/catalog/courses
 
-The shelf: published courses, newest first, paginated. Anybody may call this — no session, no role — and the answer is the same for everybody, because a course's published status is a fact about the row, not about who is looking at it.
+The [[shelf]]: published courses, newest first, paginated. Anybody may call this — no session, no role — and the answer is the same for everybody, because a course's published status is a fact about the row, not about who is looking at it.
 
 Four optional query parameters shape the list: `level` filters to one level (a code from [the levels endpoint](/docs/api-catalog#get-catalog-courses-levels)), `q` searches the title and summary (two characters minimum, so a half-typed word does not return the whole table), and `page` with `pageSize` walk the result. `pageSize` defaults to 12 and is capped at 100; `total` counts everything the filters matched rather than the rows on this page.
 
@@ -24,13 +24,17 @@ A level code that is not on the platform's list answers `400` with `VALIDATION_F
 
 One course's outline: the syllabus, and on it which rows this reader may open. The session is optional here — a stranger reaches the shelf, the syllabus and whatever the teacher left open, while a signed-in student who holds a place sees more doors unlocked.
 
-The address accepts either the course's UUID or its slug, since a slug is written by hand and pasted into a URL. A non-UUID is read as a slug rather than refused, and both spellings reach one row. A course that is not published, never existed, or was archived answers `404` with `NOT_FOUND` and "We cannot find that course." — one message for three states, because a browser that could tell them apart has a list of draft courses to work from.
+The address accepts either the course's UUID or its slug, since a slug is written by hand and pasted into a URL. A non-UUID is read as a slug rather than refused, and both spellings reach one row. For a reader who holds no place, a course that is not published, never existed, or was archived answers `404` with `NOT_FOUND` and "We cannot find that course." — one message for three states, because a browser that could tell them apart has a list of draft courses to work from.
+
+A student who holds an open place is the one reader this silence does not address. Their place was never taken away when the teacher unpublishes the course, so the outline keeps opening for them while the course is a `draft` — that is what lets a teacher pause a run to fix a page without the people inside it losing their seats. An [[archive]] is the other move, and it closes the door on the students inside it too: filing a run away is the teacher withdrawing the teaching. Taking a place still requires `published`, and the shelf below still lists only `published`; both are decisions about what a stranger may see, and pausing does not reopen either.
 
 The answer is the card's fields plus the description and the full syllabus. Each module lists its lessons with `isFreePreview` (the teacher's statement about the page) and `isReadable` (whether this reader may open it). For a stranger the two agree; a student holding a place reads every published page of the course either way. `isFreePreview` travels alongside `isReadable` unchanged, because it is the teacher's statement about the page rather than a description of how this reader got in — a badge and a door are two different facts.
 
 ## GET /api/v1/catalog/courses/:id/lessons/:lessonId
 
 One page, opened — for a stranger if the teacher marked it free, for a student who holds a place in the course otherwise. The session is optional for the same reason it is on the outline above, and the answer changes one boolean, never the list of rows.
+
+The course around the page has to be open to this reader for the page to be: `published`, or a `draft` this student holds a place in. A teacher who pauses a run to edit it does not interrupt the reading of the people already inside it; a teacher who archives it does.
 
 The lesson id must be a UUID; anything else earns `404` with "We cannot find that page." A page that exists but is not published, or belongs to a different course than the one in the path, also earns `404` — the same silence as one never written, because telling a caller which half of the address was wrong would be telling them which pages exist.
 
@@ -40,7 +44,7 @@ The recording info has `displayName` (what the teacher called the file) and `byt
 
 ## GET /api/v1/catalog/courses/:id/lessons/:lessonId/video
 
-The recording on a page, streamed to whoever that page opens for. The session is optional, and the same two doors as the page above apply — the teacher's free preview, or this reader's place in the course. What differs is the shape of the answer: this is the file, in whatever piece the player asked for, so the route takes the response over rather than returning a body for a serialiser to render.
+The recording on a page, streamed to whoever that page opens for. The session is optional, and the same two doors as the page above apply — the teacher's [[free preview]], or this reader's place in the course. What differs is the shape of the answer: this is the file, in whatever piece the player asked for, so the route takes the response over rather than returning a body for a serialiser to render.
 
 The route supports HTTP range requests, answering `206` with the requested byte range when a player asks for a piece of the file. This is how a video player seeks without downloading the whole thing first. A request with no `Range` header streams from the beginning; a malformed range earns `416 Range Not Satisfiable`.
 
@@ -56,7 +60,7 @@ The body is `{ courseId, couponCode? }`, where `courseId` is the UUID of the cou
 
 Taking a place is idempotent. Pressing the button twice is one event: the write finds the row that already exists — open, or left behind when the student went away — and answers with it rather than with a conflict or a duplicate. That is also why the route replies `200` on a first enrollment instead of `201`: two status codes for one button would ask the portal whether it had been clicked before.
 
-When a valid `couponCode` is provided, the system validates the coupon against the course (checking existence, validity window, and redemption limits), calculates the discounted price, creates a payment record linking the enrollment to the coupon, and increments the coupon's redemption counter — all within the same transaction that opens the place. An invalid or expired coupon returns `400` with `BAD_REQUEST`.
+When a valid `couponCode` is provided, the system validates the coupon against the course (checking existence, validity window, and redemption limits), calculates the discounted price, creates a payment record linking the enrollment to the coupon, and increments the coupon's [[redemption]] counter — all within the same transaction that opens the place. An invalid or expired coupon returns `400` with `BAD_REQUEST`.
 
 A course that is not published, never existed, or was archived answers `404` with `NOT_FOUND` and "We cannot find that course." — the same message the catalog gives, because enrolling in a draft would be a way to walk a teacher's unpublished work with a form.
 
@@ -64,9 +68,9 @@ On success, the answer is `{ enrollment: { id, course: { id, slug, title }, isAc
 
 ## GET /api/v1/enrollments
 
-The caller's own open places, newest first, and only in courses still on the shelf. `student` role required.
+The caller's own open places, newest first, and only in courses that still open for them: a `published` course, or a `draft` whose pages they can read because they hold a place in it. `student` role required.
 
-The answer is `{ items: [...] }`, where each item has `id`, `course: { id, slug, title }`, `isActive`, `enrolledAt`, and `updatedAt`. Only active enrollments in published courses appear here, so nothing on the screen leads to a page that will not open. A student who left a course and came back sees one row, not two — the place was reopened, not replaced.
+The answer is `{ items: [...] }`, where each item has `id`, `course: { id, slug, title }`, `isActive`, `enrolledAt`, and `updatedAt`. An archived course is not on the list, because the teacher withdrew the teaching and every page in it is closed; a paused one is, because a list that hid a course the student can still open would be a list with a hole in it. A student who left a course and came back sees one row, not two — the place was reopened, not replaced.
 
 There is no pagination: a student's list is read on a screen, not exported, so a page is what fits on one. If the list grows beyond that, the design decision is to show the most recent and let the student search, not to add pages nobody asked for.
 

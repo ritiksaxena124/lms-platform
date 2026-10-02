@@ -3,10 +3,19 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Button, EmptyState, ErrorState, Icon, Illo, SkeletonGroup, notify } from '@lms/ui';
+import {
+  Button,
+  EmptyState,
+  ErrorState,
+  Icon,
+  Illo,
+  SkeletonGroup,
+  buttonClass,
+  notify,
+} from '@lms/ui';
 import type { Enrollment } from '@lms/shared';
 
-import { describeFailure } from '@/lib/api';
+import { describeFailure, isForbidden } from '@/lib/api';
 import { formatDay } from '@/lib/dates';
 import { leavePlace, myPlaces } from '@/lib/enrollments';
 
@@ -26,10 +35,15 @@ import { useSession } from './session-provider';
  * page — the row the API keeps is the reason the pages already worked through stayed open.
  */
 
+/** The heading on this screen already names the account; this line says what that means here. */
+const NOT_A_LEARNER_NOTE = 'It cannot hold a place, so there is nothing for it to list.';
+
 type ListState =
   | { status: 'loading' }
   | { status: 'ready'; places: Enrollment[] }
-  | { status: 'failed'; message: string };
+  /** `notALearner` is why the retry is not offered: asking the same question of the same
+   * session answers the same 403, and the reader is one sign-in away rather than one press. */
+  | { status: 'failed'; message: string; notALearner: boolean };
 
 export function MyCourses() {
   const router = useRouter();
@@ -47,7 +61,15 @@ export function MyCourses() {
         if (alive) setState({ status: 'ready', places: items });
       })
       .catch((error: unknown) => {
-        if (alive) setState({ status: 'failed', message: describeFailure(error) });
+        if (!alive) return;
+        const notALearner = isForbidden(error);
+        setState({
+          status: 'failed',
+          // The heading already says the account is not a learner's; the line under it carries the
+          // consequence for this screen rather than saying the same thing twice.
+          message: notALearner ? NOT_A_LEARNER_NOTE : describeFailure(error),
+          notALearner,
+        });
       });
 
     return () => {
@@ -87,12 +109,22 @@ export function MyCourses() {
 
   if (state.status === 'failed') {
     return (
-      <div className="mt-6">
+      <div className="mt-6 flex flex-col gap-4">
         <ErrorState
-          title="Your courses did not load"
+          title={state.notALearner ? 'This is not a learner account' : 'Your courses did not load'}
           message={state.message}
-          onRetry={() => setAttempt((current) => current + 1)}
+          // A retry asks the same question of the same session and hears the same 403, so the
+          // only honest button here is the one that changes which account is asking.
+          onRetry={state.notALearner ? undefined : () => setAttempt((current) => current + 1)}
         />
+        {state.notALearner ? (
+          <Link
+            href={`/login?next=${encodeURIComponent('/my-courses')}`}
+            className={buttonClass({ variant: 'secondary', size: 'sm' })}
+          >
+            Sign in as a learner
+          </Link>
+        ) : null}
       </div>
     );
   }

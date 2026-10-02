@@ -38,7 +38,7 @@
             "conditional": false,
             "nested": false,
             "rules": [
-              "one of: account_registered, signed_in, signed_out, session_replay_detected, account_status_changed, account_role_changed, teacher_profile_saved, course_created, course_updated, course_published, course_archived, course_demo_bookings_changed, course_module_created, course_module_updated, course_module_deactivated, course_modules_reordered, lesson_created, lesson_updated, lesson_published, lesson_unpublished, lesson_deactivated, lessons_reordered, lesson_asset_attached, availability_rule_created, availability_rule_updated, availability_rule_retired, enrollment_joined, enrollment_left, booking_requested, booking_confirmed, booking_refused, booking_cancelled, booking_expired"
+              "one of: account_registered, signed_in, signed_out, session_replay_detected, account_status_changed, account_role_changed, teacher_profile_saved, course_created, course_updated, course_published, course_unpublished, course_archived, course_unarchived, course_demo_bookings_changed, course_module_created, course_module_updated, course_module_deactivated, course_modules_reordered, lesson_created, lesson_updated, lesson_published, lesson_unpublished, lesson_deactivated, lessons_reordered, lesson_asset_attached, availability_rule_created, availability_rule_updated, availability_rule_retired, enrollment_joined, enrollment_left, booking_requested, booking_confirmed, booking_refused, booking_cancelled, booking_expired"
             ],
             "values": [
               "account_registered",
@@ -51,7 +51,9 @@
               "course_created",
               "course_updated",
               "course_published",
+              "course_unpublished",
               "course_archived",
+              "course_unarchived",
               "course_demo_bookings_changed",
               "course_module_created",
               "course_module_updated",
@@ -6146,6 +6148,292 @@
       },
       "controller": "CoursesController",
       "handler": "publish"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:id/unarchive",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "unarchive"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/courses/:id/unpublish",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ course: Course }",
+        "note": "",
+        "fields": [
+          {
+            "name": "course",
+            "optional": false,
+            "type": "Course",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Course",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "summary",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "description",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "level",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              },
+              {
+                "name": "price",
+                "optional": false,
+                "type": "CoursePrice | null",
+                "note": "A quote, not a charge: nothing in this platform takes money yet, and an enrollment buys a place rather than a receipt."
+              },
+              {
+                "name": "demoBookingsEnabled",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether a student without a place may ask this teacher for a trial hour of this course. The course's own yes, because one teacher's conversation club and one teacher's exam prep do not want the same trial policy — and a route of its own rather than an edit-form field, because a teacher decides this about a course that is already live."
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CourseChoice",
+            "note": "The course wire contract, written once so the API that produces it and the portal that renders it cannot drift apart mid-request. Status and level values are the codes and labels the `CourseStatus` / `CourseLevel` lookup rows carry: a label travels with the code precisely so no client keeps a translation table that goes stale when Ops edits one.",
+            "fields": [
+              {
+                "name": "code",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "label",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "CoursePrice",
+            "note": "What a teacher says the course will cost. A number and a unit are one thing: `499900` on its own is a fortune in one currency and a rounding error in another, so the pair travels together or the price does not travel at all. The amount is in minor units (paise, cents) exactly as `Money` in this package holds it, because a portal that converted it to a float to render a rupee sign would be doing arithmetic on a figure it is only supposed to print. The currency is a `CourseChoice` rather than a bare code for the same reason the level is one: the label is a lookup row's business, not the client's. `null` — the absence of this object on a course — means \"the teacher has not said\", which is a different sentence from `minorUnits: 0`, \"the teacher says free\". A shelf that confused them would be making a promise nobody wrote.",
+            "fields": [
+              {
+                "name": "minorUnits",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "CourseChoice",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "CoursesController",
+      "handler": "unpublish"
     },
     {
       "method": "GET",

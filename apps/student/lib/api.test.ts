@@ -9,6 +9,10 @@ import {
   apiJson,
   describeFailure,
   fieldErrors,
+  isForbidden,
+  isUnreachable,
+  NOT_A_LEARNER_MESSAGE,
+  NETWORK_ERROR_CODE,
   onSessionLost,
   refreshSession,
   setAccessToken,
@@ -452,5 +456,65 @@ describe('describeFailure', () => {
     expect(describeFailure(new ApiError({ statusCode: 500, code: 'X', message: '   ' }))).toBe(
       'Something went wrong. Please try again.',
     );
+  });
+});
+
+describe('isForbidden', () => {
+  it('names the refusal a role causes', () => {
+    expect(
+      isForbidden(
+        new ApiError({
+          statusCode: 403,
+          code: API_ERROR_CODES.FORBIDDEN,
+          message: 'This account is not allowed to do that.',
+        }),
+      ),
+    ).toBe(true);
+  });
+
+  it('is not a stale session, a missing page, a dead connection or no failure at all', () => {
+    // The three refusals a screen might otherwise lump in with this one each want their own
+    // sentence: a refresh, a "not on the shelf", and a retry.
+    expect(
+      isForbidden(
+        new ApiError({ statusCode: 401, code: API_ERROR_CODES.UNAUTHORIZED, message: 'no' }),
+      ),
+    ).toBe(false);
+    expect(
+      isForbidden(
+        new ApiError({ statusCode: 404, code: API_ERROR_CODES.NOT_FOUND, message: 'no' }),
+      ),
+    ).toBe(false);
+    expect(
+      isForbidden(new ApiError({ statusCode: 0, code: NETWORK_ERROR_CODE, message: 'no' })),
+    ).toBe(false);
+    expect(isForbidden(undefined)).toBe(false);
+    expect(isForbidden(new Error('boom'))).toBe(false);
+  });
+
+  it('says what to do about it, without quoting the API at the reader', () => {
+    // The wire sentence ("This account is not allowed to do that.") is true but useless: it does
+    // not say which account would work. Nothing here names a seeded address or a password.
+    expect(NOT_A_LEARNER_MESSAGE).toMatch(/learner/i);
+    expect(NOT_A_LEARNER_MESSAGE).toMatch(/sign in/i);
+    expect(NOT_A_LEARNER_MESSAGE).not.toMatch(/example\.test|password/i);
+  });
+});
+
+describe('isUnreachable', () => {
+  it('is the request that never got an answer', () => {
+    expect(
+      isUnreachable(new ApiError({ statusCode: 0, code: NETWORK_ERROR_CODE, message: 'no' })),
+    ).toBe(true);
+  });
+
+  it('is not a server that answered and refused', () => {
+    // A 500 wants a retry. A page that could not ask anything wants a different address, and
+    // telling it "try again" is how a reader concludes the product is dead.
+    expect(isUnreachable(new ApiError({ statusCode: 500, code: 'INTERNAL', message: 'no' }))).toBe(
+      false,
+    );
+    expect(isUnreachable(new Error('boom'))).toBe(false);
+    expect(isUnreachable(undefined)).toBe(false);
   });
 });

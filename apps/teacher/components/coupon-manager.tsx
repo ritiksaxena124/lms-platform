@@ -3,364 +3,406 @@
 import { useEffect, useState } from 'react';
 import {
   Button,
+  Card,
+  ConfirmDialog,
   EmptyState,
   ErrorState,
-  Icon,
   Illo,
+  Select,
   SkeletonGroup,
-  StatusPill,
-  type StatusTone,
+  TextField,
+  notify,
 } from '@lms/ui';
-import type { Coupon } from '@lms/shared';
+import { formatMoney, type Coupon } from '@lms/shared';
 
-import { describeFailure } from '@/lib/api';
-import { listCoupons, createCoupon, updateCoupon, deactivateCoupon } from '@/lib/coupons';
+import { describeFailure, fieldErrors } from '@/lib/api';
+import { readCourse } from '@/lib/courses';
+import { createCoupon, deactivateCoupon, listCoupons, updateCoupon } from '@/lib/coupons';
 
-const DISCOUNT_TYPE_LABELS: Record<string, string> = {
-  percentage: 'Percentage',
-  fixed: 'Fixed Amount',
-};
+/**
+ * The discount codes one course carries.
+ *
+ * A code says how much comes off and never in which unit — the unit belongs to the course's
+ * quote, and the enrollment takes this number off that price. So the screen reads both halves at
+ * once: the codes on offer and the quote they come off, and every amount it prints is in the
+ * currency the teacher actually quoted rather than a default one guessed at.
+ */
 
-const STATUS_TONE: Record<boolean, StatusTone> = {
-  true: 'success',
-  false: 'neutral',
-};
-
-/** Format a discount amount for display */
-function formatDiscount(coupon: Coupon) {
+/** What one code takes off, in the units the course is quoted in. */
+function discountLabel(coupon: Coupon, currency: string | null): string {
   if (coupon.discountType === 'percentage') {
     return `${coupon.discountAmount}% off`;
   }
-  return `$${(coupon.discountAmount / 100).toFixed(2)} off`;
+  if (currency === null) {
+    // There is no unit to name. The API will not redeem a fixed amount against a course with no
+    // price, so the number here is waiting for the quote that gives it a meaning.
+    return `${coupon.discountAmount} off — this course has no price to take it from`;
+  }
+  return `${formatMoney({ minorUnits: coupon.discountAmount, currency })} off`;
 }
 
-/** Format validity period */
 function formatValidity(coupon: Coupon) {
   const from = coupon.validFrom ? new Date(coupon.validFrom).toLocaleDateString() : 'anytime';
   const until = coupon.validUntil ? new Date(coupon.validUntil).toLocaleDateString() : 'forever';
   return `${from} — ${until}`;
 }
 
+const DISCOUNT_TYPES = [
+  { value: 'percentage', label: 'Percentage' },
+  { value: 'fixed', label: 'Fixed amount' },
+];
+
+interface FormValues {
+  code: string;
+  discountType: 'percentage' | 'fixed';
+  discountAmount: string;
+  validFrom: string;
+  validUntil: string;
+  maxRedemptions: string;
+}
+
+const BLANK: FormValues = {
+  code: '',
+  discountType: 'percentage',
+  discountAmount: '',
+  validFrom: '',
+  validUntil: '',
+  maxRedemptions: '',
+};
+
 export function CouponManager({ courseId }: { courseId: string }) {
-  const [coupons, setCoupons] = useState<Coupon[] | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<{ message: string } | null>(null);
+  const [attempt, setAttempt] = useState(0);
+  const [settled, setSettled] = useState<{
+    key: string;
+    coupons: Coupon[];
+    currency: string | null;
+  } | null>(null);
+  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-
-  // Form state
-  const [code, setCode] = useState('');
-  const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
-  const [discountAmount, setDiscountAmount] = useState('');
-  const [validFrom, setValidFrom] = useState('');
-  const [validUntil, setValidUntil] = useState('');
-  const [maxRedemptions, setMaxRedemptions] = useState('');
-  const [formError, setFormError] = useState<string | null>(null);
+  const [editingCode, setEditingCode] = useState<string | null>(null);
+  const [values, setValues] = useState<FormValues>(BLANK);
+  const [fields, setFields] = useState<Record<string, string[]>>({});
   const [submitting, setSubmitting] = useState(false);
 
-  const loadCoupons = async () => {
-    try {
-      setLoading(true);
-      const data = await listCoupons(courseId);
-      setCoupons(data);
-      setError(null);
-    } catch (err: unknown) {
-      const { message } = describeFailure(err);
-      setError({ message });
-    } finally {
-      setLoading(false);
-    }
-  };
+  // The row whose retirement is being asked about, and whether the answer is on its way to the API.
+  const [retiring, setRetiring] = useState<Coupon | null>(null);
+  const [retiringBusy, setRetiringBusy] = useState(false);
+
+  // One answer for both halves, tagged with the request that earned it: a code's amount is only a
+  // sum beside the quote it comes off, and a retry has to be able to ask the same question again.
+  const key = `${courseId}:${attempt}`;
+  const ready = settled?.key === key ? settled : null;
+  const failed = failure?.key === key ? failure : null;
+  const currency = ready?.currency ?? null;
 
   useEffect(() => {
-    loadCoupons();
-  }, [courseId]);
+    let alive = true;
+    Promise.all([listCoupons(courseId), readCourse(courseId)])
+      .then(([coupons, course]) => {
+        if (alive) setSettled({ key, coupons, currency: course.price?.currency.code ?? null });
+      })
+      .catch((error: unknown) => {
+        if (alive) setFailure({ key, message: describeFailure(error) });
+      });
+    return () => {
+      alive = false;
+    };
+  }, [key, courseId]);
 
-  const resetForm = () => {
-    setCode('');
-    setDiscountType('percentage');
-    setDiscountAmount('');
-    setValidFrom('');
-    setValidUntil('');
-    setMaxRedemptions('');
-    setFormError(null);
-    setShowForm(false);
-    setEditingId(null);
-  };
+  function reload() {
+    setAttempt((current) => current + 1);
+  }
 
-  const startEdit = (coupon: Coupon) => {
-    setEditingId(coupon.id);
-    setCode(coupon.code);
-    setDiscountType(coupon.discountType);
-    setDiscountAmount(String(coupon.discountAmount));
-    setValidFrom(coupon.validFrom?.split('T')[0] ?? '');
-    setValidUntil(coupon.validUntil?.split('T')[0] ?? '');
-    setMaxRedemptions(coupon.maxRedemptions?.toString() ?? '');
-    setFormError(null);
+  function set<Field extends keyof FormValues>(field: Field, value: FormValues[Field]) {
+    setValues((current) => ({ ...current, [field]: value }));
+  }
+
+  function openForm(coupon?: Coupon) {
+    setValues(
+      coupon
+        ? {
+            code: coupon.code,
+            discountType: coupon.discountType,
+            discountAmount: String(coupon.discountAmount),
+            validFrom: coupon.validFrom?.split('T')[0] ?? '',
+            validUntil: coupon.validUntil?.split('T')[0] ?? '',
+            maxRedemptions: coupon.maxRedemptions?.toString() ?? '',
+          }
+        : BLANK,
+    );
+    setEditingId(coupon?.id ?? null);
+    setEditingCode(coupon?.code ?? null);
+    setFields({});
     setShowForm(true);
-  };
+  }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setFormError(null);
-    setSubmitting(true);
+  function closeForm() {
+    setValues(BLANK);
+    setEditingId(null);
+    setEditingCode(null);
+    setFields({});
+    setShowForm(false);
+  }
 
-    try {
-      const amount = parseInt(discountAmount, 10);
-      if (isNaN(amount) || amount < 0) {
-        throw new Error('Discount amount must be a non-negative number');
-      }
-
-      if (discountType === 'percentage' && (amount < 0 || amount > 100)) {
-        throw new Error('Percentage discount must be between 0 and 100');
-      }
-
-      const payload = {
-        code: code.toUpperCase(),
-        discountType,
-        discountAmount: amount,
-        validFrom: validFrom || null,
-        validUntil: validUntil || null,
-        maxRedemptions: maxRedemptions ? parseInt(maxRedemptions, 10) : null,
-      };
-
-      if (editingId) {
-        await updateCoupon(courseId, editingId, {
-          code: payload.code !== code.toUpperCase() ? payload.code : undefined,
-          discountAmount: payload.discountAmount,
-          validFrom: payload.validFrom,
-          validUntil: payload.validUntil,
-          maxRedemptions: payload.maxRedemptions,
-        });
-      } else {
-        await createCoupon(courseId, payload);
-      }
-
-      await loadCoupons();
-      resetForm();
-    } catch (err: unknown) {
-      const message = err instanceof Error ? err.message : 'Failed to save coupon';
-      setFormError(message);
-    } finally {
-      setSubmitting(false);
+  /** The two mistakes a teacher can make by typing, said before the request is made. */
+  function amountProblem(): string | null {
+    const amount = Number(values.discountAmount);
+    if (values.discountAmount.trim() === '' || !Number.isFinite(amount) || amount < 0) {
+      return 'Give an amount of zero or more.';
     }
-  };
+    if (values.discountType === 'percentage' && amount > 100) {
+      return 'A percentage is between 0 and 100.';
+    }
+    return null;
+  }
 
-  const handleDeactivate = async (couponId: string) => {
-    if (!confirm('Deactivate this coupon? It can no longer be used for enrollment.')) {
+  async function save(event: React.FormEvent) {
+    event.preventDefault();
+    setFields({});
+
+    const problem = amountProblem();
+    if (problem) {
+      setFields({ discountAmount: [problem] });
       return;
     }
 
-    try {
-      await deactivateCoupon(courseId, couponId);
-      await loadCoupons();
-    } catch (err: unknown) {
-      const { message } = describeFailure(err);
-      alert(`Failed to deactivate: ${message}`);
-    }
-  };
+    const amount = Number(values.discountAmount);
+    const code = values.code.toUpperCase();
+    // An empty box is "no bound", not "leave what is there": the API reads null as open-ended.
+    const bounds = {
+      validFrom: values.validFrom || null,
+      validUntil: values.validUntil || null,
+      maxRedemptions: values.maxRedemptions ? Number(values.maxRedemptions) : null,
+    };
 
-  if (loading) {
-    return (
-      <SkeletonGroup>
-        <div className="space-y-3">
-          {[...Array(3)].map((_, i) => (
-            <div key={i} className="h-16 rounded-lg bg-gray-100" />
-          ))}
-        </div>
-      </SkeletonGroup>
-    );
+    setSubmitting(true);
+    try {
+      if (editingId) {
+        await updateCoupon(courseId, editingId, {
+          // A coupon is found by its code, so the field only goes to the API when the teacher
+          // actually retyped it; leaving it alone must not look like a rename.
+          code: code === editingCode ? undefined : code,
+          discountAmount: amount,
+          ...bounds,
+        });
+      } else {
+        await createCoupon(courseId, {
+          code,
+          discountType: values.discountType,
+          discountAmount: amount,
+          ...bounds,
+        });
+      }
+
+      // Repaint from what the API says the course carries now, not from the row that was sent.
+      reload();
+      closeForm();
+    } catch (error: unknown) {
+      const errs = fieldErrors(error);
+      if (errs) {
+        setFields(errs);
+      } else {
+        notify.error(describeFailure(error));
+      }
+    } finally {
+      setSubmitting(false);
+    }
   }
 
-  if (error) {
+  async function retire(coupon: Coupon) {
+    setRetiringBusy(true);
+    try {
+      await deactivateCoupon(courseId, coupon.id);
+      // A form left open on a code that just stopped working would write back to a dead row.
+      if (editingId === coupon.id) closeForm();
+      reload();
+      setRetiring(null);
+    } catch (error: unknown) {
+      setRetiring(null);
+      notify.error(describeFailure(error));
+    } finally {
+      setRetiringBusy(false);
+    }
+  }
+
+  if (failed) {
     return (
       <ErrorState
-        title="Could not load coupons"
-        message={error.message}
-        action={<Button onClick={loadCoupons}>Try Again</Button>}
+        title="The coupons did not load"
+        message={failed.message}
+        onRetry={reload}
+        busy={submitting}
       />
     );
   }
 
-  if (!coupons || coupons.length === 0) {
+  if (!ready) {
+    return (
+      <SkeletonGroup
+        rows={3}
+        rowClassName="h-16"
+        label="Loading the course coupons"
+        className="space-y-3"
+      />
+    );
+  }
+
+  if (ready.coupons.length === 0 && !showForm) {
     return (
       <EmptyState
-        icon={<Illo name="empty-state" />}
+        illustration={<Illo src="/illustrations/peep-standing-11.svg" size="lg" />}
         title="No coupons yet"
         description="Create discount codes to offer reduced pricing for this course."
-        action={
-          <Button onClick={() => setShowForm(true)}>
-            <Icon name="plus" className="mr-2 h-4 w-4" />
-            Create Coupon
-          </Button>
-        }
+        actionLabel="Create a coupon"
+        onAction={() => openForm()}
       />
     );
   }
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Coupons</h3>
-        {!showForm && (
-          <Button onClick={() => setShowForm(true)}>
-            <Icon name="plus" className="mr-2 h-4 w-4" />
-            New Coupon
-          </Button>
-        )}
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-h3 text-ink-strong">Coupons</h3>
+        {!showForm && <Button onClick={() => openForm()}>New coupon</Button>}
       </div>
 
       {showForm && (
-        <form onSubmit={handleSubmit} className="rounded-lg border p-4 space-y-4 bg-gray-50">
-          <h4 className="font-medium">{editingId ? 'Edit Coupon' : 'Create Coupon'}</h4>
+        <Card className="p-5">
+          <form onSubmit={save} className="space-y-4">
+            <h4 className="text-label text-ink-muted">
+              {editingId ? 'Edit coupon' : 'Create coupon'}
+            </h4>
 
-          {formError && (
-            <div className="rounded-md bg-red-50 p-3 text-sm text-red-800">{formError}</div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label htmlFor="code" className="block text-sm font-medium mb-1">
-                Code *
-              </label>
-              <input
+            <div className="grid gap-4 sm:grid-cols-2">
+              <TextField
                 id="code"
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value.toUpperCase())}
+                label="Code"
+                value={values.code}
+                onChange={(event) => set('code', event.target.value.toUpperCase())}
                 placeholder="SAVE20"
                 required
-                className="w-full rounded-md border px-3 py-2 text-sm"
+                error={fields.code}
               />
-            </div>
-
-            <div>
-              <label htmlFor="discountType" className="block text-sm font-medium mb-1">
-                Discount Type *
-              </label>
-              <select
+              <Select
                 id="discountType"
-                value={discountType}
-                onChange={(e) => setDiscountType(e.target.value as 'percentage' | 'fixed')}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              >
-                <option value="percentage">Percentage</option>
-                <option value="fixed">Fixed Amount</option>
-              </select>
+                label="Discount Type"
+                value={values.discountType}
+                onChange={(event) =>
+                  set('discountType', event.target.value as 'percentage' | 'fixed')
+                }
+                options={DISCOUNT_TYPES}
+              />
+              <TextField
+                id="discountAmount"
+                label="Discount Amount"
+                type="number"
+                value={values.discountAmount}
+                onChange={(event) => set('discountAmount', event.target.value)}
+                placeholder={values.discountType === 'percentage' ? '20' : '2000'}
+                min="0"
+                max={values.discountType === 'percentage' ? 100 : undefined}
+                required
+                hint={
+                  values.discountType === 'percentage'
+                    ? '0-100%'
+                    : currency === null
+                      ? 'Minor units of the course price. This course has no price yet, so a fixed amount has nothing to come off.'
+                      : `Minor units: 2000 = ${formatMoney({ minorUnits: 2000, currency })}`
+                }
+                error={fields.discountAmount}
+              />
+              <TextField
+                id="maxRedemptions"
+                label="Max Redemptions"
+                type="number"
+                value={values.maxRedemptions}
+                onChange={(event) => set('maxRedemptions', event.target.value)}
+                placeholder="Unlimited"
+                min="1"
+                hint="Leave empty for no limit."
+                error={fields.maxRedemptions}
+              />
+              <TextField
+                id="validFrom"
+                label="Valid From"
+                type="date"
+                value={values.validFrom}
+                onChange={(event) => set('validFrom', event.target.value)}
+                hint="Leave empty for immediately."
+                error={fields.validFrom}
+              />
+              <TextField
+                id="validUntil"
+                label="Valid Until"
+                type="date"
+                value={values.validUntil}
+                onChange={(event) => set('validUntil', event.target.value)}
+                hint="Leave empty for no end date."
+                error={fields.validUntil}
+              />
             </div>
 
-            <div>
-              <label htmlFor="discountAmount" className="block text-sm font-medium mb-1">
-                Discount Amount *
-              </label>
-              <input
-                id="discountAmount"
-                type="number"
-                value={discountAmount}
-                onChange={(e) => setDiscountAmount(e.target.value)}
-                placeholder={discountType === 'percentage' ? '20' : '2000'}
-                min="0"
-                max={discountType === 'percentage' ? 100 : undefined}
-                required
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-              <p className="text-xs text-gray-500 mt-1">
-                {discountType === 'percentage' ? '0-100%' : 'In cents (e.g., 2000 = $20.00)'}
+            <div className="flex gap-2 pt-1">
+              <Button type="submit" disabled={submitting}>
+                {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={closeForm} disabled={submitting}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+      {/* The codes still on offer, which is what the read returns: a retired code leaves the list
+          rather than staying in it to be told apart, so no row wears a state pill. */}
+      <Card className="divide-y divide-line">
+        {ready.coupons.map((coupon) => (
+          <div key={coupon.id} className="flex items-start justify-between gap-4 px-4 py-3">
+            <div className="min-w-0">
+              <p className="font-mono text-[0.9375rem] font-semibold text-ink">{coupon.code}</p>
+              <p className="mt-0.5 text-[0.9375rem] text-ink-muted">
+                {discountLabel(coupon, currency)}
+              </p>
+              <p className="mt-0.5 text-xs text-ink-faint">{formatValidity(coupon)}</p>
+              <p className="mt-0.5 text-xs text-ink-faint">
+                {coupon.redemptionCount} redemption{coupon.redemptionCount !== 1 ? 's' : ''}
+                {coupon.maxRedemptions ? ` / ${coupon.maxRedemptions}` : ' (unlimited)'}
               </p>
             </div>
 
-            <div>
-              <label htmlFor="maxRedemptions" className="block text-sm font-medium mb-1">
-                Max Redemptions
-              </label>
-              <input
-                id="maxRedemptions"
-                type="number"
-                value={maxRedemptions}
-                onChange={(e) => setMaxRedemptions(e.target.value)}
-                placeholder="Unlimited"
-                min="1"
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="validFrom" className="block text-sm font-medium mb-1">
-                Valid From
-              </label>
-              <input
-                id="validFrom"
-                type="date"
-                value={validFrom}
-                onChange={(e) => setValidFrom(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="validUntil" className="block text-sm font-medium mb-1">
-                Valid Until
-              </label>
-              <input
-                id="validUntil"
-                type="date"
-                value={validUntil}
-                onChange={(e) => setValidUntil(e.target.value)}
-                className="w-full rounded-md border px-3 py-2 text-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex gap-2 pt-2">
-            <Button type="submit" disabled={submitting}>
-              {submitting ? 'Saving...' : editingId ? 'Update' : 'Create'}
-            </Button>
-            <Button type="button" variant="secondary" onClick={resetForm}>
-              Cancel
-            </Button>
-          </div>
-        </form>
-      )}
-
-      <div className="space-y-3">
-        {coupons.map((coupon) => (
-          <div key={coupon.id} className="rounded-lg border p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-1">
-                  <span className="font-mono text-sm font-semibold">{coupon.code}</span>
-                  <StatusPill tone={STATUS_TONE[coupon.isActive]}>
-                    {coupon.isActive ? 'Active' : 'Inactive'}
-                  </StatusPill>
-                </div>
-                <p className="text-sm text-gray-700">{formatDiscount(coupon)}</p>
-                <p className="text-xs text-gray-500 mt-1">{formatValidity(coupon)}</p>
-                <p className="text-xs text-gray-500 mt-1">
-                  {coupon.redemptionCount} redemption{coupon.redemptionCount !== 1 ? 's' : ''}
-                  {coupon.maxRedemptions ? ` / ${coupon.maxRedemptions}` : ' (unlimited)'}
-                </p>
-              </div>
-
-              <div className="flex gap-2">
-                {coupon.isActive && (
-                  <>
-                    <Button size="sm" variant="ghost" onClick={() => startEdit(coupon)}>
-                      <Icon name="edit" className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => handleDeactivate(coupon.id)}
-                    >
-                      Deactivate
-                    </Button>
-                  </>
-                )}
-              </div>
+            <div className="flex shrink-0 gap-2">
+              <Button
+                size="sm"
+                variant="ghost"
+                aria-label={`Edit ${coupon.code}`}
+                onClick={() => openForm(coupon)}
+              >
+                Edit
+              </Button>
+              <Button size="sm" variant="danger" onClick={() => setRetiring(coupon)}>
+                Deactivate
+              </Button>
             </div>
           </div>
         ))}
-      </div>
+      </Card>
+
+      <ConfirmDialog
+        open={retiring !== null}
+        busy={retiringBusy}
+        tone="danger"
+        title={retiring ? `Deactivate ${retiring.code}?` : ''}
+        message="It can no longer be used for enrollment."
+        confirmLabel="Deactivate"
+        cancelLabel="Keep it"
+        onConfirm={() => {
+          if (retiring) void retire(retiring);
+        }}
+        onClose={() => setRetiring(null)}
+      />
     </div>
   );
 }

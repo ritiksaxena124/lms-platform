@@ -100,7 +100,12 @@ export const ACTION_CODES = {
   COURSE_CREATED: 'course_created',
   COURSE_UPDATED: 'course_updated',
   COURSE_PUBLISHED: 'course_published',
+  /** The two moves that end a course's time on the shelf, each its own code: the reverse of a
+   * publish is not a publish, and an archive that gets undone is a different decision from the one
+   * that filed the course away. Both land in `draft`, so `detail` carries the pair. */
+  COURSE_UNPUBLISHED: 'course_unpublished',
   COURSE_ARCHIVED: 'course_archived',
+  COURSE_UNARCHIVED: 'course_unarchived',
   /** One code for both directions, because the route is one switch and the decided fact — which way
    * it went — is in `detail`. */
   COURSE_DEMO_BOOKINGS_CHANGED: 'course_demo_bookings_changed',
@@ -214,7 +219,17 @@ export const ACTION_SHAPES = {
     targetTable: ACTION_TARGET_TABLE_CODES.COURSE,
     actorKind: ACTION_ACTOR_KIND_CODES.USER,
   },
+  course_unpublished: {
+    section: ACTION_SECTION_CODES.COURSE_AUTHORING,
+    targetTable: ACTION_TARGET_TABLE_CODES.COURSE,
+    actorKind: ACTION_ACTOR_KIND_CODES.USER,
+  },
   course_archived: {
+    section: ACTION_SECTION_CODES.COURSE_AUTHORING,
+    targetTable: ACTION_TARGET_TABLE_CODES.COURSE,
+    actorKind: ACTION_ACTOR_KIND_CODES.USER,
+  },
+  course_unarchived: {
     section: ACTION_SECTION_CODES.COURSE_AUTHORING,
     targetTable: ACTION_TARGET_TABLE_CODES.COURSE,
     actorKind: ACTION_ACTOR_KIND_CODES.USER,
@@ -452,7 +467,9 @@ export const ACTION_LABELS: Record<ActionCode, string> = {
   [ACTION_CODES.COURSE_CREATED]: 'Course created',
   [ACTION_CODES.COURSE_UPDATED]: 'Course updated',
   [ACTION_CODES.COURSE_PUBLISHED]: 'Course published',
+  [ACTION_CODES.COURSE_UNPUBLISHED]: 'Course unpublished',
   [ACTION_CODES.COURSE_ARCHIVED]: 'Course archived',
+  [ACTION_CODES.COURSE_UNARCHIVED]: 'Course unarchived',
   [ACTION_CODES.COURSE_DEMO_BOOKINGS_CHANGED]: 'Demo bookings changed',
   [ACTION_CODES.COURSE_MODULE_CREATED]: 'Module created',
   [ACTION_CODES.COURSE_MODULE_UPDATED]: 'Module updated',

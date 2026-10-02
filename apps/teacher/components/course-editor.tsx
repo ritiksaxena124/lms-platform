@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import type { FormEvent } from 'react';
-import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   Button,
   Card,
   ErrorState,
+  InfoTip,
   Select,
   Skeleton,
   StatusPill,
@@ -27,6 +27,8 @@ import {
   createCourse,
   publishCourse,
   readCourse,
+  unarchiveCourse,
+  unpublishCourse,
   updateCourse,
 } from '@/lib/courses';
 
@@ -35,6 +37,24 @@ const STATUS_TONE: Record<string, StatusTone> = {
   published: 'success',
   archived: 'warning',
 };
+
+/**
+ * The four moves a course can be asked to make, one per API route.
+ *
+ * Each carries the sentence the toast says when it succeeds, and that sentence is the only place
+ * the portal states what the move did: the status itself is painted from the row the API answered
+ * with. Both `unpublish` and `unarchive` land on draft and the portal does not say so anywhere in
+ * a request — which state a transition comes back to is the API's rule, and repeating it here
+ * would be a second copy free to disagree.
+ */
+const TRANSITIONS = {
+  publish: { run: publishCourse, done: 'Published' },
+  unpublish: { run: unpublishCourse, done: 'Unpublished' },
+  archive: { run: archiveCourse, done: 'Archived' },
+  unarchive: { run: unarchiveCourse, done: 'Brought back as a draft' },
+} as const;
+
+type Transition = keyof typeof TRANSITIONS;
 
 /** What the form holds, before anything knows whether it is a new course or an old one. */
 interface FormValues {
@@ -96,7 +116,7 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
   const router = useRouter();
   const [values, setValues] = useState<FormValues>(BLANK);
   const [course, setCourse] = useState<Course | null>(null);
-  const [pending, setPending] = useState<'save' | 'publish' | 'archive' | null>(null);
+  const [pending, setPending] = useState<'save' | Transition | null>(null);
   const [fields, setFields] = useState<Record<string, string[]>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -249,7 +269,7 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
     if (isNew) router.push('/courses');
   }
 
-  async function transition(to: 'publish' | 'archive') {
+  async function transition(to: Transition) {
     if (busy || !course) return;
 
     setPending(to);
@@ -257,11 +277,10 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
     setFormError(null);
 
     try {
-      const next =
-        to === 'publish' ? await publishCourse(course.id) : await archiveCourse(course.id);
+      const next = await TRANSITIONS[to].run(course.id);
       setCourse(next);
       setValues(ofCourse(next));
-      notify.success(next.status.label === 'Published' ? 'Published' : 'Archived');
+      notify.success(TRANSITIONS[to].done);
     } catch (error) {
       const perField = fieldErrors(error);
       setFields(perField);
@@ -301,7 +320,8 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
           </StatusPill>
           {locked ? (
             <p className="text-[0.8125rem] text-ink-muted">
-              Published courses are read-only. Archive it to change what a student is reading.
+              Published courses are read-only. Unpublish to edit — students already enrolled keep
+              reading it. Archive ends it for them too.
             </p>
           ) : null}
         </div>
@@ -413,47 +433,83 @@ export function CourseEditor({ courseId }: { courseId?: string }) {
         )}
 
         {course?.status.code === 'draft' ? (
-          <Button
-            type="button"
-            variant="secondary"
-            loading={pending === 'publish'}
-            disabled={busy}
-            onClick={() => void transition('publish')}
-          >
-            Publish
-          </Button>
+          <span className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="secondary"
+              loading={pending === 'publish'}
+              disabled={busy}
+              onClick={() => void transition('publish')}
+            >
+              Publish
+            </Button>
+            <InfoTip label="What Publish does">
+              Puts the course on the shelf, lets a student take a place, and locks the form.
+            </InfoTip>
+          </span>
         ) : null}
 
         {locked ? (
-          <Button
-            type="button"
-            variant="secondary"
-            loading={pending === 'archive'}
-            onClick={() => void transition('archive')}
-          >
-            Archive
-          </Button>
+          <>
+            {/* The two ways off the shelf are offered together, because they are not two strengths
+                of the same move: unpublishing pauses a course its students keep reading, and
+                archiving ends it for everybody. Naming only one would decide for the teacher. Each
+                carries its own sentence for the same reason — the names are two steps apart and the
+                consequences are a world apart. */}
+            <span className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="secondary"
+                loading={pending === 'unpublish'}
+                onClick={() => void transition('unpublish')}
+              >
+                Unpublish
+              </Button>
+              <InfoTip label="What Unpublish does">
+                Off the shelf for strangers, editable again for you, and still open to every student
+                who holds a place.
+              </InfoTip>
+            </span>
+            <span className="flex items-center gap-1">
+              <Button
+                type="button"
+                variant="ghost"
+                loading={pending === 'archive'}
+                onClick={() => void transition('archive')}
+              >
+                Archive
+              </Button>
+              <InfoTip label="What Archive does">
+                Ends the course for everybody, including the students who hold a place in it.
+              </InfoTip>
+            </span>
+          </>
+        ) : null}
+
+        {course?.status.code === 'archived' ? (
+          <span className="flex items-center gap-1">
+            <Button
+              type="button"
+              variant="secondary"
+              loading={pending === 'unarchive'}
+              disabled={busy}
+              onClick={() => void transition('unarchive')}
+            >
+              Bring it back as a draft
+            </Button>
+            <InfoTip label="What bringing it back does">
+              Returns the course to you as a draft, at the address it never lost. Putting it back on
+              the shelf is a separate decision.
+            </InfoTip>
+          </span>
         ) : null}
       </div>
 
-      {course ? (
-        <p className="text-[0.8125rem] text-ink-muted">
-          The course is more than this page:{' '}
-          <Link
-            href={`/courses/${course.id}/modules`}
-            transitionTypes={['nav-forward']}
-            className="text-brand underline-offset-4 hover:underline"
-          >
-            write its syllabus
-          </Link>
-          .
-        </p>
-      ) : null}
-
       {course?.status.code === 'archived' ? (
         <p className="text-[0.75rem] leading-snug text-ink-faint">
-          Archived courses are hidden from students. Their address stays reserved, so nothing else
-          can take it.
+          Archived courses are hidden from students, including the ones who took a place. Bringing
+          one back returns it as a draft — its address has stayed reserved the whole time, and
+          putting it on the shelf again is a separate decision.
         </p>
       ) : null}
     </form>
