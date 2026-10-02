@@ -1,5 +1,6 @@
 import {
   ACCOUNT_STATUS_CODES,
+  ATTENDANCE_STATUS_CODES,
   BOOKING_STATUS_CODES,
   BOOKING_TYPE_CODES,
   COURSE_LEVEL_CODES,
@@ -142,6 +143,17 @@ export const LOOKUP_SEEDS: Partial<Record<LkpTypeCode, LookupTypeSeed>> = {
       at(BOOKING_STATUS_CODES.NO_SHOW, 'No show'),
       at(BOOKING_STATUS_CODES.REJECTED, 'Rejected'),
       at(BOOKING_STATUS_CODES.EXPIRED, 'Expired'),
+    ],
+  },
+  /**
+   * What a teacher said about one name on a class's register. Two rows, because the third answer
+   * is the absence of one: an unmarked line has no status rather than a status for "not yet".
+   */
+  [LKP_TYPE_CODES.ATTENDANCE_STATUS]: {
+    description: 'How a person stood at a class they were expected at',
+    values: [
+      at(ATTENDANCE_STATUS_CODES.PRESENT, 'Present'),
+      at(ATTENDANCE_STATUS_CODES.ABSENT, 'Absent'),
     ],
   },
   /**
