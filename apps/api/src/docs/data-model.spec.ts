@@ -20,7 +20,7 @@ describe('the data model reference', () => {
   const models = collectModels();
 
   it('reads every model the schema declares', () => {
-    expect(models).toHaveLength(20);
+    expect(models).toHaveLength(22);
     expect(models.map((model) => model.name)).toEqual(
       expect.arrayContaining([
         'User',

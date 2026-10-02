@@ -1,8 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AuthUser, Booking } from '@lms/shared';
+import type { AssignedClass, AuthUser, Booking } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { MyClasses } from './my-classes';
@@ -12,6 +12,7 @@ const bookings = vi.hoisted(() => ({
   leaveClass: vi.fn(),
   joinRoom: vi.fn(),
 }));
+const assignedClasses = vi.hoisted(() => ({ myAssignedClasses: vi.fn() }));
 const session = vi.hoisted(() => ({
   value: { status: 'signed-in' as string, user: null as AuthUser | null },
 }));
@@ -19,6 +20,7 @@ const notify = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 const push = vi.hoisted(() => vi.fn());
 
 vi.mock('@/lib/bookings', () => bookings);
+vi.mock('@/lib/cohort-classes', () => assignedClasses);
 vi.mock('./session-provider', () => ({ useSession: () => session.value }));
 vi.mock('next/navigation', () => ({ useRouter: () => ({ push }) }));
 vi.mock('@lms/ui', async (importOriginal) => {
@@ -76,12 +78,28 @@ function refused(code: string, message: string) {
   return new ApiError({ statusCode: code === 'CONFLICT' ? 409 : 400, code, message });
 }
 
+/** A class the course scheduled rather than one the student asked for: the same window shape, with
+ * no status until a teacher marks it. */
+const COHORT_ONE: AssignedClass = {
+  id: 'o8',
+  course: { id: 'b2a1', slug: 'fractions', title: 'Fractions, the slow way' },
+  startsAt: MONDAY,
+  endsAt: MONDAY_END,
+  durationMinutes: 45,
+  status: null,
+};
+
+function assigned(overrides: Partial<AssignedClass> = {}): AssignedClass {
+  return { ...COHORT_ONE, ...overrides };
+}
+
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ['Date'] });
   vi.setSystemTime(new Date(NOW));
   session.value = { status: 'signed-in', user: SAM };
   bookings.myBookings.mockReset().mockResolvedValue([]);
   bookings.leaveClass.mockReset().mockResolvedValue(booking({ status: 'cancelled' }));
+  assignedClasses.myAssignedClasses.mockReset().mockResolvedValue([]);
   notify.success.mockReset();
   notify.error.mockReset();
   push.mockReset();
@@ -221,6 +239,32 @@ describe('MyClasses', () => {
     await waitFor(() => expect(bookings.myBookings).toHaveBeenCalledTimes(2));
   });
 
+  /**
+   * The 403 the shared cookie really produces: a sign-in earned at the teacher portal that this
+   * student tab is holding. Retrying asks the same session the same question, so the honest answer
+   * names the account that would work and points at the sign-in, exactly as `My courses` does —
+   * the two screens read the same refusal and must not disagree about what it means.
+   */
+  it('names a session that is not a learner, and does not offer a retry of the same answer', async () => {
+    bookings.myBookings.mockRejectedValueOnce(
+      new ApiError({
+        statusCode: 403,
+        code: 'FORBIDDEN',
+        message: 'This account is not allowed to do that.',
+      }),
+    );
+
+    render(<MyClasses />);
+
+    await screen.findByText('This is not a learner account');
+    expect(screen.queryByText(/not allowed to do that/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+    expect(screen.getByRole('link', { name: /sign in as a learner/i })).toHaveAttribute(
+      'href',
+      '/login?next=%2Fmy-classes',
+    );
+  });
+
   it('sends a student with nothing booked to the shelf', async () => {
     const user = userEvent.setup();
     bookings.myBookings.mockResolvedValue([]);
@@ -358,6 +402,121 @@ describe('MyClasses', () => {
         ),
       );
       expect(document.querySelector('iframe')).toBeNull();
+    });
+  });
+
+  /**
+   * The classes a course scheduled rather than the ones this student asked for.
+   *
+   * A cohort class arrives from a second route and a second kind of decision — the teacher's plan,
+   * not a booking — so the tests below care less that it appears than that it appears *on the same
+   * calendar*, and that nothing on it offers a way out or a room, neither of which the platform has
+   * for a class nobody booked.
+   */
+  describe('the classes a course scheduled', () => {
+    /** 10:30–11:15 on the same Monday, in a course of its own. */
+    function cohort(overrides: Partial<AssignedClass> = {}): AssignedClass {
+      return assigned({
+        course: { id: 'c2', slug: 'veena-basics', title: 'Veena Basics' },
+        startsAt: '2026-09-28T05:00:00.000Z',
+        endsAt: '2026-09-28T05:45:00.000Z',
+        ...overrides,
+      });
+    }
+
+    function rowOf(name: string): HTMLElement {
+      const link = screen.getByRole('link', { name });
+      const line = link.closest('li');
+      if (!line) throw new Error(`${name} has no row`);
+      return line as HTMLElement;
+    }
+
+    it('puts them on the same calendar, in the order they happen', async () => {
+      bookings.myBookings.mockResolvedValue([booking()]);
+      assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
+
+      render(<MyClasses />);
+
+      const upcoming = await screen.findByLabelText('Coming up');
+      expect(
+        within(rowOf('Veena Basics')).getByText('Mon 28 Sept, 10:30–11:15'),
+      ).toBeInTheDocument();
+      const text = upcoming.textContent ?? '';
+      expect(text.indexOf('09:30–10:15')).toBeLessThan(text.indexOf('10:30–11:15'));
+      expect(screen.getByRole('link', { name: 'Veena Basics' })).toHaveAttribute(
+        'href',
+        '/courses/c2',
+      );
+    });
+
+    it('counts both halves of the calendar in the line at the top', async () => {
+      bookings.myBookings.mockResolvedValue([booking()]);
+      assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
+
+      render(<MyClasses />);
+
+      expect(await screen.findByText('2 classes on your calendar')).toBeInTheDocument();
+    });
+
+    it('names a scheduled class as one, and says nothing about a mark nobody has made', async () => {
+      assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Veena Basics');
+      expect(rowOf('Veena Basics')).toHaveTextContent('Cohort class');
+      // The attendance vocabulary is not this stage's, and an invented word on an unmarked row
+      // would read as a mark the teacher never made.
+      expect(within(rowOf('Veena Basics')).queryByText(/confirmed|pending|not marked/i)).toBeNull();
+    });
+
+    it('offers no way out of a class the series booked, and no room either', async () => {
+      bookings.myBookings.mockResolvedValue([booking()]);
+      assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Veena Basics');
+      // Leaving is a booking's story: nobody can quit a class their place in the course brought
+      // them, and there is no route here that would accept the press.
+      expect(screen.getAllByRole('button', { name: /leave this class/i })).toHaveLength(1);
+      expect(rowOf('Fractions, the slow way')).toContainElement(
+        screen.getByRole('button', { name: /leave this class/i }),
+      );
+      expect(rowOf('Veena Basics').textContent).not.toMatch(/door|join/i);
+    });
+
+    it('shows the calendar when the only class on it was scheduled', async () => {
+      assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
+
+      render(<MyClasses />);
+
+      expect(await screen.findByText('Veena Basics')).toBeInTheDocument();
+      expect(screen.queryByText(/No classes yet/)).toBeNull();
+    });
+
+    it('reads both lists again when a class is left, because the calendar is one answer', async () => {
+      const user = userEvent.setup();
+      bookings.myBookings.mockResolvedValue([booking()]);
+      assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
+
+      render(<MyClasses />);
+
+      await user.click(await screen.findByRole('button', { name: /leave this class/i }));
+
+      await waitFor(() => expect(bookings.myBookings).toHaveBeenCalledTimes(2));
+      await waitFor(() => expect(assignedClasses.myAssignedClasses).toHaveBeenCalledTimes(2));
+    });
+
+    it('puts a failed read of either list where it can be retried', async () => {
+      bookings.myBookings.mockResolvedValue([booking()]);
+      assignedClasses.myAssignedClasses.mockRejectedValueOnce(
+        refused('NETWORK_ERROR', 'The API is unreachable.'),
+      );
+
+      render(<MyClasses />);
+
+      expect(await screen.findByText('Your classes did not load')).toBeInTheDocument();
     });
   });
 });

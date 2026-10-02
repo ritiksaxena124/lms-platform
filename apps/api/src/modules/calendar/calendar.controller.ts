@@ -15,15 +15,16 @@ import { CreateClassSeriesDto, UpdateClassSeriesDto } from './dto/class-series.d
 import { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
 
 /**
- * A teacher's recurring calendar: the weekly series that auto-enroll students, and the holidays
- * that stop minutes from being offered at all.
+ * A teacher's recurring calendar: the weekly series that stands for their dated classes, and the
+ * holidays that take a day off the month.
  *
  * Series are owned by a course rather than the account — a teacher schedules one course's rhythm
  * separately from another's, and both may run on Monday at 09:00 without colliding. Holidays are
  * personal to the teacher: one teacher's festival is another teacher's working day.
  *
- * `@Roles(TEACHER)` covers all routes. A student reading a teacher's series would be reading a
- * schedule they cannot yet book against — the instances these mint are for enrolled students only.
+ * Because a series decides what a *teacher's* calendar holds, every route here is scoped to the
+ * caller's own course rather than to "a teacher and any course uuid": the account that scheduled a
+ * plan is the account whose dated classes change, and the service refuses the mismatch.
  */
 @Controller('courses/:courseId/series')
 @Roles(ROLE_CODES.TEACHER)
@@ -31,35 +32,41 @@ export class ClassSeriesController {
   constructor(private readonly calendar: CalendarService) {}
 
   @Get()
-  async list(@Param('courseId') courseId: string): Promise<ClassSeriesListResponse> {
-    return this.calendar.listSeries(courseId);
+  async list(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('courseId') courseId: string,
+  ): Promise<ClassSeriesListResponse> {
+    return this.calendar.listSeries(user.id, courseId);
   }
 
   @Post()
   async create(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('courseId') courseId: string,
     @Body() dto: CreateClassSeriesDto,
   ): Promise<ClassSeriesResponse> {
-    return this.calendar.createSeries(courseId, dto);
+    return this.calendar.createSeries(user.id, courseId, dto);
   }
 
   @Patch(':id')
   async update(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('courseId') courseId: string,
     @Param('id') id: string,
     @Body() dto: UpdateClassSeriesDto,
   ): Promise<ClassSeriesResponse> {
-    return this.calendar.updateSeries(courseId, id, dto);
+    return this.calendar.updateSeries(user.id, courseId, id, dto);
   }
 
   /** Retirement is its own endpoint so an edit cannot smuggle in a flag change beside new times. */
   @Post(':id/retire')
   @HttpCode(HttpStatus.OK)
   async retire(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('courseId') courseId: string,
     @Param('id') id: string,
   ): Promise<ClassSeriesResponse> {
-    return this.calendar.retireSeries(courseId, id);
+    return this.calendar.retireSeries(user.id, courseId, id);
   }
 }
 

@@ -29,8 +29,14 @@ export function formatDay(instant: string | Date, timeZone?: string | null): str
   return formatter.format(new Date(instant));
 }
 
-/** The zone the reader is actually in, when the account cannot name one it trusts. */
-function zoneFor(timeZone?: string | null): string {
+/**
+ * The zone the reader is actually in, when the account cannot name one it trusts.
+ *
+ * A dated calendar has to group its columns in some zone, and the account's own is the only one
+ * worth asking the browser about — the platform's is not the teacher's, and a screen that grouped
+ * a week by UTC would teach a Kolkata Monday on a London Sunday.
+ */
+export function readerZone(timeZone?: string | null): string {
   return timeZone && isValidIanaTimeZone(timeZone)
     ? timeZone
     : Intl.DateTimeFormat().resolvedOptions().timeZone;
@@ -72,7 +78,7 @@ export function formatClassWindow(
   endsAt: string,
   timeZone?: string | null,
 ): string {
-  const zone = zoneFor(timeZone);
+  const zone = readerZone(timeZone);
   return `${namedDay(startsAt, zone)}, ${clockFace(startsAt, zone)}–${clockFace(endsAt, zone)}`;
 }
 
@@ -83,6 +89,6 @@ export function formatClassWindow(
  * reading `09:30–10:15` would be two formats for the one clock the teacher wrote both from.
  */
 export function formatInstant(instant: string, timeZone?: string | null): string {
-  const zone = zoneFor(timeZone);
+  const zone = readerZone(timeZone);
   return `${namedDay(instant, zone)}, ${clockFace(instant, zone)}`;
 }

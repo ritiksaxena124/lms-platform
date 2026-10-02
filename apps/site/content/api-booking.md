@@ -89,3 +89,15 @@ Each request includes the student's name, the requested slot, and how long the r
 Lists available time slots generated from active availability rules. Slots are computed on demand for a given date range; they reflect current rules, existing bookings, and capacity limits.
 
 Query parameters control the date range, course filter, and teacher filter. Slots already booked are excluded from the response.
+
+## GET /api/v1/classes/teaching
+
+Lists the dated classes a teacher teaches, soonest first. Each row names the course, the start and end instants, how long the class runs and how many students are expected — the number that tells a teacher whether Monday is a lesson or a room full of people.
+
+There is no matching write. A [[dated class]] is what a [[series]] comes to at a particular minute, so it is produced by the generation sweep rather than asked for: `from` and `to` bound the window, and leaving both out returns the thirty days the sweep keeps filled. A window wider than those thirty days is refused with `400` — nothing is written that far ahead, so the ask would only gather every class this caller owns into one response.
+
+## GET /api/v1/classes/learning
+
+Lists the classes a student is standing for, soonest first, each carrying their own attendance mark or nothing at all — an unanswered class reads as blank rather than as a word the platform invented for it.
+
+These are the [[cohort class]]es: a course the reader holds a [[place]] in, meeting on its teacher's plan rather than on anything this student pressed. The list is read from those places rather than from one class's [[register]], which is how somebody who enrolled five minutes ago sees the term they just joined. The same `from`/`to` window applies.

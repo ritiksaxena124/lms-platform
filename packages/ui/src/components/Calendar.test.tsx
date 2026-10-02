@@ -1,8 +1,8 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 
-import { Calendar, type CalendarDay } from './Calendar';
+import { Calendar, type CalendarChip, type CalendarDay } from './Calendar';
 
 /**
  * The one grid both portals draw: a teacher's standing week, a student's calendar of what they
@@ -219,5 +219,99 @@ describe('Calendar', () => {
     // it is a press on a time that may not be on offer any more.
     expect(screen.getByRole('button', { name: '09:00' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Next week' })).toBeDisabled();
+  });
+
+  /**
+   * A teacher who keeps a weekly class on four courses has four chips on that weekday, and the
+   * seven columns are one row: the tallest column sets the height of all six others, so a calendar
+   * of a busy Monday is a wall of eight empty boxes under a quiet Tuesday. Whoever owns the week
+   * says how many columns it will show; the rest stay one press away and never vanish.
+   */
+  describe('a day with more on it than the grid shows', () => {
+    const BUSY = ['09:00', '10:00', '11:00', '12:00', '14:00', '16:00'];
+
+    function onDay(times: string[]): CalendarChip[] {
+      return times.map((time) => ({ id: time, label: time, tone: 'confirmed' as const }));
+    }
+
+    function timesDrawn() {
+      return screen.getAllByText(/^\d\d:\d\d$/).map((chip) => chip.textContent);
+    }
+
+    /** A column the tests can hold on to, rather than an index that might not be a column. */
+    function columnAt(index: number): HTMLElement {
+      const found = columns()[index];
+      if (!found) throw new Error(`no column at index ${index}`);
+      return found;
+    }
+
+    it('shows the ones it was told to and folds the rest behind a press', () => {
+      render(<Calendar days={[day({ chips: onDay(BUSY) })]} label="Week" maxChipsPerDay={4} />);
+
+      expect(timesDrawn()).toEqual(['09:00', '10:00', '11:00', '12:00']);
+      const more = screen.getByRole('button', { name: '+2 more on Mon 28 Sep' });
+      expect(more).toHaveAttribute('aria-expanded', 'false');
+    });
+
+    it('opens the folded chips in place, and folds them back', async () => {
+      const user = userEvent.setup();
+      render(<Calendar days={[day({ chips: onDay(BUSY) })]} label="Week" maxChipsPerDay={4} />);
+
+      await user.click(screen.getByRole('button', { name: '+2 more on Mon 28 Sep' }));
+      expect(timesDrawn()).toEqual(BUSY);
+      expect(screen.getByRole('button', { name: 'Show fewer on Mon 28 Sep' })).toHaveAttribute(
+        'aria-expanded',
+        'true',
+      );
+
+      await user.click(screen.getByRole('button', { name: 'Show fewer on Mon 28 Sep' }));
+      expect(timesDrawn()).toEqual(['09:00', '10:00', '11:00', '12:00']);
+    });
+
+    it('says nothing about more on a day that fits', () => {
+      render(
+        <Calendar
+          days={[day({ chips: onDay(BUSY.slice(0, 4)) })]}
+          label="Week"
+          maxChipsPerDay={4}
+        />,
+      );
+
+      expect(timesDrawn()).toEqual(BUSY.slice(0, 4));
+      expect(screen.queryByRole('button', { name: /more/i })).toBeNull();
+    });
+
+    it('draws every chip a grid was given when nobody set a cap', () => {
+      render(<Calendar days={[day({ chips: onDay(BUSY) })]} label="Week" />);
+
+      expect(timesDrawn()).toEqual(BUSY);
+      expect(screen.queryByRole('button', { name: /more/i })).toBeNull();
+    });
+
+    it('folds each day on its own, so a busy Monday says nothing about a busy Tuesday', async () => {
+      const user = userEvent.setup();
+      render(
+        <Calendar
+          days={week((index) =>
+            index === 0 || index === 1
+              ? { chips: onDay(BUSY) }
+              : { chips: onDay(BUSY.slice(0, 2)) },
+          )}
+          label="Week"
+          maxChipsPerDay={4}
+        />,
+      );
+
+      const monday = within(columnAt(0));
+      const tuesday = within(columnAt(1));
+
+      await user.click(screen.getByRole('button', { name: '+2 more on Mon 28 Sep' }));
+
+      expect(monday.getByRole('button', { name: 'Show fewer on Mon 28 Sep' })).toBeInTheDocument();
+      expect(tuesday.getByRole('button', { name: '+2 more on Tue 29 Sep' })).toHaveAttribute(
+        'aria-expanded',
+        'false',
+      );
+    });
   });
 });
