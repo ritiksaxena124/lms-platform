@@ -8,6 +8,10 @@ import { z } from 'zod';
 const EnvSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65_535).default(4000),
+  /** The interface to bind. Loopback by default so a host run never opens the port to the network by
+   * accident; a container sets `0.0.0.0`, because nothing on another container's interface can reach
+   * an address that only exists inside this one. */
+  LISTEN_HOST: z.string().min(1).default('127.0.0.1'),
 
   CORS_ORIGINS: z
     .string()

@@ -23,6 +23,14 @@ describe('parseEnv', () => {
     expect(env.JITSI_DOMAIN).toBe('meet.jit.si');
   });
 
+  it('stays on loopback unless it is told to answer the network', () => {
+    // The laptop default. In a container this has to be overridden, because a process bound to
+    // 127.0.0.1 accepts nothing from another container — but the code keeps the conservative value so
+    // a host run never opens the port to the network by accident.
+    expect(parseEnv({ ...BASE }).LISTEN_HOST).toBe('127.0.0.1');
+    expect(parseEnv({ ...BASE, LISTEN_HOST: '0.0.0.0' }).LISTEN_HOST).toBe('0.0.0.0');
+  });
+
   it('takes jitsi as the video provider, and the bridge it should point classes at', () => {
     const env = parseEnv({
       ...BASE,

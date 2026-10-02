@@ -28,20 +28,21 @@ See [Phases](#phases) for what each phase promised and what it delivered.
 
 ## Contents
 
-| Section                                                           | What it covers                                               |
-| ----------------------------------------------------------------- | ------------------------------------------------------------ |
-| [What each portal does](#what-each-portal-does)                   | The routes that exist today, by the door they are reachable  |
-| [Prerequisites](#prerequisites)                                   | The three tools this repo needs                              |
-| [First run](#first-run)                                           | Environment, database, seed, and the ports the apps answer   |
-| [Signing in](#signing-in)                                         | The three demo accounts `db:seed` writes                     |
-| [Walking the demo](#walking-the-demo)                             | The same course, from a teacher's page to a stranger's shelf |
-| [Commands](#commands)                                             | The gate, the dev servers, the docs exports, the release     |
-| [Releases](#releases)                                             | What a tag means here, and how one is cut                    |
-| [Layout](#layout)                                                 | The seven workspace packages and what each one owns          |
-| [Design system — Graphite](#design-system--graphite)              | The five rules that outrank taste                            |
-| [Conventions](#conventions-that-are-enforced-not-documented-away) | The four rules ESLint holds                                  |
-| [Phases](#phases)                                                 | The thirteen, their status, and why that order               |
-| [Environment variables](#environment-variables)                   | The four worth knowing early                                 |
+| Section                                                             | What it covers                                                |
+| ------------------------------------------------------------------- | ------------------------------------------------------------- |
+| [What each portal does](#what-each-portal-does)                     | The routes that exist today, by the door they are reachable   |
+| [Prerequisites](#prerequisites)                                     | The tools behind a laptop run, and the one containers add     |
+| [First run](#first-run)                                             | Environment, database, seed, and the ports the apps answer    |
+| [Signing in](#signing-in)                                           | The three demo accounts `db:seed` writes                      |
+| [Walking the demo](#walking-the-demo)                               | The same course, from a teacher's page to a stranger's shelf  |
+| [Running the stack in containers](#running-the-stack-in-containers) | The images, the gateway, and what a build-time key means here |
+| [Commands](#commands)                                               | The gate, the dev servers, the docs exports, the release      |
+| [Releases](#releases)                                               | What a tag means here, and how one is cut                     |
+| [Layout](#layout)                                                   | The seven workspace packages and what each one owns           |
+| [Design system — Graphite](#design-system--graphite)                | The five rules that outrank taste                             |
+| [Conventions](#conventions-that-are-enforced-not-documented-away)   | The four rules ESLint holds                                   |
+| [Phases](#phases)                                                   | The thirteen, their status, and why that order                |
+| [Environment variables](#environment-variables)                     | The four worth knowing early                                  |
 
 ## What each portal does
 
@@ -163,11 +164,12 @@ Money and attendance are still ahead — [Phases](#phases) says in which order t
 
 ## Prerequisites
 
-| Tool     | Version | Notes                                            |
-| -------- | ------- | ------------------------------------------------ |
-| Bun      | ≥ 1.2   | package manager, runner and test driver          |
-| Node     | ≥ 22    | Next.js and Prisma CLI run on Node               |
-| Postgres | ≥ 16    | local server; extensions `pg_trgm`, `btree_gist` |
+| Tool     | Version | Notes                                                    |
+| -------- | ------- | -------------------------------------------------------- |
+| Bun      | ≥ 1.2   | package manager, runner and test driver                  |
+| Node     | ≥ 22    | Next.js and Prisma CLI run on Node                       |
+| Postgres | ≥ 16    | local server; extensions `pg_trgm`, `btree_gist`         |
+| Docker   | ≥ 24    | only for the container path; `bun run dev` needs neither |
 
 ## First run
 
@@ -341,23 +343,86 @@ the teacher out of it.
    and asks the API for nothing — which is the one screen on this portal worth watching in the network
    tab.
 
+## Running the stack in containers
+
+`bun run dev` is still the way to work here — it recompiles in seconds and watches the files. The
+container path is for the other case: handing the whole product to somebody as six images and one
+database, so it comes up the same on any machine that has Docker.
+
+```bash
+cp docker/.env.example docker/.env.docker    # then set JWT_SECRET:  openssl rand -hex 32
+
+bun run docker:build     # api, teacher, student, ops, site, gateway
+bun run docker:up        # postgres -> migrate -> api + three portals + site -> gateway
+bun run docker:seed      # reference rows + demo accounts — `up` never writes them, and an
+                         # unseeded stack has no lookups to answer with
+```
+
+Then open <http://teacher.localtest.me>, <http://student.localtest.me>, <http://ops.localtest.me>
+and <http://site.localtest.me>. There is no port to remember: one nginx gateway answers `:80` and
+routes by subdomain, which keeps the exact hostnames every `.env.example` already names — so the
+session cookie keeps its `COOKIE_DOMAIN=localtest.me` scope and a sign-in still carries from one
+portal to the next. `COOKIE_SECURE` stays `false` until something in front of the gateway holds a
+certificate. The gateway is also the only published port: the stack's Postgres is reachable from its
+own services and from nowhere else, so the host's Postgres on `:5432` — the one `bun run test` uses —
+keeps working while the stack is up.
+
+Things about the shape of it, because each one is a bug that would otherwise be silent:
+
+- **`NEXT_PUBLIC_*` is chosen at build time, not runtime.** Next inlines those values into the
+  client bundle, so the portals take them as build `ARG`s read from `docker/.env.docker` — the same
+  file the API reads, so the address a button points at and the address the API advertises cannot
+  drift apart.
+- **`bun run docker:check` guards that.** It reads the portal sources, the Dockerfiles, the gateway
+  config and the compose file and fails when an app has no service, or reads a public key no
+  Dockerfile passes in. It needs no Docker daemon, so it rides inside `bun run verify`.
+- **Migrations run before the API starts**, as a one-shot service (`prisma migrate deploy`) from
+  the same tag, so a container never serves a schema its image does not contain. The same server
+  gets an `lms_test` database from `docker/postgres/init-lms-test.sql`, which is what the
+  integration suites expect.
+- **The API binds `0.0.0.0` in a container and `127.0.0.1` on a host.** That is `LISTEN_HOST`: the
+  loopback default keeps a laptop run from opening the port to the network by accident, and nothing
+  on another container's interface can reach an address that only exists inside this one.
+- **Two named volumes**, `pgdata` for the rows and `api-storage` for uploaded lesson bytes, so
+  rebuilding an image does not orphan a video somebody attached. `.dockerignore` keeps `.env` files,
+  `apps/api/storage` and `node_modules` out of the build context entirely.
+- **`docker:seed` is the one service that says it is not a live server.** The image it runs from is
+  built with `NODE_ENV=production`, where `db:seed` writes the reference rows and skips the demo
+  accounts on purpose. The seed service overrides that for itself and nothing else, because a
+  hand-off nobody can sign in to is not a hand-off — and the API keeps `production`.
+- **`docker:build` builds the images one at a time.** Five concurrent `bun install` layers were seen
+  to fail a shared tarball's checksum and then say nothing for ten minutes, and the install layer is
+  the same layer every portal reads — so the first image pays for it and the rest take a cache hit.
+
+`bun run docker:down` stops the stack and leaves both volumes; `docker compose down --volumes`
+is the thing that actually deletes them.
+
+What this deliberately does not do: there is no registry push, no image published anywhere, and no
+deploy workflow. The images exist on the machine that built them.
+
 ## Commands
 
-| Command                                 | What it does                                                             |
-| --------------------------------------- | ------------------------------------------------------------------------ |
-| `bun run verify`                        | The gate: shared build, typecheck, lint, tests. Run before every commit. |
-| `bun run dev`                           | API + all three portals + the public site, together.                     |
-| `bun run dev:api`                       | NestJS API with watch mode.                                              |
-| `bun run dev:teacher`                   | Next.js teacher portal.                                                  |
-| `bun run dev:student`                   | Next.js student portal — the public catalog.                             |
-| `bun run dev:ops`                       | Next.js operator's desk.                                                 |
-| `bun run dev:site`                      | Next.js public site and docs on <http://localhost:3003>.                 |
-| `bun run dev:ui`                        | Storybook for `@lms/ui` on <http://localhost:6006>.                      |
-| `bun run --filter @lms/api docs:export` | Rewrite `content/endpoints.json` from the Nest route table.              |
-| `bun run --filter @lms/api docs:data`   | Rewrite `content/data-model.json` from `schema.prisma`.                  |
-| `bun run test`                          | All test suites (Vitest, one package at a time — see ARCHITECTURE §17).  |
-| `bun run format`                        | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.      |
-| `bun run release`                       | Cut a tagged GitHub release: verify, tag, push, publish.                 |
+| Command                                 | What it does                                                                           |
+| --------------------------------------- | -------------------------------------------------------------------------------------- |
+| `bun run verify`                        | The gate: shared build, docker check, typecheck, lint, tests. Run before every commit. |
+| `bun run dev`                           | API + all three portals + the public site, together.                                   |
+| `bun run dev:api`                       | NestJS API with watch mode.                                                            |
+| `bun run dev:teacher`                   | Next.js teacher portal.                                                                |
+| `bun run dev:student`                   | Next.js student portal — the public catalog.                                           |
+| `bun run dev:ops`                       | Next.js operator's desk.                                                               |
+| `bun run dev:site`                      | Next.js public site and docs on <http://localhost:3003>.                               |
+| `bun run dev:ui`                        | Storybook for `@lms/ui` on <http://localhost:6006>.                                    |
+| `bun run docker:build`                  | The six images, from `compose.yaml` and `docker/.env.docker`.                          |
+| `bun run docker:up`                     | The stack: Postgres, migrations, API, three portals, site, gateway `:80`.              |
+| `bun run docker:down`                   | Stops the stack; `pgdata` and the uploads keep their volumes.                          |
+| `bun run docker:logs`                   | The stack's logs, together.                                                            |
+| `bun run docker:seed`                   | The demo accounts into the running stack's database.                                   |
+| `bun run docker:check`                  | The container guard — no Docker daemon needed; part of `verify`.                       |
+| `bun run --filter @lms/api docs:export` | Rewrite `content/endpoints.json` from the Nest route table.                            |
+| `bun run --filter @lms/api docs:data`   | Rewrite `content/data-model.json` from `schema.prisma`.                                |
+| `bun run test`                          | All test suites (Vitest, one package at a time — see ARCHITECTURE §17).                |
+| `bun run format`                        | Prettier over TS/TSX/JSON/MD. `schema.prisma` uses `prisma format`.                    |
+| `bun run release`                       | Cut a tagged GitHub release: verify, tag, push, publish.                               |
 
 The two `docs:` commands are run when a route or a table changes, and committed with it: a spec in
 each package compares the committed file against what the code says now, so forgetting to re-export
