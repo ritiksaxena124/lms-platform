@@ -1537,6 +1537,182 @@
       "tracksUpdates": true
     },
     {
+      "name": "ClassOccurrence",
+      "table": "class_occurrence",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "seriesId",
+          "column": "series_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "courseId",
+          "column": "course_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "teacherUserId",
+          "column": "teacher_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "startsAt",
+          "column": "starts_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "durationMinutes",
+          "column": "duration_minutes",
+          "type": "Int",
+          "optional": false
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "series",
+          "type": "ClassSeries",
+          "columns": [
+            "seriesId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "course",
+          "type": "Course",
+          "columns": [
+            "courseId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "teacher",
+          "type": "User",
+          "columns": [
+            "teacherUserId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "seriesId",
+          "startsAt"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
+      "name": "ClassAttendance",
+      "table": "class_attendance",
+      "columns": [
+        {
+          "name": "id",
+          "column": "id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "occurrenceId",
+          "column": "occurrence_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "studentUserId",
+          "column": "student_user_id",
+          "type": "String",
+          "optional": false
+        },
+        {
+          "name": "statusValueId",
+          "column": "status_value_id",
+          "type": "String",
+          "optional": true
+        },
+        {
+          "name": "isActive",
+          "column": "is_active",
+          "type": "Boolean",
+          "optional": false
+        },
+        {
+          "name": "createdAt",
+          "column": "created_at",
+          "type": "DateTime",
+          "optional": false
+        },
+        {
+          "name": "updatedAt",
+          "column": "updated_at",
+          "type": "DateTime",
+          "optional": false
+        }
+      ],
+      "relations": [
+        {
+          "field": "occurrence",
+          "type": "ClassOccurrence",
+          "columns": [
+            "occurrenceId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "student",
+          "type": "User",
+          "columns": [
+            "studentUserId"
+          ],
+          "onDelete": "Restrict"
+        },
+        {
+          "field": "status",
+          "type": "LkpValue",
+          "columns": [
+            "statusValueId"
+          ],
+          "onDelete": "Restrict"
+        }
+      ],
+      "uniqueKeys": [
+        [
+          "occurrenceId",
+          "studentUserId"
+        ]
+      ],
+      "softDelete": true,
+      "tracksUpdates": true
+    },
+    {
       "name": "Coupon",
       "table": "coupon",
       "columns": [

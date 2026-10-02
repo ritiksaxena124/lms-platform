@@ -839,36 +839,6 @@
                 "note": ""
               },
               {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
-                "note": ""
-              },
-              {
                 "name": "createdAt",
                 "optional": false,
                 "type": "string",
@@ -960,36 +930,6 @@
                 "name": "courseId",
                 "optional": false,
                 "type": "string",
-                "note": ""
-              },
-              {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
                 "note": ""
               },
               {
@@ -1089,36 +1029,6 @@
                 "note": ""
               },
               {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
-                "note": ""
-              },
-              {
                 "name": "createdAt",
                 "optional": false,
                 "type": "string",
@@ -1181,36 +1091,6 @@
                 "name": "courseId",
                 "optional": false,
                 "type": "string",
-                "note": ""
-              },
-              {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
                 "note": ""
               },
               {
@@ -3190,6 +3070,228 @@
     },
     {
       "method": "GET",
+      "path": "/api/v1/classes/learning",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "student"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "from",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the start of the window as an instant."
+            ],
+            "values": []
+          },
+          {
+            "name": "to",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the end of the window as an instant."
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "LearningClassesResponse",
+        "note": "The classes a student holds a place in, oldest first, within the window they asked for.",
+        "fields": [
+          {
+            "name": "from",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "to",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "items",
+            "optional": false,
+            "type": "AssignedClass[]",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "AssignedClass",
+            "note": "One dated class a student is standing for. There is no register count here and no series id: a student's calendar is a list of days they are expected at, and both of those facts belong to whoever runs the course. `status` is the student's own mark — present or absent — or null while the class has not been answered. A mark can only be made after the minute has passed, so a future class on this list is unmarked by definition, and the null is the honest state rather than a placeholder for one.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": ""
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "AttendanceStatusCode | null",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "ClassOccurrenceController",
+      "handler": "learning"
+    },
+    {
+      "method": "GET",
+      "path": "/api/v1/classes/teaching",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [],
+        "query": [
+          {
+            "name": "from",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the start of the window as an instant."
+            ],
+            "values": []
+          },
+          {
+            "name": "to",
+            "optional": true,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "Give the end of the window as an instant."
+            ],
+            "values": []
+          }
+        ],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "TeachingClassesResponse",
+        "note": "The teacher's dated classes, oldest first, within the window they asked for. `from` and `to` are echoed back because they are the caller's, not the platform's: the rows only exist as far as the horizon, and a screen that asked for April and got March needs to know which of the two it ran out of.",
+        "fields": [
+          {
+            "name": "from",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "to",
+            "optional": false,
+            "type": "string",
+            "note": ""
+          },
+          {
+            "name": "items",
+            "optional": false,
+            "type": "ScheduledClass[]",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "ScheduledClass",
+            "note": "One dated class, as the teacher who teaches it reads it. `endsAt` is not stored — the row keeps a start and a length — for the same reason a booking carries one: a calendar square has to say when the class is over, and three portals each adding sixty minutes is how one class ends at three times. `studentsExpected` counts the names on the register beside the class, which is what tells a teacher whether Monday is a lesson or a room full of people. It is a number rather than a list because a week of classes is a list of days, and the names are a screen away — the roster a teacher marks after the class is Stage 3's question, asked of one class at a time.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "seriesId",
+                "optional": false,
+                "type": "string",
+                "note": "The pattern this class came from, so a screen can say \"the Monday nine o'clock\" as well as a date."
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": ""
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "studentsExpected",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "ClassOccurrenceController",
+      "handler": "teaching"
+    },
+    {
+      "method": "GET",
       "path": "/api/v1/courses",
       "statusCode": 200,
       "access": {
@@ -4926,36 +5028,6 @@
                 "note": ""
               },
               {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
-                "note": ""
-              },
-              {
                 "name": "createdAt",
                 "optional": false,
                 "type": "string",
@@ -5067,36 +5139,6 @@
                 "name": "courseId",
                 "optional": false,
                 "type": "string",
-                "note": ""
-              },
-              {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
                 "note": ""
               },
               {
@@ -5215,36 +5257,6 @@
                 "note": ""
               },
               {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
-                "note": ""
-              },
-              {
                 "name": "createdAt",
                 "optional": false,
                 "type": "string",
@@ -5308,36 +5320,6 @@
                 "name": "courseId",
                 "optional": false,
                 "type": "string",
-                "note": ""
-              },
-              {
-                "name": "weekday",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "startMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "endMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "durationMinutes",
-                "optional": false,
-                "type": "number",
-                "note": ""
-              },
-              {
-                "name": "isActive",
-                "optional": false,
-                "type": "boolean",
                 "note": ""
               },
               {

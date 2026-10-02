@@ -28,6 +28,7 @@ export const LKP_TYPE_CODES = {
   CURRENCY: 'Currency',
   MODERATION_STATUS: 'ModerationStatus',
   DISCOUNT_TYPE: 'DiscountType',
+  ATTENDANCE_STATUS: 'AttendanceStatus',
 } as const;
 
 export type LkpTypeCode = (typeof LKP_TYPE_CODES)[keyof typeof LKP_TYPE_CODES];
@@ -179,6 +180,27 @@ export const DISCOUNT_TYPE_CODES = {
 } as const;
 
 export type DiscountTypeCode = (typeof DISCOUNT_TYPE_CODES)[keyof typeof DISCOUNT_TYPE_CODES];
+
+/**
+ * What a teacher said about one name on a class's register.
+ *
+ * Only the two answers a mark can carry, because the row's third state — nobody has marked it —
+ * is the column being null, and a code for it would let a reader not tell an untaught class from
+ * one the teacher worked through and simply never wrote down.
+ *
+ * Not `BookingStatus`, which the platform's booked classes answer to. Those codes describe a
+ * minute on a teacher's calendar (`confirmed` is a yes, `no_show` is a class nobody turned up to);
+ * these describe a person at a class that was always going to happen. Sharing one vocabulary
+ * would mean a query over "rows in `no_show`" returning both a lesson that never took place and a
+ * student who skipped one that did.
+ */
+export const ATTENDANCE_STATUS_CODES = {
+  PRESENT: 'present',
+  ABSENT: 'absent',
+} as const;
+
+export type AttendanceStatusCode =
+  (typeof ATTENDANCE_STATUS_CODES)[keyof typeof ATTENDANCE_STATUS_CODES];
 
 /**
  * Where a payment stands in its lifecycle. `pending` means the provider has not responded;

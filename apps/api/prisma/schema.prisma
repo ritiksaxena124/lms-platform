@@ -72,6 +72,9 @@ model LkpValue {
   /// Coupons that apply this kind of discount (percentage or fixed).
   couponsAsDiscountType Coupon[] @relation("coupon_discount_type")
 
+  /// The names marked this way at a class — present, absent.
+  classAttendanceAsStatus ClassAttendance[] @relation("class_attendance_status")
+
   /// Payments quoted in this currency.
   paymentsAsCurrency Payment[] @relation("payment_currency")
 
@@ -141,6 +144,13 @@ model User {
 
   /// The days this teacher does not teach — holidays, festivals, personal days off.
   holidays Holiday[]
+
+  /// The dated classes this person teaches, across every course — which is what a week of
+  /// a calendar is.
+  classOccurrencesTaught ClassOccurrence[] @relation("teacher_class_occurrences")
+
+  /// The registers naming this person at a class, every week of every course they have joined.
+  classAttendance ClassAttendance[] @relation("student_class_attendance")
 
   @@index([roleValueId, isActive], map: "ix_user_role_active")
   @@map("users")
@@ -273,6 +283,9 @@ model Course {
 
   /// The recurring weekly series of classes for this course.
   classSeries ClassSeries[]
+
+  /// The dated classes this course's series have opened, and the cohort each one expects.
+  classOccurrences ClassOccurrence[] @relation("course_class_occurrences")
 
   /// The discount codes a teacher issued for this course.
   coupons Coupon[]
@@ -819,26 +832,30 @@ model ActionLog {
 
 /// A recurring series of classes a teacher schedules for a course, repeating weekly on the
 /// chosen day. Each row is one slot in the teacher's week — Monday at 09:00–10:00, Thursday
-/// at 14:00–15:00 — and the booking endpoint auto-enrolls students into every instance that
-/// falls within their enrollment window.
+/// at 14:00–15:00 — and it is a plan rather than a class: the dated rows it stands for are
+/// `class_occurrence`, written by the generation sweep from the same arithmetic
+/// (`expandSeries` in @lms/shared) that decides what a calendar offers.
 ///
 /// The series has no status of its own: `isActive` answers whether it is still running, and
-/// a retired series keeps its rows so past bookings can resolve which plan made them possible.
-/// The timezone is absent because it lives on the teacher's account (§5), and the day-of-week
-/// is stored as an integer matching `AvailabilityRule.weekday`.
+/// a retired series keeps its rows — and its dated classes — so past weeks still resolve which
+/// plan made them possible. The timezone is absent because it lives on the teacher's account
+/// (§5), and the day-of-week is stored as an integer matching `AvailabilityRule.weekday`.
 model ClassSeries {
-  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  courseId      String @map("course_id") @db.Uuid
-  weekday       Int    @map("weekday")
-  startMinutes  Int    @map("start_minutes")
-  endMinutes    Int    @map("end_minutes")
-  durationMinutes Int  @map("duration_minutes")
+  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId        String @map("course_id") @db.Uuid
+  weekday         Int    @map("weekday")
+  startMinutes    Int    @map("start_minutes")
+  endMinutes      Int    @map("end_minutes")
+  durationMinutes Int    @map("duration_minutes")
 
   isActive  Boolean  @default(true) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   course Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+
+  /// The classes this pattern has opened, and will keep opening while it runs.
+  occurrences ClassOccurrence[]
 
   /// One series may run on a given day at a given time for one course. A second row with the
   /// same weekday and start would hand a student two bookings for the same minute; the unique
@@ -856,10 +873,10 @@ model ClassSeries {
 /// a one-off blocks only the stated year. The table is owned by the teacher's account because a
 /// holiday is personal to them — one teacher's festival is another teacher's working day.
 model Holiday {
-  id               String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  teacherUserId    String @map("teacher_user_id") @db.Uuid
-  date             String @map("date") @db.VarChar(10)
-  reason           String? @map("reason")
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  teacherUserId     String  @map("teacher_user_id") @db.Uuid
+  date              String  @map("date") @db.VarChar(10)
+  reason            String? @map("reason")
   isRecurringAnnual Boolean @default(false) @map("is_recurring_annually")
 
   isActive  Boolean  @default(true) @map("is_active")
@@ -876,6 +893,92 @@ model Holiday {
   @@map("holiday")
 }
 
+/// One class a series actually opened on the calendar: the pattern with a date attached to it.
+///
+/// This is a separate aggregate because `booking` cannot hold it. That table's race guard is
+/// `uk_booking_slot_hold` — one standing class per teacher per minute — which is exactly right
+/// for a minute a student claims and exactly wrong for a class fifty students are expected at:
+/// a cohort would need fifty rows sharing the teacher's minute, and the index would refuse every
+/// one after the first. So the booked class and the assigned class are two things, named
+/// differently, and each keeps the promise it was built for.
+///
+/// There is no status column. A generated occurrence is not a request waiting on an answer: the
+/// pattern says the class happens, so it happens, and the two questions a reader asks of it — has
+/// it gone by, and is it still on — are answered by `startsAt` and `isActive` rather than by a
+/// code. A day off is a holiday, which means the row is never written; closing the plan itself is
+/// retiring the series. Anything else would be a column nothing in the platform writes.
+///
+/// `durationMinutes` is copied from the series rather than joined, on the same reasoning as
+/// `booking.duration_minutes`: a class that was on for an hour stays an hour after the teacher
+/// starts teaching forty-five minutes, so the record of a past week cannot be redrawn by a later
+/// edit to the plan.
+model ClassOccurrence {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  seriesId      String @map("series_id") @db.Uuid
+  courseId      String @map("course_id") @db.Uuid
+  teacherUserId String @map("teacher_user_id") @db.Uuid
+
+  /// The instant `expandSeries` produced for the pattern in the teacher's zone (§5), which is why
+  /// a spring-forward week can simply not have a row for the face that never arrived.
+  startsAt        DateTime @map("starts_at") @db.Timestamptz(6)
+  durationMinutes Int      @map("duration_minutes")
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  series  ClassSeries @relation(fields: [seriesId], references: [id], onDelete: Restrict)
+  course  Course      @relation("course_class_occurrences", fields: [courseId], references: [id], onDelete: Restrict)
+  teacher User        @relation("teacher_class_occurrences", fields: [teacherUserId], references: [id], onDelete: Restrict)
+
+  /// The sheet of who was expected. Written with the row, so a class always has its cohort even
+  /// after the last student's place has closed.
+  attendances ClassAttendance[]
+
+  /// The pattern, per instant. The generation sweep runs on a clock, may overlap itself, and may
+  /// be the second instance to reach a given minute, so this index — not a read-then-write — is
+  /// what keeps a term from listing one class twice.
+  @@unique([seriesId, startsAt], map: "uk_class_occurrence_series_instant")
+  @@index([teacherUserId, isActive, startsAt], map: "ix_class_occurrence_teacher_calendar")
+  @@index([courseId, isActive, startsAt], map: "ix_class_occurrence_course_calendar")
+  @@map("class_occurrence")
+}
+
+/// One name expected at one class, and what the teacher later said about it.
+///
+/// The row is written when the occurrence is, not when the person walks in: a register that only
+/// holds marks cannot answer "who was meant to be there", and that is the question a missed class
+/// is asked about. An unmarked row is therefore the normal state rather than a gap.
+///
+/// Deliberately not keyed to `enrollment`. A place can close and reopen, and the answer to "was
+/// this person expected on that Monday" is a fact about that day; pointing at the enrollment row
+/// would let a leave taken in November reach back and un-answer a question about March.
+model ClassAttendance {
+  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  occurrenceId  String @map("occurrence_id") @db.Uuid
+  studentUserId String @map("student_user_id") @db.Uuid
+
+  /// Whether the person came, once a teacher has said. Null is not "absent" and not "pending": it
+  /// is that nobody has marked the line yet, and no code stands for that better than the absence
+  /// of one.
+  statusValueId String? @map("status_value_id") @db.Uuid
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  occurrence ClassOccurrence @relation(fields: [occurrenceId], references: [id], onDelete: Restrict)
+  student    User            @relation("student_class_attendance", fields: [studentUserId], references: [id], onDelete: Restrict)
+  status     LkpValue?       @relation("class_attendance_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+
+  /// One line per person per class, so a mark twice made is one line written twice rather than a
+  /// second answer to the same question.
+  @@unique([occurrenceId, studentUserId], map: "uk_class_attendance_person_class")
+  @@index([studentUserId, isActive], map: "ix_class_attendance_student")
+  @@index([statusValueId], map: "ix_class_attendance_status")
+  @@map("class_attendance")
+}
+
 /// A discount code a teacher issues for one of their courses. Each coupon carries its own
 /// discount amount (percentage or fixed), validity window, and usage cap. Redeemed at
 /// enrollment time, not stored on the enrollment row itself — a payment record links the two.
@@ -884,9 +987,9 @@ model Holiday {
 /// cannot reuse a code on the same course. Deactivation (`isActive = false`) stops redemptions
 /// without deleting history.
 model Coupon {
-  id            String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  courseId      String @map("course_id") @db.Uuid
-  code          String @map("code")
+  id       String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  courseId String @map("course_id") @db.Uuid
+  code     String @map("code")
 
   /// What kind of discount this coupon applies. Lookup row so Ops can add "buy-one-get-one"
   /// or other schemes without a migration.
@@ -914,7 +1017,7 @@ model Coupon {
   createdAt DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  course Course @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Restrict)
   discountType LkpValue @relation("coupon_discount_type", fields: [discountTypeValueId], references: [id], onDelete: Restrict)
 
   /// The payments that used this coupon.
@@ -935,9 +1038,9 @@ model Coupon {
 /// No hard deletes: a failed payment is still part of the financial record, and a refund is
 /// a new row pointing at the original.
 model Payment {
-  id              String @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  enrollmentId    String @map("enrollment_id") @db.Uuid
-  couponId        String? @map("coupon_id") @db.Uuid
+  id           String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  enrollmentId String  @map("enrollment_id") @db.Uuid
+  couponId     String? @map("coupon_id") @db.Uuid
 
   /// The amount charged, in minor units. Equals the course price minus any coupon discount.
   amountMinorUnits Int @map("amount_minor_units")
@@ -960,9 +1063,9 @@ model Payment {
   updatedAt DateTime @updatedAt @map("updated_at") @db.Timestamptz(6)
 
   enrollment Enrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
-  coupon Coupon? @relation(fields: [couponId], references: [id], onDelete: Restrict)
-  currency LkpValue @relation("payment_currency", fields: [currencyValueId], references: [id], onDelete: Restrict)
-  status LkpValue @relation("payment_status", fields: [statusValueId], references: [id], onDelete: Restrict)
+  coupon     Coupon?    @relation(fields: [couponId], references: [id], onDelete: Restrict)
+  currency   LkpValue   @relation("payment_currency", fields: [currencyValueId], references: [id], onDelete: Restrict)
+  status     LkpValue   @relation("payment_status", fields: [statusValueId], references: [id], onDelete: Restrict)
 
   /// One payment per enrollment per attempt. Multiple attempts are allowed for retries, but
   /// only one should reach `completed`. Enforced in code, not by a unique constraint.
