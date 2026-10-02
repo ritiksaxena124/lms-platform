@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   OCCURRENCE_HORIZON_DAYS,
@@ -288,11 +288,19 @@ function lineKey(occurrenceId: string, studentUserId: string): string {
  * is shown the week it asked for, and one that asked for nothing is shown the month the platform
  * still stands behind. A window that ends before it starts is not an error worth a status code —
  * it is an empty list, and the two bounds say so.
+ *
+ * A window wider than the horizon is refused rather than answered. The rows do not exist that far
+ * ahead, so the ask brings no more calendar — only every class this caller owns in one response.
  */
 function windowOf(query: ListClassesQueryDto, now: Date): { from: Date; to: Date } {
   const from = query.from ? new Date(query.from) : now;
   const to = query.to
     ? new Date(query.to)
     : new Date(now.getTime() + OCCURRENCE_HORIZON_DAYS * MS_PER_DAY);
+  if (to.getTime() - from.getTime() > OCCURRENCE_HORIZON_DAYS * MS_PER_DAY) {
+    throw new BadRequestException(
+      `A class window may not be wider than ${OCCURRENCE_HORIZON_DAYS} days.`,
+    );
+  }
   return { from, to };
 }

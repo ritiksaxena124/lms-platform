@@ -580,6 +580,16 @@ describe('the teacher’s dated calendar', () => {
     );
   });
 
+  it('refuses a window wider than the calendar is kept for', async () => {
+    // Rows only exist inside the horizon the sweep fills, so a wider ask is not a bigger calendar: it
+    // is a request to pull every class this teacher owns into one response.
+    const from = new Date('2020-01-01T00:00:00.000Z');
+    const at = (days: number) => new Date(from.getTime() + days * MS_PER_DAY);
+
+    await teaching(as('thrd'), { from, to: at(HORIZON_DAYS) }).expect(200);
+    await teaching(as('thrd'), { from, to: at(HORIZON_DAYS + 1) }).expect(400);
+  });
+
   it('names the course, the hour and the number standing for it', async () => {
     const list = await seenTeaching(as('thrd'));
     const [row] = list;
@@ -644,6 +654,13 @@ describe('the student’s classes', () => {
     // `fifth` holds no place anywhere in the suite: the list is read from a person's places, not
     // from a course, and a student with nothing to attend is answered with an empty month.
     expect(await seenLearning(as('fifth'))).toHaveLength(0);
+  });
+
+  it('refuses the window the teacher’s door refuses', async () => {
+    const from = new Date('2020-01-01T00:00:00.000Z');
+    const to = new Date(from.getTime() + (HORIZON_DAYS + 1) * MS_PER_DAY);
+
+    await learning(as('four'), { from, to }).expect(400);
   });
 
   it('carries the student’s own mark, or nothing', async () => {

@@ -94,7 +94,7 @@ Query parameters control the date range, course filter, and teacher filter. Slot
 
 Lists the dated classes a teacher teaches, soonest first. Each row names the course, the start and end instants, how long the class runs and how many students are expected — the number that tells a teacher whether Monday is a lesson or a room full of people.
 
-There is no matching write. A [[dated class]] is what a [[series]] comes to at a particular minute, so it is produced by the generation sweep rather than asked for: `from` and `to` bound the window, and leaving both out returns the thirty days the sweep keeps filled.
+There is no matching write. A [[dated class]] is what a [[series]] comes to at a particular minute, so it is produced by the generation sweep rather than asked for: `from` and `to` bound the window, and leaving both out returns the thirty days the sweep keeps filled. A window wider than those thirty days is refused with `400` — nothing is written that far ahead, so the ask would only gather every class this caller owns into one response.
 
 ## GET /api/v1/classes/learning
 
