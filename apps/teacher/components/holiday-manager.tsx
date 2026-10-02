@@ -117,6 +117,10 @@ export function HolidayManager() {
     try {
       await retireHoliday(id);
       notify.success('Holiday retired');
+      // The row leaves the list, so the form it was opened from has nothing left to edit.
+      setSelected(null);
+      setValues(BLANK);
+      setFields({});
       reload();
     } catch (error: unknown) {
       notify.error(describeFailure(error));
@@ -125,23 +129,26 @@ export function HolidayManager() {
     }
   }
 
-  if (loading) {
+  if (failed) {
     return (
-      <SkeletonGroup>
-        <Card className="p-4">
-          <div className="h-6 w-32 rounded bg-slate-200" />
-          <div className="mt-4 space-y-2">
-            {[...Array(3)].map((_, i) => (
-              <div key={i} className="h-10 rounded bg-slate-100" />
-            ))}
-          </div>
-        </Card>
-      </SkeletonGroup>
+      <ErrorState
+        title="The holidays did not load"
+        message={failed.message}
+        onRetry={reload}
+        busy={busy !== null}
+      />
     );
   }
 
-  if (failed) {
-    return <ErrorState message={failed.message} onRetry={reload} />;
+  if (loading) {
+    return (
+      <SkeletonGroup
+        rows={3}
+        rowClassName="h-14"
+        label="Loading your holidays"
+        className="space-y-3"
+      />
+    );
   }
 
   return (
@@ -180,22 +187,25 @@ export function HolidayManager() {
       {/* Form */}
       <form onSubmit={save} className="space-y-3">
         <TextField
+          id="holiday-date"
           label="Date"
           value={values.date}
-          onChange={(v) => set('date', v)}
+          onChange={(event) => set('date', event.target.value)}
           placeholder="2026-12-25"
           error={fields.date?.[0]}
         />
         <TextField
+          id="holiday-reason"
           label="Reason (optional)"
           value={values.reason}
-          onChange={(v) => set('reason', v)}
+          onChange={(event) => set('reason', event.target.value)}
           placeholder="Diwali"
         />
         <Checkbox
+          id="holiday-recurring"
           label="Recur annually (blocks this date every year)"
           checked={values.recurring}
-          onChange={(v) => set('recurring', v)}
+          onChange={(event) => set('recurring', event.target.checked)}
         />
 
         <div className="flex gap-2">
@@ -224,7 +234,7 @@ export function HolidayManager() {
         <div className="border-t border-line pt-3">
           <Button
             type="button"
-            variant="destructive"
+            variant="danger"
             size="sm"
             onClick={() => retire(selected)}
             disabled={busy !== null}

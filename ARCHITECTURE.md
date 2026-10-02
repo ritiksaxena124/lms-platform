@@ -141,14 +141,17 @@ errors, which is why both sides import the type from one place.
 
 ## 6. Third-party providers
 
-Video, storage, payments and email sit behind ports in `apps/api/src/providers`, selected
-by environment (`STORAGE_PROVIDER`, `PAYMENT_PROVIDER`, `VIDEO_PROVIDER`, `SMTP_URL`).
-Domain code depends on the port, never on a vendor SDK.
+Video, storage and email sit behind ports in `apps/api/src/providers`, selected by environment
+(`STORAGE_PROVIDER`, `VIDEO_PROVIDER`, `SMTP_URL`). Domain code depends on the port, never on a vendor
+SDK.
 
-`PAYMENT_PROVIDER` defaults to `none`: that integration is **not built yet** (Phase 9). The
-ports exist so that choosing a vendor later is an adapter plus an env change, not a refactor —
-and so nothing pretends to take a payment in the meantime. `STORAGE_PROVIDER=s3` throws at boot
-rather than silently doing nothing.
+Payment is the exception, and the honest way to say it is that **there is no payment port**. A
+`PAYMENT_PROVIDER` key exists in the schema and defaults to `none`; nothing outside the env parser reads
+it, because there is no `providers/payment` directory to hand a message to. Phase 9 built the money half
+of the product — coupon codes, redemption, a `payment` row priced at the discount — without building it,
+so the platform records what a class costs and asks nobody for anything. That is a real gap rather than a
+config flag: when a vendor arrives, the work is the port the other three were built as, not a value in
+an env file. `STORAGE_PROVIDER=s3` throws at boot rather than silently doing nothing.
 
 Storage is the first of these to be real (Phase 5, step 5a). `apps/api/src/providers/storage`
 defines two operations — write a stream under a key, read a stream back for a key — and the
@@ -191,7 +194,7 @@ sense of is ignored and the whole file goes out; a well-formed one beginning pas
 question answered `416` with the real length, which is how a player learns it has outgrown the
 recording. Both audiences share one writer of those answers, `streamLessonVideo`, so the teacher's
 own page and a student's gated page cannot drift into two range contracts — and each of them opens
-the file *before* the first header leaves, so a refusal is still the JSON envelope rather than a
+the file _before_ the first header leaves, so a refusal is still the JSON envelope rather than a
 `200` that goes quiet halfway. `apps/api/test/lesson-asset-stream.spec.ts` holds the teacher's
 side of that contract and `apps/api/test/lesson-video-stream.spec.ts` the student's, including the
 case a player creates on its own: a tab closed mid-seek, after which the next request has to work.
@@ -270,7 +273,7 @@ The port takes a finished message, so something has to finish it. That something
   and an optional button label — the words an operator rewords. It does not hold HTML: a document in
   a row is markup nobody reviewed, and Outlook renders it with Word's engine, which ignores flexbox,
   grid and padding on an anchor, while Gmail clips a `<style>` block it does not recognise. So the
-  primitives are tables with `role="presentation"`, a width written as an attribute *and* a style,
+  primitives are tables with `role="presentation"`, a width written as an attribute _and_ a style,
   inline styles only, a button built from a table cell, and no image at all — an SVG renders badly
   and a hosted PNG needs a public URL, which §6 refuses for gated bytes and which would tell whoever
   served the file that this particular person read this particular message.
@@ -339,8 +342,8 @@ happens twice to one reader, and a queue with a unique key is a ledger that refu
 
 Seven writes now say what they decided: a student asking for a minute, a teacher confirming or
 refusing it, a request left to expire, a student giving a class back, and a place in a course taken
-or left. Each files exactly one `mail_outbox` row, and it files it *inside the transaction that
-moved the row* — the outbox rule, which is worth more than the pattern's usual justification. A
+or left. Each files exactly one `mail_outbox` row, and it files it _inside the transaction that
+moved the row_ — the outbox rule, which is worth more than the pattern's usual justification. A
 letter queued after a commit is a letter about a class that a rollback may never have allowed.
 
 - **The repository calls the queue; the service names the event.** Each write takes a `notify`
@@ -352,16 +355,16 @@ letter queued after a commit is a letter about a class that a rollback may never
 - **A replay files nothing.** This is the whole reason the callback is a parameter rather than a
   line after the write. The second press of a book button, the second press of a confirm, the loser
   of a race, a refused conflict, a `404` gate and a leave on a place that is already closed all
-  reach no notifier, because none of them made news. Reopening a place a student left *is* news on
+  reach no notifier, because none of them made news. Reopening a place a student left _is_ news on
   an old row: they really are back in the course. A person told twice about one decision stops
   believing the queue, and the queue is the only thing that will tell them about the next one.
 - **The expiry sweep moves row by row.** A bulk update reports a count, and a count cannot be
-  addressed — an expiration letter has to reach the student who asked for *that* minute, so the
+  addressed — an expiration letter has to reach the student who asked for _that_ minute, so the
   sweep asks for each row's own after-image inside the transaction that files the news about it.
   What made it safe to run twice is unchanged and is not the callback: the pending status is in
   every `where`, so a second pass matches nothing.
 - **A class message is written in its reader's clock and names the other person.** A class instant is
-  one row and two different times on two screens, so `when` is formatted from the *recipient's*
+  one row and two different times on two screens, so `when` is formatted from the _recipient's_
   `User.timezone` (§5), never the class's or the sender's. And the copy addresses the reader by
   naming the person they are waiting on: a teacher is told who is asking, a student who answered. A
   place carries no instant at all — taking a place is a decision, not an appointment, and the copy
@@ -401,7 +404,7 @@ person asks an operator, who should be able to answer it from one file.
   reclaimable at all: a row still `sending` after fifteen minutes goes to `queued` keeping the ask it
   never reported. An abandoned send was still a send, and a reclaim that reset the count would hand a
   poisoned row an infinite budget.
-- **A row is asked about at most once per run.** The claim counts the ask *before* the transport is
+- **A row is asked about at most once per run.** The claim counts the ask _before_ the transport is
   touched, so `mailRetryDelayMinutes` reads the wait off the number in the row it is holding. Five
   waits — a minute, five, thirty, two hours, six — mean six asks, and a row that stops being asked
   about inside a day of the news it carries. A curve rather than a fixed gap because the two failure
@@ -481,13 +484,19 @@ The choice has now been made, which is why these are phases rather than open que
   `STORAGE_PROVIDER`, which is the second reason storage gets built before either is demoed —
   a recorded lesson and a live room are one field apart on a page, and two completely
   different promises about where the bytes live.
-- **Money stays `none` until Phase 9**, and it arrives together with **coupons**: a discount
-  code is meaningless on a course nothing charges for. A teacher issues many codes per course
-  from the course itself, each carrying its own discount and its own lifetime (an
-  `LkpCouponValidityUnit` interval rather than a wall-clock enum, so "48 hours" and "the end
-  of the month" are data), and a student redeems one on the way to a place. Because
-  redemption is a decision about money, it belongs after every portal exists — a code entered
-  in one app and honoured in another is exactly the drift this system keeps to one API.
+- **Money was to arrive with coupons, and only half of it did.** The argument held — a discount code
+  is meaningless on a course nothing charges for, so it came after every portal existed and after the
+  price did. Phase 9 shipped the code: a teacher issues many per course from the course itself, each
+  with its own discount and its own lifetime, a student redeems one on the way to a place, and a
+  redemption writes a `payment` row inside the transaction that opens the place. The lifetime was
+  planned as an `LkpCouponValidityUnit` interval so "48 hours" and "end of the month" would both be
+  data; what shipped is a `validFrom` / `validUntil` pair, which states the same window once and needs
+  no lookup type, and a run-time measured from the redemption date is the half that was not built.
+  What it did not ship
+  is the charging: no `PAYMENT_PROVIDER` adapter is selected because no port exists (§6), so the row's
+  `providerReference` is a literal, and the ledger is arithmetic rather than money. The reason to say
+  so here is that the shape of the row was decided as if a provider existed — which is the useful part
+  of the work, and the part a later vendor fits into.
 - **Every entity's write is recorded** (§18): an append-only `action_log` of who did what, to
   which row, and in which part of the app. It was a phase rather than a column added earlier
   because a record's shape is only worth fixing once every kind of write exists — and
@@ -562,13 +571,24 @@ A portal is a client of that design, and inherits its rules:
   over a word. Retiring a course must not free its address: a link, a screenshot and a
   forwarded message that named it are still in the world.
 - **`status` is not a writable field.** The validation pipe rejects unknown properties, so a
-  body cannot contain `status`, and the column moves only through `POST /courses/:id/publish`
-  and `/archive`. Those two handlers can attach a precondition; a PATCH could not.
+  body cannot contain `status`, and the column moves only through `POST /courses/:id/publish`,
+  `/unpublish`, `/archive` and `/unarchive`. Those four handlers can attach a precondition; a
+  PATCH could not.
 - **Publishing checks what a student reads** — a summary and a description — and answers per
   field, so the form can point at the two boxes still empty rather than at the page.
-- **A published course cannot be edited.** Archive it first. A student reading a description
+- **A published course cannot be edited.** Unpublish it first. A student reading a description
   is reading a promise about the classes they enrolled for, and silent changes to it are how
   that promise stops meaning anything.
+- **Coming off the shelf is two decisions, not one verb.** `unpublish` is a pause: the course is
+  a `draft` again, editable, off the shelf for strangers and still not enrollable, but open to
+  the students who already hold a place (§11). `archive` ends the run: every page closes on
+  place-holders too, because filing a course away is the teacher withdrawing the teaching
+  rather than tidying it. Two codes rather than one `left the shelf` row for the same reason —
+  a log that cannot tell a pause from a retirement cannot answer who decided what.
+- **Unarchiving lands on `draft`, never on the shelf.** A run written up again is edited before
+  it is shown, and going straight to `published` would skip the check that publishing exists to
+  run. The place-holders' reading comes back with the row, since it was never taken away — only
+  the shelf was.
 - **Another teacher's course answers `NOT_FOUND`, not `FORBIDDEN`.** Every read and write
   carries `teacherUserId` in its `where` clause rather than checking ownership afterwards, so
   ownership is not a step a later endpoint can forget. `403` would tell a colleague the id
@@ -577,9 +597,10 @@ A portal is a client of that design, and inherits its rules:
   and `priceCurrencyValueId` are two nullable columns that move as one decision (§5), the
   currency a `LkpValue` under the `Currency` type rather than an enum so a new one is a seed
   row, not a deploy. `null` in both means nobody has quoted it — which a shelf renders as
-  silence, distinct from a `0` that means free. Nothing charges it: `PAYMENT_PROVIDER` is still
-  `none` (§6), a place in a course is still taken for free through enrollment (§12), and the
-  figure is the teacher's stated intent rather than a settled transaction. It is writable while
+  silence, distinct from a `0` that means free. Nothing charges it: there is no payment port (§6), a
+  place in a course is still taken without a payment being taken (§12), and a coupon lowers the figure
+  that is written down rather than moving any money. The price is the teacher's stated intent, and the
+  `payment` row a redemption writes is a record of that intent at a discount. It is writable while
   a course is a draft and locked once published, exactly like every other field the student
   reads.
 - **`DELETE` is still not a thing.** Retiring is archiving; the row is what an enrollment points
@@ -729,6 +750,14 @@ no writes, and — but for the routes below — no session either.
   it appears only while its own lesson is published too. §10 promised those two flags; this is the
   promise kept. A draft lesson under a live course is invisible here, which is what lets a teacher
   pull one back without touching the course.
+- **The shelf is published-only; the door a place opens is wider by one state.** The listing and
+  `POST /enrollments` ask the course's status and nothing else, so pausing a run takes its title
+  off the shelf and stops new places being taken in it. Reading one course — its outline, its
+  pages, its recording — asks a second question too: does this caller hold an active place here?
+  A `draft` that answers yes is a paused run, not an unpublished one, and its students keep what
+  they paid for (§8). `archived` answers no whoever asks, because an archive is the teacher
+  withdrawing the teaching rather than editing it. All of it is one `where`, built from the two
+  status ids the service resolves, so a route cannot honour the place and forget the shelf.
 - **A block is listed only while it holds something readable, so a card's counts are the detail's
   counts.** `moduleCount` and `lessonCount` on a card count the same rows the course page will
   list, not everything the teacher ever made. A card that promised nine pages and opened onto
@@ -746,7 +775,7 @@ no writes, and — but for the routes below — no session either.
   published page of a course they hold a place in. It is one route, not a syllabus row with text
   slipped in, so the outline keeps one shape whether or not any room on it happens to be open.
 - **A page's recording is that same door, answered in bytes.** `GET
-  /catalog/courses/:id/lessons/:lessonId/video` asks the readable-page question above and nothing
+/catalog/courses/:id/lessons/:lessonId/video` asks the readable-page question above and nothing
   subtler — a locked page, a page of a course nobody published and a page that never was all
   answer the one `404` — and then streams the standing `LessonAsset` with its range honoured (§6).
   It is a route rather than a link on the page because a guessable URL for these bytes would be a
@@ -765,9 +794,10 @@ no writes, and — but for the routes below — no session either.
 - **`isFreePreview` is a door, not a third visibility gate.** A page marked free still appears on
   the syllabus exactly as it did when it was locked, and a page that is free but still draft, or
   inside a course nobody published, appears nowhere and reads nothing. The flag decides whether
-  the body can be opened; the two published statuses decide whether the row is on the shelf at
-  all. A student's place opens the same door for their own pages — and opens no door the
-  statuses shut, which is why enrolling cannot reach a draft. All of it is one Prisma `where`,
+  the body can be opened; the statuses decide whether the row is on the shelf at all, with the one
+  exception above — a place in a paused course. A student's place opens the same door for their own
+  pages — and opens no door the lesson statuses shut, which is why enrolling cannot reach a draft
+  and a place cannot reach a page its teacher never published. All of it is one Prisma `where`,
   so a route cannot honour the door and forget the wall behind it.
 - **`@OptionalSession()` is for the routes that read who is calling without demanding it** — a
   course's outline and one of its pages. The alternative was a second endpoint that repeats these
@@ -780,8 +810,9 @@ no writes, and — but for the routes below — no session either.
   goes inside the same `where` as the publish gates; where it only colours a flag on rows that are
   published already, it is a probe beside the read — a wrong answer there can never reveal a
   draft, and the syllabus query stays the single statement of what is on the shelf.
-- **`NOT_FOUND` is one answer for several cases.** An unpublished course, a retired one, a slug
-  nobody typed and an id that never existed all read the same; so do a locked page, a draft page,
+- **`NOT_FOUND` is one answer for several cases.** To a reader who holds no place, an unpublished
+  course, a retired one, a slug nobody typed and an id that never existed all read the same; so do
+  a locked page, a draft page,
   a published page of a course the caller is not inside, and a page that is not inside the course
   named in the path. A malformed id is caught in the service before Postgres is asked. A catalog
   that distinguished them would be a list of other people's drafts — and a `403` on a locked page
@@ -928,6 +959,15 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   edits to what a window expands into, so both belong after `slotAt` has been exercised by the
   booking loop and by whatever Phase 5 attaches to a booked minute — an expansion is the one
   function in this system where an exception would have to be honoured in three places at once.
+- **Phase 10 wrote the two exception records and not the exception.** `class_series` hangs off a course
+  (weekday, start and end minutes, class length) and `holiday` off the teacher (an ISO date, an
+  optional reason, an annual-repeats flag), both retired rather than deleted, both gated on ownership
+  the way the availability rules are — series through the course they belong to, holidays through the
+  account that wrote them. The endpoints and the two teacher screens are live. **What is missing is the
+  sentence the tables exist for:** `expandWindows` is still handed the availability rules alone, so a
+  series generates no instances and a holiday removes no date from the grid. The reason that matters is
+  the line above it — an exception has to be honoured wherever a minute is derived, so the fix belongs
+  in the expansion, not in whichever screen happens to show the grid.
 
 ## 14. Bookings
 
@@ -993,7 +1033,7 @@ offered at, and everything else about the hour happens somewhere else.
   no `@Roles`, because the two accounts it opens for are read off the row rather than claimed by a
   role, and everybody else — a stranger, a classmate holding a place in the same course, another
   teacher — gets the identical 404 an invented id gets. The gates run in that order: are you on it,
-  does the class stand, does it have a room, is it *now*. Early answers with the same `opensAt` the
+  does the class stand, does it have a room, is it _now_. Early answers with the same `opensAt` the
   lists publish, so a portal with a wrong clock still counts down to the minute the server unlocks;
   late answers the same way as having never been let in, with the room left on the row, because a
   class that was taught is not un-taught. Asking twice is the same answer and writes nothing, and a

@@ -4,7 +4,7 @@ Teacher availability windows and student booking workflows live here. A teacher 
 
 ## GET /api/v1/availability/rules
 
-Lists every availability rule a teacher has published. Each rule describes a recurring window — day of week, start time, end time — and whether it is still active. The response includes the rule ID so a caller can update or retire it later.
+Lists every availability rule a teacher has published. Each rule describes a recurring window — day of week, start time, end time — and whether it is still active. The response includes the rule ID so a caller can update or [[retire]] it later.
 
 Only authenticated teachers may call this route. The response contains only rules belonging to the caller's profile.
 
@@ -38,7 +38,7 @@ Updates an existing holiday date, reason, or recurring annual status.
 
 ## POST /api/v1/availability/holidays/:id/retire
 
-Retires an existing holiday so that date is no longer blocked.
+Retires an existing [[holiday]] so that date is no longer blocked.
 
 ## GET /api/v1/bookings
 
@@ -50,7 +50,7 @@ Each booking record carries its current state (`requested`, `confirmed`, `refuse
 
 Requests a new booking for a specific availability slot. The request body identifies the slot, the course, and any special requirements. The server checks for calendar conflicts and capacity limits before creating the booking in `requested` state.
 
-Automatic confirmation may occur if the teacher has enabled instant-book; otherwise the teacher must explicitly confirm or refuse.
+Automatic confirmation may occur if the teacher has enabled [[instant-book]]; otherwise the teacher must explicitly confirm or refuse.
 
 ## POST /api/v1/bookings/:id/cancel
 
@@ -60,7 +60,7 @@ Cancellation policies (refund windows, penalties) are enforced server-side and n
 
 ## POST /api/v1/bookings/:id/confirm
 
-Moves a booking from `requested` to `confirmed`. Only the teacher who owns the slot, or ops staff, may confirm a booking. Confirmation locks the slot and prevents other students from requesting it.
+Moves a booking from `requested` to `confirmed`. Only the teacher who owns the slot, or ops staff, may confirm a booking. Confirmation locks the [[slot]] and prevents other students from requesting it.
 
 ## POST /api/v1/bookings/:id/reject
 

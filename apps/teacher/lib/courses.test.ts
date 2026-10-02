@@ -9,6 +9,8 @@ import {
   publishCourse,
   readCourse,
   setDemoBookings,
+  unarchiveCourse,
+  unpublishCourse,
   updateCourse,
 } from './courses';
 
@@ -156,6 +158,8 @@ describe('courses client', () => {
   it('sends a transition as a request with no body at all', async () => {
     await publishCourse('c1');
     await archiveCourse('c1');
+    await unpublishCourse('c1');
+    await unarchiveCourse('c1');
 
     const publish = requestAt(0);
     expect(publish.url).toBe(`${BASE_URL}/api/v1/courses/c1/publish`);
@@ -164,9 +168,19 @@ describe('courses client', () => {
     // the browser claim a JSON payload that says nothing.
     expect(publish.body).toBeUndefined();
     expect(requestAt(1).url).toBe(`${BASE_URL}/api/v1/courses/c1/archive`);
+    // The two moves back are the same kind of call, named for the shelf they leave rather than
+    // for the status they land on — which is always draft, and the API's business, not the form's.
+    expect(requestAt(2).url).toBe(`${BASE_URL}/api/v1/courses/c1/unpublish`);
+    expect(requestAt(3).url).toBe(`${BASE_URL}/api/v1/courses/c1/unarchive`);
+    expect(requestAt(2).body).toBeUndefined();
+    expect(requestAt(3).body).toBeUndefined();
   });
 
   it('returns the course a transition produced, so the caller can repaint without refetching', async () => {
     await expect(publishCourse('c1')).resolves.toEqual(COURSE);
+    // The paused course comes back as a draft, and the caller paints the status chip from that
+    // row rather than guessing what the transition must have done.
+    await expect(unpublishCourse('c1')).resolves.toEqual(COURSE);
+    await expect(unarchiveCourse('c1')).resolves.toEqual(COURSE);
   });
 });

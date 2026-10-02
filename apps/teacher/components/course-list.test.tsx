@@ -109,14 +109,20 @@ describe('CourseList', () => {
     );
   });
 
-  it('links a row to the class that is inside it', async () => {
+  it('links a row to every screen that course owns', async () => {
     render(<CourseList />);
     await screen.findAllByRole('listitem');
 
-    expect(within(rowOf('Verbs in passing')).getByRole('link', { name: 'Roster' })).toHaveAttribute(
-      'href',
-      '/courses/c2/roster',
-    );
+    const links = within(rowOf('Verbs in passing'))
+      .getAllByRole('link')
+      .filter((link) => link.textContent !== 'Verbs in passing');
+
+    expect(links.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Syllabus', '/courses/c2/modules'],
+      ['Roster', '/courses/c2/roster'],
+      ['Series', '/courses/c2/series'],
+      ['Coupons', '/courses/c2/coupons'],
+    ]);
   });
 
   it('narrows to one status without asking the API again', async () => {

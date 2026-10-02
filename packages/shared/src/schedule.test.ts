@@ -12,6 +12,8 @@ import {
   isoWeekdayOf,
   liveClassWindow,
   slotAt,
+  stretchesOverlap,
+  type ClassStretch,
   type SlotInstant,
   type WeeklyWindow,
 } from './schedule';
@@ -336,3 +338,36 @@ describe('the live class door', () => {
   });
 });
 
+/**
+ * The single question the offered grid and the booking write ask about a minute. It lives here,
+ * beside the expansion itself, because the two must not answer differently: a calendar that hides
+ * only the minute another class *started* on will offer a square that class is still running
+ * through, and the student learns about the collision by clicking it.
+ */
+describe('whether two classes want the same minute', () => {
+  const nine = new Date('2026-10-05T03:30:00.000Z'); // 09:00 in Kolkata
+  const minute = (offset: number) => new Date(nine.getTime() + offset * 60_000);
+  const stretch = (startsAt: Date, durationMinutes: number): ClassStretch => ({
+    startsAt,
+    durationMinutes,
+  });
+
+  it('counts a class that opens inside another one as taken, which is the case an exact start misses', () => {
+    // A 09:00 class that runs ninety minutes is standing in the 10:00 square.
+    expect(stretchesOverlap(stretch(nine, 90), stretch(minute(60), 60))).toBe(true);
+  });
+
+  it('leaves back-to-back classes both deliverable', () => {
+    // The minute one ends is the minute the next begins, and neither teaches in it, so both ends
+    // of the comparison are strict — a grid that overlapped on the boundary would refuse a whole
+    // day of perfectly good tiles.
+    expect(stretchesOverlap(stretch(nine, 60), stretch(minute(60), 60))).toBe(false);
+  });
+
+  it('answers the same whatever order the two are handed over in', () => {
+    const later = stretch(minute(30), 60);
+    expect(stretchesOverlap(stretch(nine, 90), later)).toBe(
+      stretchesOverlap(later, stretch(nine, 90)),
+    );
+  });
+});

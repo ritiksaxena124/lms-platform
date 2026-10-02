@@ -57,7 +57,7 @@ An availability rule is written in the teacher's zone, and a zone is a name — 
 UTC and converted at the edge that shows them, which means a learner in another country sees the
 same class at the hour that class actually starts for them.
 
-Money is an integer in minor units plus a currency code. Never a float, and never a number whose
+Money is an integer in [[minor units]] plus a currency code. Never a float, and never a number whose
 unit is a rumour.
 
 ## Third parties sit behind ports

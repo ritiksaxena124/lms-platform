@@ -22,6 +22,7 @@ import {
   expandWindows,
   liveClassWindow,
   slotAt,
+  stretchesOverlap,
   type Booking,
   type BookingRequest,
   type BookingRoom,
@@ -225,8 +226,11 @@ interface Entitlement {
  * The grid is never stored, so nothing here repairs a table when a teacher changes their week:
  * the windows are expanded across the coming horizon in the *teacher's* zone — the account's, not
  * the course's, because that is what decides when their classes are — and then cut down by the
- * two facts that make an offer undeliverable. A minute already held by a standing booking goes,
- * and a minute already gone by never arrives.
+ * two facts that make an offer undeliverable. A minute a standing booking is still running
+ * through goes, and a minute already gone by never arrives. The first is cut with the same
+ * arithmetic the booking write applies: a grid that hid only the exact minute another class
+ * started on would offer a square it then refused, and the student would learn about the
+ * collision by clicking it.
  *
  * The entitlement is decided before a single window is read, so a student with no right to the
  * calendar cannot cost the platform a week of expansion, and so the reason can be stated rather
@@ -272,15 +276,23 @@ export class BookingsService {
     }
 
     const windows = await this.rules.listActive(course.teacherUserId);
-    const held = await this.bookings.heldStarts(
+    const held = await this.bookings.heldStretches(
       course.teacherUserId,
       await this.statusIds(BLOCKING_BOOKING_STATUSES),
       from,
       to,
     );
-    const taken = new Set(held.map((startsAt) => startsAt.getTime()));
     const slots: OpenSlot[] = expandWindows(windows, course.teacher.timezone, { from, to })
-      .filter((slot) => !taken.has(slot.startsAt.getTime()))
+      .filter(
+        (slot) =>
+          // The square goes if any standing class runs through it — the same question the write asks.
+          !held.some((stretch) =>
+            stretchesOverlap(stretch, {
+              startsAt: slot.startsAt,
+              durationMinutes: (slot.endsAt.getTime() - slot.startsAt.getTime()) / MS_PER_MINUTE,
+            }),
+          ),
+      )
       .map((slot) => ({
         startsAt: slot.startsAt.toISOString(),
         endsAt: slot.endsAt.toISOString(),

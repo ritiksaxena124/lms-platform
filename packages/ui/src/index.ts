@@ -20,6 +20,13 @@ export { EmptyState, type EmptyStateProps } from './components/EmptyState';
 export { ErrorState, type ErrorStateProps } from './components/ErrorState';
 export { Illo, type IlloProps, type IlloSize } from './components/Illo';
 export {
+  ConfirmDialog,
+  Modal,
+  type ConfirmDialogProps,
+  type ModalProps,
+  type ModalSize,
+} from './components/Modal';
+export {
   Icon,
   ICON_NAMES,
   type IconName,
@@ -44,6 +51,13 @@ export { Spinner, type SpinnerProps, type SpinnerSize } from './components/Spinn
 export { StatusPill, type StatusPillProps, type StatusTone } from './components/StatusPill';
 export { Textarea, type TextareaProps } from './components/Textarea';
 export { TextField, type TextFieldProps } from './components/TextField';
+export {
+  InfoTip,
+  Tooltip,
+  type InfoTipProps,
+  type TooltipProps,
+  type TooltipSide,
+} from './components/Tooltip';
 
 export { Reveal, REVEAL_STEP_MS, type RevealProps } from './motion/Reveal';
 export {

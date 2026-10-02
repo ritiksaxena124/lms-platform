@@ -199,4 +199,40 @@ describe('EnrollControl', () => {
     expect(button).toBeInTheDocument();
     expect(screen.getByText(/could not check/i)).toBeInTheDocument();
   });
+
+  it('names the session when the place check says this account is not a learner', async () => {
+    signedIn();
+    enrollments.myPlaces.mockRejectedValueOnce(
+      refused('FORBIDDEN', 403, 'This account is not allowed to do that.'),
+    );
+    render(<EnrollControl courseId="b2a1" />);
+
+    // A 403 is not a connection that has not come back: the session is live and this is not the
+    // account the portal can take a place with. Saying "we could not check" would send the
+    // reader to press a button that can only answer 403 again.
+    await screen.findByText(/not a learner account/i);
+    expect(screen.queryByRole('button', { name: /enroll/i })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/have a coupon code/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /sign in as a learner/i })).toHaveAttribute(
+      'href',
+      '/login?next=%2Fcourses%2Fb2a1',
+    );
+  });
+
+  it('says the same thing when the write is refused for the wrong role', async () => {
+    signedIn();
+    enrollments.myPlaces.mockResolvedValue([]);
+    enrollments.takePlace.mockRejectedValueOnce(
+      refused('FORBIDDEN', 403, 'This account is not allowed to do that.'),
+    );
+    render(<EnrollControl courseId="b2a1" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /enroll in this course/i }));
+
+    // The API's line is true and useless: it does not say which account would work.
+    await waitFor(() =>
+      expect(notify.error).toHaveBeenCalledWith(expect.stringMatching(/not a learner account/i)),
+    );
+    expect(notify.error).not.toHaveBeenCalledWith(expect.stringMatching(/not allowed to do that/i));
+  });
 });

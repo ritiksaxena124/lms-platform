@@ -293,3 +293,82 @@
 .endpoint-nested .endpoint-fields:last-child {
   margin-bottom: 0;
 }
+
+/*
+ * A word the reader may take to mean something else, with its sentence hung on it.
+ *
+ * The bubble is written into the page beside the word and lives there permanently — see the
+ * `explainTerms` pass in `lib/docs.ts` — so all this has to do is put it away until it is asked for.
+ * `opacity` rather than `display: none` for the hidden state, which is what the portals' Tooltip does
+ * and for the same reason: taking the text out of the layout would take it out of the tree a screen
+ * reader is already reading. Hover and focus paint it, so a reader with a keyboard and a reader with
+ * a mouse are given the same one sentence.
+ */
+.doc-term {
+  /* An inline-flex box, because a break is allowed between a word and the atomic glyph after it even
+   * when `white-space` says nowrap — and a mark that lands alone at the head of the next line points
+   * at nothing. The box takes the word's baseline, so it sits in the sentence it belongs to. */
+  display: inline-flex;
+  align-items: baseline;
+  position: relative;
+  border-bottom: 1px dotted var(--color-line-strong);
+  cursor: help;
+  white-space: nowrap;
+}
+
+.doc-term:hover,
+.doc-term:focus-visible {
+  border-bottom-color: var(--color-brand);
+}
+
+.doc-term:focus-visible {
+  outline: 2px solid var(--color-brand-line);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* The mark is a pointer to the sentence, not a third thing in the reading, so it stays quiet until
+ * the word itself is being looked at. */
+.doc-term-mark {
+  /* Centred against the word rather than sitting on its baseline, which is where a glyph with no
+   * ink of its own would land: half a cap-height under the line it annotates. */
+  align-self: center;
+  margin-left: 0.1875rem;
+  color: var(--color-ink-faint);
+}
+
+.doc-term:hover .doc-term-mark,
+.doc-term:focus-visible .doc-term-mark {
+  color: var(--color-brand);
+}
+
+.doc-term-tip {
+  position: absolute;
+  bottom: calc(100% + 0.375rem);
+  left: 50%;
+  z-index: 20;
+  width: max-content;
+  max-width: 19rem;
+  padding: 0.375rem 0.625rem;
+  border-radius: var(--radius-field);
+  background: var(--color-ink-strong);
+  color: var(--color-ink-inverse);
+  font-size: 0.75rem;
+  font-weight: 400;
+  line-height: 1.35;
+  text-align: left;
+  white-space: normal;
+  opacity: 0;
+  pointer-events: none;
+  translate: -50% -4px;
+  transition:
+    opacity var(--duration-fast) var(--ease-out),
+    translate var(--duration-fast) var(--ease-out);
+}
+
+.doc-term:hover .doc-term-tip,
+.doc-term:focus .doc-term-tip,
+.doc-term:focus-visible .doc-term-tip {
+  opacity: 1;
+  translate: -50% 0;
+}

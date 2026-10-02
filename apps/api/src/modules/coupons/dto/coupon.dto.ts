@@ -8,7 +8,6 @@ import {
   IsIn,
   IsInt,
   Min,
-  Max,
   IsOptional,
   IsISO8601,
 } from 'class-validator';

@@ -329,7 +329,34 @@ export function describeFailure(error: unknown): string {
   return message.trim() === '' ? 'Something went wrong. Please try again.' : message.trim();
 }
 
+/** True when the request never got an answer, rather than an answer that refused.
+ * The difference is what a reader can act on: a 500 wants a retry, while no answer at all
+ * usually means this page was opened on an address that has no API behind it. */
+export function isUnreachable(error: unknown): boolean {
+  return error instanceof ApiError && error.code === NETWORK_ERROR_CODE;
+}
+
 /** A 404 is the catalog's answer to "not published" as much as to "not there". */
 export function isNotFound(error: unknown): boolean {
   return error instanceof ApiError && error.code === API_ERROR_CODES.NOT_FOUND;
 }
+
+/**
+ * True when the session is live but this account is not allowed to ask.
+ *
+ * On this portal that has one common cause: a cookie earned at a teacher's or the ops desk's
+ * sign-in, which the shared session lets a student tab hold. It is not a stale token (a refresh
+ * answers the same 403), not a refused place, and not a connection that has not come back, so
+ * the three read differently on screen.
+ */
+export function isForbidden(error: unknown): boolean {
+  return error instanceof ApiError && error.code === API_ERROR_CODES.FORBIDDEN;
+}
+
+/**
+ * What to say when a 403 turns up. The API's line is true and useless — "This account is not
+ * allowed to do that." does not name the account that would work, which is the only thing the
+ * reader can act on. Names no address and no password, because this reaches a browser.
+ */
+export const NOT_A_LEARNER_MESSAGE =
+  'This session is not a learner account, so it cannot hold a place. Sign in as a learner to read on.';

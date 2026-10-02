@@ -8,6 +8,8 @@ import {
   docRoutes,
   docSlugs,
   explainEndpoints,
+  explainTerms,
+  glossary,
   readDoc,
   type DataModelFile,
   type EndpointDoc,
@@ -505,6 +507,85 @@ describe('every exported route has a section somewhere', () => {
       }
 
       expect(found, `${label} has no ## heading on any docs page`).toBe(true);
+    }
+  });
+});
+
+describe('a term a reader may guess wrong', () => {
+  /** The marked words on one page, each with the id of the sentence attached to it. */
+  function marks(html: string): { word: string; tipId: string }[] {
+    return [...html.matchAll(/<span class="doc-term"[^>]*aria-describedby="([^"]+)">([^<]+)</g)].map(
+      (match) => ({ word: match[2] ?? '', tipId: match[1] ?? '' }),
+    );
+  }
+
+  it('hangs the glossary sentence on the word, in the page’s own markup', () => {
+    const html = readDoc('api-courses').html;
+    const roster = marks(html).find((mark) => mark.word === 'roster');
+
+    expect(roster, 'the roster is not marked on the courses page').toBeDefined();
+    // The bubble is in the document the whole time and put away by CSS, so a reader who tabs to the
+    // word hears the same sentence a mouse reader hovers — and `aria-describedby` is what binds them.
+    expect(html).toContain(`id="${roster?.tipId}" role="tooltip"`);
+    expect(html).toContain(
+      `id="${roster?.tipId}" role="tooltip">${asRendered(glossary.roster ?? '')}`,
+    );
+  });
+
+  it('draws the mark with the same glyph the portals use, and keeps it out of the reading', () => {
+    const html = readDoc('guide').html;
+
+    expect(html).toContain('class="doc-term-mark"');
+    // The word and the sentence carry the meaning; an announced icon would be a third thing in the
+    // way of the pair.
+    expect(html).toContain('aria-hidden="true"');
+    expect(html).toMatch(/<svg class="doc-term-mark"[^>]*viewBox="0 0 24 24"/);
+  });
+
+  it('gives each mark on a page its own id, so two uses of one word say it twice', () => {
+    const html = readDoc('api-courses').html;
+    const repeated = marks(html).filter((mark) => mark.word === 'roster');
+    const ids = marks(html).map((mark) => mark.tipId);
+
+    expect(repeated.length).toBeGreaterThanOrEqual(1);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  it('refuses a mark the glossary does not answer', () => {
+    // The other half of the drift guard: prose is edited faster than the word list, and a page that
+    // built with a hollow mark would promise a sentence and show nothing.
+    expect(() => explainTerms('The [[widget]] stays put.')).toThrow(/widget/);
+    expect(() => explainTerms('The [[widget]] stays put.')).toThrow(/glossary\.json/);
+  });
+
+  it('leaves a marked word alone inside a command someone is copying', () => {
+    // A fence is bytes to paste, not prose to read, and markup injected into it would be pasted too.
+    const fenced = '```bash\ncurl "[[roster]]"\n```';
+
+    expect(explainTerms(fenced)).toBe(fenced);
+  });
+
+  it('leaves no marker on a page and defines nothing no page points at', () => {
+    const defined = Object.keys(glossary);
+
+    expect(defined.length).toBeGreaterThanOrEqual(10);
+    for (const slug of docSlugs()) {
+      expect(readDoc(slug).html, `${slug} shows a reader a raw marker`).not.toContain('[[');
+    }
+
+    const used = new Set(
+      docSlugs().flatMap((slug) => marks(readDoc(slug).html).map((mark) => mark.word)),
+    );
+    for (const term of defined) {
+      expect(used, `glossary.json defines ${term}, which no page ever marks`).toContain(term);
+    }
+  });
+
+  it('answers each term in one sentence a stranger can act on', () => {
+    for (const [term, means] of Object.entries(glossary)) {
+      expect(means, `${term} has no sentence`).toMatch(/\S/);
+      expect(means, `${term} is more than one sentence`).not.toMatch(/[.!?] [A-Z]/);
+      expect(means, `${term} does not end like a sentence`).toMatch(/[.]$/);
     }
   });
 });

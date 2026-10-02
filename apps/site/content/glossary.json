@@ -1,0 +1,17 @@
+{
+  "shelf": "The public catalog: every course whose status is published, and nothing else.",
+  "place": "An enrollment row, which is the record that a student may read a course, kept whether or not they ever open it.",
+  "open place": "A place the student has not closed, so its course still appears on their list.",
+  "roster": "A teacher's class list for one course: the students who hold a place, named and never emailed.",
+  "free preview": "A lesson the teacher marked readable by anybody, so a stranger can open it without taking a place.",
+  "archive": "Ends the course for everybody, including the students who hold a place in it.",
+  "series": "A weekly class pattern a teacher writes down, which the booking grid does not yet read.",
+  "holiday": "A date a teacher blocks so that no class is asked for on it, once or every year.",
+  "slot": "One bookable window of one teacher's calendar, refused to a second request once it is taken.",
+  "instant-book": "A booking the system confirms the moment it is asked for rather than leaving it for the teacher.",
+  "retire": "To take a row out of use by clearing its active flag, leaving the row and everything that points at it.",
+  "outbox": "The queue of messages the platform means to send, delivered by a scheduled sweep rather than by the request that wrote it.",
+  "port": "The name for the boundary an outside system sits behind, such as mail, video or storage, and not for a network socket.",
+  "redemption": "One use of a coupon, counted against the cap the teacher set on it.",
+  "minor units": "An amount stored as a count of the smallest unit of its currency, so 50000 read alongside INR is five hundred rupees."
+}

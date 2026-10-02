@@ -1,14 +1,21 @@
-import type { Coupon } from '@lms/shared';
+import type { Coupon, CouponListResponse, CouponResponse } from '@lms/shared';
 import { apiJson } from './api';
 
-/** List all coupons for a course. */
-export async function listCoupons(courseId: string) {
-  return apiJson<Coupon[]>(`/courses/${courseId}/coupons`, {
+/**
+ * The discount codes one course carries.
+ *
+ * The API answers every route through an envelope — `{ items }` for the list, `{ coupon }` for a
+ * write — so each call unwraps here rather than passing the wrapper to a screen that wants rows.
+ * Deactivation is its own endpoint so an edit cannot smuggle an `isActive` change beside new numbers.
+ */
+
+export async function listCoupons(courseId: string): Promise<Coupon[]> {
+  const { items } = await apiJson<CouponListResponse>(`/courses/${courseId}/coupons`, {
     method: 'GET',
   });
+  return items;
 }
 
-/** Create a new coupon for a course. */
 export async function createCoupon(
   courseId: string,
   input: {
@@ -19,14 +26,14 @@ export async function createCoupon(
     validUntil?: string | null;
     maxRedemptions?: number | null;
   },
-) {
-  return apiJson<Coupon>(`/courses/${courseId}/coupons`, {
+): Promise<Coupon> {
+  const { coupon } = await apiJson<CouponResponse>(`/courses/${courseId}/coupons`, {
     method: 'POST',
-    body: JSON.stringify(input),
+    body: input,
   });
+  return coupon;
 }
 
-/** Update an existing coupon. */
 export async function updateCoupon(
   courseId: string,
   couponId: string,
@@ -37,16 +44,18 @@ export async function updateCoupon(
     validUntil?: string | null;
     maxRedemptions?: number | null;
   },
-) {
-  return apiJson<Coupon>(`/courses/${courseId}/coupons/${couponId}`, {
+): Promise<Coupon> {
+  const { coupon } = await apiJson<CouponResponse>(`/courses/${courseId}/coupons/${couponId}`, {
     method: 'PATCH',
-    body: JSON.stringify(input),
+    body: input,
   });
+  return coupon;
 }
 
-/** Deactivate a coupon. */
-export async function deactivateCoupon(courseId: string, couponId: string) {
-  return apiJson<Coupon>(`/courses/${courseId}/coupons/${couponId}/deactivate`, {
-    method: 'POST',
-  });
+export async function deactivateCoupon(courseId: string, couponId: string): Promise<Coupon> {
+  const { coupon } = await apiJson<CouponResponse>(
+    `/courses/${courseId}/coupons/${couponId}/deactivate`,
+    { method: 'POST' },
+  );
+  return coupon;
 }
