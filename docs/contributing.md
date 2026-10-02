@@ -27,6 +27,95 @@ develop ───────╲─●─●─╱─●─●────   eve
 feat/* ────────────╳  deleted after the merge
 ```
 
+## Running it while you change it
+
+There are two ways to have Hourloom in front of you and they are not interchangeable: the **host run** is
+where you edit, the **container run** is where you hand the product to somebody. Nothing about day-to-day work
+needs a Docker daemon — not `dev`, not a test run, and not the `docker:check` step inside `bun run verify`,
+which reads the compose files as text.
+
+### On the host, while editing
+
+Setup is the README's *First run*: `bun install`, copy each app's `.env.example` to the file it reads (the
+API needs two, one at `lms` and one at `lms_test`), generate a `JWT_SECRET`, create both databases on the
+local Postgres, then `db:generate`, `db:migrate`, `db:seed`.
+
+```bash
+bun run dev      # api :4000, teacher :3000, student :3001, ops :3002, site :3003
+```
+
+Usually not that. One app at a time is the normal shape — `dev:api`, `dev:teacher`, `dev:student`, `dev:ops`,
+`dev:site`, `dev:ui` — because five watchers on one machine are five processes competing for the same cores
+and you are only ever reading one of the ports.
+
+Five facts that cost a morning each the other way round:
+
+- **Open `http://teacher.localtest.me:3000`, never `http://localhost:3000`.** The session cookie is scoped to
+  `Domain=localtest.me` and the API answers CORS only to the `localtest.me` origins, so a portal on `localhost`
+  is not merely unsigned-in — it is cut off from its API, and its shelf says so by naming the address it wants.
+- **`packages/shared` reaches every app as built `dist`, not as source.** An edit there does nothing to a
+  running portal until `bun run build:shared` writes it. `dev:api` runs that build for itself as a `predev`
+  hook; the portals do not, and neither does a per-app test command — only the root `verify` starts with it.
+- **One signed-in account per browser profile**, because the cookie is shared across the subdomains on
+  purpose. Being the teacher who published a course and the student enrolled in it at once needs a second
+  profile or a private window, not a second tab.
+- **`bun run dev:ui` is Storybook on :6006**, which is where a new or changed `@lms/ui` primitive gets looked
+  at before it is wired anywhere. Every primitive has a story; a change without one is a change nobody reviewed.
+- **The host run and the container run are two different databases.** The stack's Postgres publishes no port,
+  so a course seeded on the host is absent from the containers and the other way round. That is not a bug, but
+  it explains an empty shelf in front of a stack you thought you had just seeded.
+
+The loop while editing is per-app, not repo-wide:
+
+```bash
+bun run --filter @lms/api test:watch    # the API suite; its global setup applies migrations to lms_test
+bun run --filter @lms/teacher test      # one portal's suite
+bun run typecheck && bun run lint       # both cheap, both in the gate
+```
+
+The suites that touch rows refuse to run against anything but `lms_test` — `apps/api/test/global-setup.ts`
+checks the database name in the URL for you, because two spec files sweeping the same booking table is a
+flaky test suite pretending to be a bug in the code.
+
+### In containers, for a hand-off or a demo
+
+```bash
+cp docker/.env.example docker/.env.docker    # then set JWT_SECRET:  openssl rand -hex 32
+
+bun run docker:build     # six images, one at a time on purpose
+bun run docker:up        # postgres -> migrate -> api + three portals + site -> gateway
+bun run docker:seed      # the lookups and the demo accounts; `up` never writes them
+```
+
+Then the four `*.localtest.me` addresses with no port on the end — one nginx gateway answers `:80` and routes
+by subdomain. The README's *Running the stack in containers* explains why the shape is what it is; two things
+that bite here rather than there:
+
+- `docker/.env.docker` is read for **build `ARG`s** as well as by the API, so changing a `NEXT_PUBLIC_*` value
+  there means `bun run docker:build`, not a restart. The `.env.*` pattern in `.gitignore` is unanchored, so the
+  file is ignored at `docker/` exactly as it is under `apps/` — it holds a secret and stays out of history.
+- `bun run docker:down` stops the stack and leaves both named volumes. `docker compose down --volumes` is the
+  command that deletes the rows and the uploaded lesson bytes with them, and nothing warns you first.
+
+### Why there is no container dev mode
+
+The obvious next request is an overlay that runs the same five services in watch mode with the repository
+mounted, so the container path becomes the editing path too. That was built and it does not work on Windows,
+for reasons that belong to the toolchain rather than to this repository:
+
+- Docker Desktop shares the drive over `9p` and carries **no file-system events** into a Linux container, so no
+  watcher in a bind mount ever sees a save. Checked twice — `next dev` and `tsc --watch` both sat idle while the
+  file's new content was plainly readable from inside the container.
+- **Turbopack has no polling mode**, so the flag that would fix the line above does not exist.
+- Dropping to `next dev --webpack` hits a different wall: Next's fast-refresh loader injects
+  `import.meta.webpackHot.accept()` into `packages/shared/dist`, which is CommonJS, and the dev compile fails
+  with `Cannot use 'import.meta' outside a module`.
+- Copying the source into a Linux volume with a host-side syncer moves the problem instead of solving it: the
+  syncer is still a watcher, on a filesystem whose events it would have to poll for.
+
+So images are built by Docker and watched by `bun`, each doing the one it is good at. If this is revisited,
+revisit it on a Linux host, and before writing any compose file check that one watcher there notices one save.
+
 ## The loop
 
 1. **Start from `develop`.** `git checkout develop && git pull`, then
@@ -34,7 +123,9 @@ feat/* ────────────╳  deleted after the merge
 2. **One feature at a time.** A branch that carries two unrelated changes cannot be reviewed, reverted, or
    released on its own. Split it.
 3. **Test first.** Write the failing test, watch it fail for the reason you expect, then implement. A bug
-   fix arrives with a test that would have caught it.
+   fix arrives with a test that would have caught it. Then open the screen you changed on the host run — see
+   *Running it while you change it* — because a green suite says the code is correct, not that the feature is
+   there.
 4. **Run the gate before you push.**
    ```
    bun run verify              # whole repository
@@ -169,7 +260,7 @@ action — once, for that number — not as an assumed last step of a task.
 | --------------------------------- | ------------------------------------------- |
 | `README.md`                       | The phase record, the walk-through, the rules |
 | `ARCHITECTURE.md`                 | Why the system is shaped like this          |
-| `docs/contributing.md`            | This file: how work moves                   |
+| `docs/contributing.md`            | This file: how to run it, and how work moves |
 | `apps/site/content/*.md`          | The public manual, rendered at `/docs`      |
 
 The public docs pages are generated: the route table from the running Nest app, the column table from
