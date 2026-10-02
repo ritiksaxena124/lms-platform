@@ -279,4 +279,20 @@ export class EnrollmentsRepository {
     ]);
     return { rows, total };
   }
+
+  /**
+   * Every name holding a place in one course, unpaged.
+   *
+   * The roster screen above is a page because a person reads it; this one is for the sweep that
+   * writes a register beside a class, and a class does not get a partial attendance sheet. It lives
+   * here rather than in the caller's own query because "who is enrolled" has exactly one answer in
+   * this platform, and the row that owns the place is where it is defined.
+   */
+  async listActiveStudentIds(courseId: string): Promise<string[]> {
+    const rows = await this.prisma.enrollment.findMany({
+      where: { courseId, isActive: true },
+      select: { studentUserId: true },
+    });
+    return rows.map((row) => row.studentUserId);
+  }
 }

@@ -10,6 +10,7 @@
  */
 
 import { expandWindows, type SlotHorizon, type SlotInstant, type WeeklyWindow } from './schedule';
+import type { AttendanceStatusCode } from './lookup-codes';
 import { zoneDateKey } from './timezone';
 
 /** The seven days, numbered the way the table stores them: Monday is 1. Re-exported here so
@@ -172,4 +173,78 @@ export function expandSeries(
   return expandWindows([seriesWindow(series)], timeZone, horizon).filter(
     (slot) => holidayOn(holidays, zoneDateKey(slot.startsAt, timeZone)) === null,
   );
+}
+
+/**
+ * How far forward a teacher's series is written down as dated classes.
+ *
+ * Thirty days, the same span a student is allowed to book into, so a term and a booking calendar
+ * end on the same day and nobody has to explain why one of them stops earlier. It is a horizon of
+ * *rows* rather than of *offers*: `BOOKING_HORIZON_DAYS` bounds a grid derived fresh on every page
+ * load, while this bounds a table the sweep has to keep, and a pattern that ran past the last row
+ * would show a calendar with a hole in the middle of it.
+ */
+export const OCCURRENCE_HORIZON_DAYS = 30;
+
+/**
+ * One dated class, as the teacher who teaches it reads it.
+ *
+ * `endsAt` is not stored — the row keeps a start and a length — for the same reason a booking
+ * carries one: a calendar square has to say when the class is over, and three portals each adding
+ * sixty minutes is how one class ends at three times.
+ *
+ * `studentsExpected` counts the names on the register beside the class, which is what tells a
+ * teacher whether Monday is a lesson or a room full of people. It is a number rather than a list
+ * because a week of classes is a list of days, and the names are a screen away — the roster a
+ * teacher marks after the class is Stage 3's question, asked of one class at a time.
+ */
+export interface ScheduledClass {
+  id: string;
+  /** The pattern this class came from, so a screen can say "the Monday nine o'clock" as well as a
+   * date. */
+  seriesId: string;
+  course: { id: string; slug: string; title: string };
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  studentsExpected: number;
+}
+
+/**
+ * The teacher's dated classes, oldest first, within the window they asked for.
+ *
+ * `from` and `to` are echoed back because they are the caller's, not the platform's: the rows only
+ * exist as far as the horizon, and a screen that asked for April and got March needs to know which
+ * of the two it ran out of.
+ */
+export interface TeachingClassesResponse {
+  from: string;
+  to: string;
+  items: ScheduledClass[];
+}
+
+/**
+ * One dated class a student is standing for.
+ *
+ * There is no register count here and no series id: a student's calendar is a list of days they are
+ * expected at, and both of those facts belong to whoever runs the course.
+ *
+ * `status` is the student's own mark — present or absent — or null while the class has not been
+ * answered. A mark can only be made after the minute has passed, so a future class on this list is
+ * unmarked by definition, and the null is the honest state rather than a placeholder for one.
+ */
+export interface AssignedClass {
+  id: string;
+  course: { id: string; slug: string; title: string };
+  startsAt: string;
+  endsAt: string;
+  durationMinutes: number;
+  status: AttendanceStatusCode | null;
+}
+
+/** The classes a student holds a place in, oldest first, within the window they asked for. */
+export interface LearningClassesResponse {
+  from: string;
+  to: string;
+  items: AssignedClass[];
 }

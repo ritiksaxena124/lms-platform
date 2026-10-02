@@ -1,27 +1,41 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import type { ClassSeriesListResponse, ClassSeriesResponse, HolidayListResponse, HolidayResponse } from '@lms/shared';
+import type {
+  ClassSeriesListResponse,
+  ClassSeriesResponse,
+  HolidayListResponse,
+  HolidayResponse,
+} from '@lms/shared';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
 import { CalendarRepository } from './calendar.repository';
+import { ClassOccurrenceService } from './class-occurrence.service';
 import type { CreateClassSeriesDto, UpdateClassSeriesDto } from './dto/class-series.dto';
 import type { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
 
 /**
  * The recurring calendar behind a teacher's week.
  *
- * A series is a plan for one course — Monday at 09:00–10:00, Thursday at 14:00–15:00 — and the
- * booking endpoint will auto-enroll students into every instance. A holiday is a day nobody
- * teaches: a festival, a personal day off. Both are edits to what §13's windows mean.
+ * A series is a plan for one course — Monday at 09:00–10:00, Thursday at 14:00–15:00 — and a
+ * holiday is a day nobody teaches: a festival, a personal day off. Both are edits to what §13's
+ * windows mean, and neither touches the booking table, which runs on its own availability rules.
+ *
+ * Both are also, since §2c, edits to a dated calendar. A teacher who changes a pattern has changed
+ * what next Tuesday holds, so every write here hands the row to `ClassOccurrenceService` to
+ * reconcile the horizon it governs before the answer goes back. That is not the sweep running
+ * twice over; it is the sweep running *now* rather than on the next hour, because a teacher who
+ * has just edited their week is looking at the screen that shows it.
  */
 @Injectable()
 export class CalendarService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly repo: CalendarRepository,
+    private readonly occurrences: ClassOccurrenceService,
   ) {}
 
   /** Every active series for one course. */
-  async listSeries(courseId: string): Promise<ClassSeriesListResponse> {
+  async listSeries(teacherUserId: string, courseId: string): Promise<ClassSeriesListResponse> {
+    await this.requireOwnCourse(teacherUserId, courseId);
     const items = await this.repo.listSeriesForCourse(courseId);
     return {
       items: items.map((s) => ({
@@ -38,11 +52,14 @@ export class CalendarService {
     };
   }
 
-  /** Add a new weekly slot to this course. */
+  /** Add a new weekly slot to this course, and open the classes it stands for. */
   async createSeries(
+    teacherUserId: string,
     courseId: string,
     dto: CreateClassSeriesDto,
   ): Promise<ClassSeriesResponse> {
+    await this.requireOwnCourse(teacherUserId, courseId);
+
     const overlap = await this.repo.findSeriesOverlap(courseId, dto.weekday, dto.startMinutes);
     if (overlap) {
       throw new ConflictException('A series already exists at this time for this course.');
@@ -69,15 +86,20 @@ export class CalendarService {
     const withCourse = await this.repo.findSeriesOwned(courseId, series.id);
     if (!withCourse) throw new NotFoundException('Series not found after creation.');
 
+    await this.occurrences.reconcileTeacher(teacherUserId, new Date());
+
     return { series: this.toSeriesResponse(withCourse) };
   }
 
-  /** Adjust an existing series. */
+  /** Adjust an existing series, and move the classes it no longer stands for. */
   async updateSeries(
+    teacherUserId: string,
     courseId: string,
     id: string,
     dto: UpdateClassSeriesDto,
   ): Promise<ClassSeriesResponse> {
+    await this.requireOwnCourse(teacherUserId, courseId);
+
     const existing = await this.repo.findSeriesOwned(courseId, id);
     if (!existing) {
       throw new NotFoundException('This series does not belong to this course.');
@@ -109,11 +131,19 @@ export class CalendarService {
     const withCourse = await this.repo.findSeriesOwned(courseId, id);
     if (!withCourse) throw new NotFoundException('Series not found after update.');
 
+    await this.occurrences.reconcileTeacher(teacherUserId, new Date());
+
     return { series: this.toSeriesResponse(withCourse) };
   }
 
-  /** Retire a series so it stops generating instances. */
-  async retireSeries(courseId: string, id: string): Promise<ClassSeriesResponse> {
+  /** Retire a series so it stops standing for classes, and close the ones it made. */
+  async retireSeries(
+    teacherUserId: string,
+    courseId: string,
+    id: string,
+  ): Promise<ClassSeriesResponse> {
+    await this.requireOwnCourse(teacherUserId, courseId);
+
     const existing = await this.repo.findSeriesOwned(courseId, id);
     if (!existing) {
       throw new NotFoundException('This series does not belong to this course.');
@@ -126,6 +156,8 @@ export class CalendarService {
 
     const withCourse = await this.repo.findSeriesOwned(courseId, id);
     if (!withCourse) throw new NotFoundException('Series not found after retirement.');
+
+    await this.occurrences.reconcileTeacher(teacherUserId, new Date());
 
     return { series: this.toSeriesResponse(withCourse) };
   }
@@ -147,11 +179,8 @@ export class CalendarService {
     };
   }
 
-  /** Add a day this teacher does not teach. */
-  async createHoliday(
-    teacherUserId: string,
-    dto: CreateHolidayDto,
-  ): Promise<HolidayResponse> {
+  /** Add a day this teacher does not teach, and take that day off their calendar. */
+  async createHoliday(teacherUserId: string, dto: CreateHolidayDto): Promise<HolidayResponse> {
     const existing = await this.repo.findHolidayOnDate(teacherUserId, dto.date);
     if (existing) {
       throw new ConflictException('A holiday already exists on this date.');
@@ -166,10 +195,12 @@ export class CalendarService {
       },
     });
 
+    await this.occurrences.reconcileTeacher(teacherUserId, new Date());
+
     return { holiday: this.toHolidayResponse(holiday) };
   }
 
-  /** Adjust an existing holiday. */
+  /** Move an existing holiday, and re-open the day it used to block. */
   async updateHoliday(
     teacherUserId: string,
     id: string,
@@ -196,10 +227,12 @@ export class CalendarService {
       data: { date, reason, isRecurringAnnual },
     });
 
+    await this.occurrences.reconcileTeacher(teacherUserId, new Date());
+
     return { holiday: this.toHolidayResponse(updated) };
   }
 
-  /** Retire a holiday so it no longer blocks slots. */
+  /** Lift a holiday so the day it blocked is taught again. */
   async retireHoliday(teacherUserId: string, id: string): Promise<HolidayResponse> {
     const existing = await this.repo.findHolidayOwned(teacherUserId, id);
     if (!existing) {
@@ -211,7 +244,24 @@ export class CalendarService {
       data: { isActive: false },
     });
 
+    await this.occurrences.reconcileTeacher(teacherUserId, new Date());
+
     return { holiday: this.toHolidayResponse(retired) };
+  }
+
+  /**
+   * Refuse a series written on a course the caller does not own.
+   *
+   * The route has always been `@Roles(TEACHER)`, which says the caller runs a timetable but not
+   * *this* one. While a series only fed its own course's screens that was a small leak; since §2c a
+   * series is what puts dated classes on a named teacher's month, and a teacher who could schedule
+   * somebody else's course could fill their calendar with classes they never agreed to teach.
+   */
+  private async requireOwnCourse(teacherUserId: string, courseId: string): Promise<void> {
+    const course = await this.repo.findCourseOwned(courseId, teacherUserId);
+    if (!course) {
+      throw new NotFoundException('No course here is yours to schedule.');
+    }
   }
 
   private toSeriesResponse(series: {
