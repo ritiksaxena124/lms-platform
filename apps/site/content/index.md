@@ -37,10 +37,10 @@ it. A room for the class that opens in its window and not a minute before. Email
 loop. A log of who changed what, and a screen that reads it back.
 
 What is not: a charge. A course carries a price, a coupon lowers it, and nothing is billed — no payment
-provider is connected, so a `payment` row is a record rather than a receipt. A schedule that repeats: a
-teacher can write down a weekly series and mark a holiday, and both are stored and managed on screen,
-but the booking grid still reads only the availability windows, so a series creates no classes and a
-holiday blocks no date. And discovery: a teacher is
+provider is connected, so a `payment` row is a record rather than a receipt. An attendance sheet. A
+weekly series now writes real dated classes and a holiday takes that date's away, and every one of those
+classes carries a register of the names holding a place — but nothing answers it, so a class that happened
+is not yet marked taught or missed. And discovery: a teacher is
 found by a link someone sent you, not by a search that ranks them.
 
 ## Where to go next

@@ -95,7 +95,7 @@ describe('CohortCalendar', () => {
     render(<CohortCalendar />);
 
     const link = await screen.findByRole('link', { name: 'Veena Basics' });
-    expect(link).toHaveAttribute('href', '/courses/c1');
+    expect(link).toHaveAttribute('href', '/courses/c1/edit');
     expect(screen.getByText('Mon 28 Sept, 09:30–10:15')).toBeInTheDocument();
     expect(screen.getByText('6 students expected')).toBeInTheDocument();
   });

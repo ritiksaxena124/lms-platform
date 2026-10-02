@@ -15,12 +15,15 @@ stranger reads and the docs a builder needs, both generated from what the code a
 route is explained endpoint by endpoint, with purpose, gates, fields and failures documented alongside
 the contract the code enforces.
 
-Two phases hold records that no code reads yet, and the honest version of that belongs here rather than
-in a commit message:
+Two phases are delivered only halfway, and the honest version of that belongs here rather than in a
+commit message:
 
-- **Phase 10 — the calendar.** A teacher writes down a weekly series and marks a holiday, and both are
-  stored, listed and retired. Neither changes what the booking grid offers: slot generation still
-  expands the availability windows alone, so a holiday is a note and a series is a plan nobody executes.
+- **Phase 10 — the calendar.** A weekly series now writes dated classes and a marked-off day takes them
+  out again; the teacher reads those rows on `/calendar`, and a student meets them on their own list
+  beside the classes they booked. Two things are missing. Every dated class carries a register of the
+  names holding a place and nothing answers it, so `completed` and `no_show` stay unreachable until a
+  teacher can mark a class that has happened. And the booking grid still expands the availability
+  windows alone, so a day off stops a cohort class rather than a minute a student asks for.
 - **Phase 9 — money.** A teacher issues discount codes, a learner redeems one while enrolling, and the
   discounted amount is filed as a `payment` row. No provider is connected and no money moves.
 
@@ -80,10 +83,16 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   fills with the minutes that window offers over the next thirty days.
 - **Recurring classes** — `/courses/[id]/series` for a weekly slot a course keeps meeting at: Monday
   at 09:00–10:00 as a 45-minute class, repeating until retired. Written, listed and retired through
-  the API — **but it generates no classes and opens no minutes yet.**
+  the API, and every one of those writes reconciles the dated classes the pattern stands for — a plan
+  and the calendar in front of the teacher do not get to spend an hour disagreeing.
 - **Holidays** — `/holidays` for days the teacher doesn't teach. Festivals, personal days off, or
-  recurring annual observances. Stored with the same caveat: **slot generation does not consult them
-  yet**, so a holiday is the teacher's note rather than a block on the grid.
+  recurring annual observances. A marked-off day takes that date's classes out of the calendar and
+  puts them back when the day is lifted. It does not touch the booking grid, which still expands the
+  availability windows alone.
+- **The dated calendar** — `/calendar` (`/api/v1/classes/teaching`) shows the classes the series wrote,
+  the next thirty days in whole weeks. The rows rather than the patterns, because only the table holds
+  the days that were marked off. Nothing on it is clickable: no route accepts an edit to a dated class,
+  and a chip that invited one would be a feature the API refuses to back.
 - **The queue, and the classes** — an ask lands in `/requests` as `pending` and holds the minute;
   nothing is a class until the teacher confirms or refuses it. `/classes` holds the answer either
   way, soonest first.
@@ -121,7 +130,9 @@ See [Phases](#phases) for what each phase promised and what it delivered.
 - **Classes** — `/courses/[id]/book` shows the teacher's next thirty days as minutes to ask for
   (`/api/v1/bookings/slots`), under the caption "Times are the teacher's clock"; `/my-classes`
   shows the same class in the student's own timezone, _Leave this class_ gives the minute back
-  while it still stands, and Join opens the room for the class happening now.
+  while it still stands, and Join opens the room for the class happening now. The classes a course's
+  series scheduled (`/api/v1/classes/learning`) arrive on that same list in the order they happen,
+  wearing one pill and no door — nobody booked them, so there is no minute to give back.
 
 ### The operator's desk
 
@@ -543,9 +554,11 @@ decision was made, and what was deliberately left out.
 | 13    | The API explained endpoint by endpoint — purpose, fields, failures        | **Done**    |
 
 Two of those rows need their notes read with them. **9** shipped the codes, the redemption and the
-`payment` row, and no provider behind any of it. **10** shipped the series and holiday tables, their
-endpoints and their screens, and nothing that consults them when the grid is worked out. The rest of
-the table means what it says.
+`payment` row, and no provider behind any of it. **10** shipped its tables, endpoints and screens and
+now the sweep that turns a series into dated classes and takes a marked-off day's classes out from
+under it — but nothing answers the register beside a class, so no class is yet taught or missed, and the
+booking grid is still expanded from the availability windows alone, so a day off stops a cohort class
+rather than a minute a student asks for. The rest of the table means what it says.
 
 ### All thirteen, in order
 
@@ -553,8 +566,10 @@ The table is the index; this is what each one is for. Phases 0–8 are the produ
 putting a door in front of what the two before it had only recorded, and 11–12 are the two apps that
 sit outside it — the face and the manual. 9 and 10 sit where they do because of what has to exist
 before their shape stops moving, and both are now half-built rather than unbuilt: each wrote its
-tables, its endpoints and its screens, and each left the part that would have changed what the older
-phases do. That is recorded on the rows above rather than smoothed over. 13 was added on
+tables, its endpoints and its screens, and each left out the part that would have changed what the
+older phases do — Phase 9 a charge behind the price, Phase 10 the mark on a class and any effect on
+the minutes the booking grid offers. That is recorded on the rows above rather than smoothed over. 13
+was added on
 2026-09-30, after 12 closed, because a route table is a catalogue and not a manual.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
@@ -597,11 +612,15 @@ phases do. That is recorded on the rows above rather than smoothed over. 13 was 
   amount recorded is an arithmetic result, not a charge, and `PAYMENT_PROVIDER` is an env key no code
   reads.
 - **Phase 10 — the teacher's calendar.** A course's classes repeating weekly, and the holidays and
-  no-class days that stop minutes being offered at all. Both are edits to what §13's windows mean,
-  so they come after booking, video and both portals have settled. **Half delivered:** the `class_series`
-  and `holiday` tables, their teacher-gated endpoints and their management screens are all in place, and
-  the slot grid still expands the availability windows alone. A series generates no instances and a
-  holiday blocks no date, because no read of either feeds the expansion.
+  no-class days that stop a date being taught at all. Both are edits to what §13's windows mean, so they
+  come after booking, video and both portals have settled. **Delivered except the mark:** the
+  `class_series` and `holiday` tables, their endpoints and their screens were already in, and an hourly
+  sweep now reconciles them into `class_occurrence` — a dated class with its `class_attendance` register
+  beside it — so a series stands for real classes and a holiday takes that date's away. The teacher reads
+  the rows at `/calendar`, a student meets them on `/my-classes`, and the booking grid is untouched: it
+  still expands the availability windows alone, because a cohort class is a timetable rather than minutes
+  to claim. What is missing is the answer on the register — nothing marks a class taught or missed, so
+  `completed` and `no_show` stay unreachable for a cohort class.
 - **Phase 11 — the product's face.** A public website a school or a teacher reads before anybody
   signs up: an `apps/*` workspace member on `@lms/ui` and `@lms/shared`, and not a second backend.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
@@ -923,7 +942,8 @@ the database, and every generated table on the site is a reading of what the cod
 than a second copy of it that can drift. The table above is what the docs site publishes, and what the
 public page points at. Nothing is left unstarted in the table, but two rows are not the whole thing
 they were scoped as: Phase 9 wrote its coupons and its `payment` rows without a payment provider behind
-them, and Phase 10 wrote its series and holidays without the grid ever reading them. Those are the two
+them, and Phase 10 now reconciles its series and holidays into a dated calendar without the booking
+grid ever reading either, or anybody marking a class taught. Those are the two
 places where a phase is closed on paper and open in the product.
 
 ## Environment variables

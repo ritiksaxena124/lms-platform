@@ -153,7 +153,7 @@ export function CohortCalendar() {
                 <div className="min-w-0">
                   <h3 className="text-h3">
                     <Link
-                      href={`/courses/${row.course.id}`}
+                      href={`/courses/${row.course.id}/edit`}
                       className="text-ink-strong underline-offset-4 hover:underline"
                     >
                       {row.course.title}

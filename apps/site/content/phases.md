@@ -40,12 +40,16 @@ the same transaction that opens the place; an expired, exhausted or unknown code
 place opens. That is the whole of it: **nothing is charged.** There is no payment port behind
 `PAYMENT_PROVIDER`, so the amount on a `payment` row is what the class costs, not money that moved.
 
-**The calendar, as far as it goes (Phase 10).** A course keeps a weekly series — Monday, 09:00 to
+**The calendar, executed but unanswered (Phase 10).** A course keeps a weekly series — Monday, 09:00 to
 10:00, a 45-minute class, repeating until retired — and a teacher keeps holidays, single dates or ones
-that return each year. Both have tables, teacher-gated endpoints and management screens. Neither has
-yet been given to the thing they were meant to change: **the booking grid still expands the
-availability windows alone**, so a series generates no classes and a holiday stops no minute being
-offered. The records are trustworthy; the consequences are not yet written.
+that return each year. Both now have consequences. A sweep reconciles them into dated classes over the
+next thirty days, so a series stands for real classes on the teacher's `/calendar`, a marked-off day
+takes that date's classes out and puts them back when it is lifted, and a student meets the same rows on
+their own list beside the classes they booked. What the phase still does not do is answer them: every
+dated class carries a register of the names holding a place and nothing marks one taught or missed, and
+**the booking grid still expands the availability windows alone** — deliberately, since a cohort class is
+a timetable rather than minutes to claim, but it is the promise the phase was scoped with and it is on
+the row above.
 
 ## Where the reasoning lives
 

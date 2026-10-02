@@ -239,6 +239,32 @@ describe('MyClasses', () => {
     await waitFor(() => expect(bookings.myBookings).toHaveBeenCalledTimes(2));
   });
 
+  /**
+   * The 403 the shared cookie really produces: a sign-in earned at the teacher portal that this
+   * student tab is holding. Retrying asks the same session the same question, so the honest answer
+   * names the account that would work and points at the sign-in, exactly as `My courses` does —
+   * the two screens read the same refusal and must not disagree about what it means.
+   */
+  it('names a session that is not a learner, and does not offer a retry of the same answer', async () => {
+    bookings.myBookings.mockRejectedValueOnce(
+      new ApiError({
+        statusCode: 403,
+        code: 'FORBIDDEN',
+        message: 'This account is not allowed to do that.',
+      }),
+    );
+
+    render(<MyClasses />);
+
+    await screen.findByText('This is not a learner account');
+    expect(screen.queryByText(/not allowed to do that/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /try again/i })).toBeNull();
+    expect(screen.getByRole('link', { name: /sign in as a learner/i })).toHaveAttribute(
+      'href',
+      '/login?next=%2Fmy-classes',
+    );
+  });
+
   it('sends a student with nothing booked to the shelf', async () => {
     const user = userEvent.setup();
     bookings.myBookings.mockResolvedValue([]);

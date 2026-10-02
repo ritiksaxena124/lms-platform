@@ -27,7 +27,7 @@ import {
   type LiveClassDoor,
 } from '@lms/shared';
 
-import { ApiError, describeFailure } from '@/lib/api';
+import { ApiError, describeFailure, isForbidden } from '@/lib/api';
 import { myAssignedClasses } from '@/lib/cohort-classes';
 import { joinRoom, leaveClass, myBookings } from '@/lib/bookings';
 import { formatClassWindow, formatInstant } from '@/lib/dates';
@@ -105,6 +105,17 @@ function standsToLeave(booking: Booking): boolean {
   return CANCELLABLE_BOOKING_STATUSES.includes(booking.status);
 }
 
+/** The heading says the account is not a learner's; this line says what follows from that here. */
+const NOT_A_LEARNER_NOTE = 'It cannot hold a place, so no class is standing for it.';
+
+interface Failure {
+  key: string;
+  message: string;
+  /** A 403 is not a connection that failed: the same session gives the same answer when asked again,
+   * so the retry is withheld and the sign-in is offered in its place. */
+  notALearner: boolean;
+}
+
 /**
  * The student's own calendar, which is the one list on this portal that is theirs.
  *
@@ -132,7 +143,7 @@ export function MyClasses() {
   const { user } = useSession();
   const [attempt, setAttempt] = useState(0);
   const [settled, setSettled] = useState<Settled | null>(null);
-  const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
+  const [failure, setFailure] = useState<Failure | null>(null);
   const [leaving, setLeaving] = useState<string | null>(null);
   const [stale, setStale] = useState<string | null>(null);
   /**
@@ -161,7 +172,13 @@ export function MyClasses() {
         if (alive) setSettled({ key, classes: mergeRows(booked, scheduled), now: Date.now() });
       })
       .catch((error: unknown) => {
-        if (alive) setFailure({ key, message: describeFailure(error) });
+        if (!alive) return;
+        const notALearner = isForbidden(error);
+        setFailure({
+          key,
+          message: notALearner ? NOT_A_LEARNER_NOTE : describeFailure(error),
+          notALearner,
+        });
       });
 
     return () => {
@@ -206,7 +223,21 @@ export function MyClasses() {
 
   if (failed) {
     return (
-      <ErrorState title="Your classes did not load" message={failed.message} onRetry={reload} />
+      <div className="flex flex-col gap-4">
+        <ErrorState
+          title={failed.notALearner ? 'This is not a learner account' : 'Your classes did not load'}
+          message={failed.message}
+          onRetry={failed.notALearner ? undefined : reload}
+        />
+        {failed.notALearner ? (
+          <Link
+            href={`/login?next=${encodeURIComponent('/my-classes')}`}
+            className={buttonClass({ variant: 'secondary', size: 'sm' })}
+          >
+            Sign in as a learner
+          </Link>
+        ) : null}
+      </div>
     );
   }
 
