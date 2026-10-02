@@ -17,7 +17,7 @@ async function bootstrap(): Promise<void> {
   configureApp(app, env);
   app.useLogger(app.get(AppLogger));
 
-  await app.listen(env.PORT, '127.0.0.1');
+  await app.listen(env.PORT, env.LISTEN_HOST);
   Logger.log(`API listening on ${env.API_PUBLIC_URL}${API_PREFIX} (port ${env.PORT})`, 'Bootstrap');
 }
 

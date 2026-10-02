@@ -57,6 +57,14 @@ feat/* ────────────╳  deleted after the merge
 not run on a push to `develop` or `release`, so those branches are only checked at PR time — which holds as
 long as nothing lands on them except through a PR.
 
+Inside that gate is `bun run docker:check` (`scripts/docker-check.mjs`), which needs no Docker daemon: it
+reads the compose file, the Dockerfiles, the gateway config and the portal sources and fails when an app has
+no service, when a portal reads a `NEXT_PUBLIC_*` key no Dockerfile passes in as a build `ARG`, when the
+gateway has stopped answering one of the five hostnames, or when `.dockerignore` has let a `.env` file or
+`apps/api/storage` back into the build context. It is in the chain rather than in a separate job because the
+container shape is edited one file at a time, and the failure it prevents — a portal built pointing at
+`undefined` — only surfaces in a browser.
+
 `main` is **not yet protected** on GitHub: nothing stops a hand-push except this file and the person reading
 it. Two changes close that gap, and both need the maintainer's explicit go-ahead because they alter shared
 state — adding `develop` and `release` to the workflow's `push` branches, and turning on protection for
@@ -121,9 +129,9 @@ Patches **accumulate and go out together**. Six fixes are one tag, not six. With
 number stops carrying information and the repository ends up with a hundred releases that all mean
 "something small changed".
 
-The version line today: `v0.15.0` is published on origin at `0611825`, and `main` is one commit ahead of it
-(`2511fc0`, the `CalendarRepository` fix). So the next patch on that line is **`v0.15.1`**, and the next new
-capability is **`v0.16.0`**.
+The version line today: `v0.15.1` is published on origin at `fb33ba3`, and `develop`, `release` and `main` are
+that same commit. So the next patch on that line is **`v0.15.2`**, and the next new capability is
+**`v0.16.0`**.
 
 Cutting a release:
 

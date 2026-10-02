@@ -1,0 +1,143 @@
+# The whole product on one machine, behind http://*.localtest.me.
+#
+# Bring it up with `bun run docker:up` (it passes --env-file for you). First run needs
+# `cp docker/.env.example docker/.env.docker` and a generated secret in it; images are built locally
+# only, and nothing here pushes or deploys — the deploy question is still deliberately unanswered
+# (README, "Releases").
+
+x-portal: &portal
+  context: .
+  dockerfile: docker/portal.Dockerfile
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init-lms-test.sql:/docker-entrypoint-initdb.d/init-lms-test.sql:ro
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}']
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    # Deliberately unpublished. This machine already runs a Postgres on 5432 and the host suites read
+    # it through `apps/api/.env.test`; a stack that took the port would break the thing it was handed
+    # to alongside. Nothing outside this network needs the database — that is the point of a network.
+
+  migrate:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: migrator
+    command: ['bunx', 'prisma', 'migrate', 'deploy']
+    env_file: docker/.env.docker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: runner
+    env_file: docker/.env.docker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      # The gateway is what a browser talks to, so these are the gateway URLs — not the in-network
+      # service addresses. A notification whose button points at `http://api:4000/...` opens a page
+      # that does not exist outside this network.
+      API_PUBLIC_URL: ${API_PUBLIC_URL}
+      TEACHER_PORTAL_URL: http://teacher.localtest.me
+      STUDENT_PORTAL_URL: http://student.localtest.me
+      CORS_ORIGINS: http://teacher.localtest.me,http://student.localtest.me,http://ops.localtest.me,http://site.localtest.me
+      COOKIE_DOMAIN: localtest.me
+      # Plain http on a laptop. ARCHITECTURE §6 keeps this explicit rather than letting NODE_ENV decide,
+      # because a cookie marked Secure over an unencrypted connection is a session that never sticks.
+      COOKIE_SECURE: 'false'
+      LISTEN_HOST: 0.0.0.0
+      STORAGE_LOCAL_DIR: ./storage/uploads
+    volumes:
+      - api-storage:/app/apps/api/storage/uploads
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+
+  teacher:
+    build:
+      <<: *portal
+      args:
+        APP: teacher
+        # One value used twice on purpose: it is what the browser is sent to and what the API is
+        # allowed to hear from. If they drift, the portals load and every fetch is a CORS error.
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}
+
+  student:
+    build:
+      <<: *portal
+      args:
+        APP: student
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}
+
+  ops:
+    build:
+      <<: *portal
+      args:
+        APP: ops
+        NEXT_PUBLIC_API_URL: ${API_PUBLIC_URL}
+
+  site:
+    build:
+      context: .
+      dockerfile: docker/site.Dockerfile
+      args:
+        NEXT_PUBLIC_TEACHER_PORTAL_URL: http://teacher.localtest.me
+        NEXT_PUBLIC_STUDENT_PORTAL_URL: http://student.localtest.me
+
+  # Behind a profile: `docker compose up` never writes demo accounts into a database by itself.
+  # `bun run docker:seed` runs it on purpose.
+  seed:
+    build:
+      context: .
+      dockerfile: docker/api.Dockerfile
+      target: seed
+    profiles: ['tools']
+    env_file: docker/.env.docker
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}?schema=public
+      # The one service that says it is not a live server, and the only place that does. Demo accounts
+      # are the point of a hand-off stack — without them nobody can sign in to look at it — and
+      # `assertDemoSeedAllowed` refuses them under `production` precisely so a deployment cannot mint
+      # a README password by forgetting to ask. Here the ask is explicit and human-run; the API itself
+      # keeps NODE_ENV=production from the env file.
+      NODE_ENV: development
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  gateway:
+    build:
+      context: .
+      dockerfile: docker/gateway/Dockerfile
+    ports:
+      # The only published port. localtest.me answers from public DNS, so this machine's browser finds
+      # every subdomain here without a hosts-file entry.
+      - '80:80'
+    depends_on:
+      - api
+      - teacher
+      - student
+      - ops
+      - site
+
+volumes:
+  pgdata:
+  api-storage:

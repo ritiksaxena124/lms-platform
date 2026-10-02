@@ -6,6 +6,9 @@ const config: NextConfig = {
   // Dev runs on *.localtest.me so every portal gets the same session cookie domain —
   // which a student browsing the catalog does not have yet, and enrollment will change.
   allowedDevOrigins: ['student.localtest.me'],
+  // A container image copies `.next/standalone` — the traced subset of node_modules this app actually
+  // imports — instead of the whole workspace. `next dev` and `next start` are unaffected.
+  output: 'standalone',
   reactStrictMode: true,
 };
 
