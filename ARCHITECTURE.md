@@ -959,15 +959,37 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   edits to what a window expands into, so both belong after `slotAt` has been exercised by the
   booking loop and by whatever Phase 5 attaches to a booked minute — an expansion is the one
   function in this system where an exception would have to be honoured in three places at once.
-- **Phase 10 wrote the two exception records and not the exception.** `class_series` hangs off a course
-  (weekday, start and end minutes, class length) and `holiday` off the teacher (an ISO date, an
-  optional reason, an annual-repeats flag), both retired rather than deleted, both gated on ownership
-  the way the availability rules are — series through the course they belong to, holidays through the
-  account that wrote them. The endpoints and the two teacher screens are live. **What is missing is the
-  sentence the tables exist for:** `expandWindows` is still handed the availability rules alone, so a
-  series generates no instances and a holiday removes no date from the grid. The reason that matters is
-  the line above it — an exception has to be honoured wherever a minute is derived, so the fix belongs
-  in the expansion, not in whichever screen happens to show the grid.
+- **The exception became a table, not a rule inside `expandWindows`.** `class_series` hangs off a course
+  (weekday, start and end minutes, class length) and `holiday` off the teacher (an ISO date, an optional
+  reason, an annual-repeats flag), both retired rather than deleted, both gated on ownership the way the
+  availability rules are — series through the course they belong to, holidays through the account that
+  wrote them. A sweep reconciles the two into `class_occurrence`: one row per class the patterns stand
+  for over a rolling 30-day horizon (`OCCURRENCE_HORIZON_DAYS`), dated in the teacher's zone, with
+  `class_attendance` holding one line per student who holds a place in that course. The booking grid is
+  still handed the availability rules alone, and that is a decision rather than a gap: a slot is a
+  minute one student claims for themselves and a series is a timetable a course keeps, so running both
+  through one expansion would sell the same hour twice.
+- **Reconcile, not generate.** Each run works out what the horizon should hold *now* and moves the rows
+  that differ — creating what is new, lifting the flag on what a day off freed, dropping it on what a
+  pattern no longer stands for. An appender leaves behind every class an edited pattern stopped meaning;
+  a rebuild deletes rows the register points at. Nothing is deleted and nothing re-dated, because a
+  class that returns after a holiday is the same class rather than a new one wearing its time. The same
+  shape survives two API instances on one clock: every write is keyed by the pair the database already
+  guards.
+- **The horizon starts at the instant the sweep stands in**, not at the beginning of its week, and that
+  is the whole of how history is protected: a class whose minute has passed is in nobody's window, so no
+  later edit — a day off, a retirement, a moved hour — reaches back and changes what happened that day.
+  Three doors call it and all three ask the same question: the clock hourly, every write to a series or
+  a holiday so the screen is true the moment the form closes, and no route at all that accepts a dated
+  class from a caller.
+- **Both calendars read the rows rather than the patterns.** `GET /api/v1/classes/teaching` and `GET
+  /api/v1/classes/learning` take a window a caller may leave off, defaulting to the horizon the sweep
+  keeps so that number lives in `@lms/shared` alone, and echo the bounds they used — which is how a
+  screen tells "no classes left" apart from "no calendar left". Only the table holds both the days that
+  were marked off and the classes a lifted day brought back, which is why `/calendar` shows dated rows
+  while `/availability` shows the rule that made them.
+- **What holds it:** `apps/api/test/cohort-classes.spec.ts` for the reconcile, the registers and the two
+  reads, beside the schema and route specs named above.
 
 ## 14. Bookings
 

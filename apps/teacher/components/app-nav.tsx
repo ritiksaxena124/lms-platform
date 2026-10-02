@@ -11,6 +11,7 @@ const ITEMS = [
   { href: '/courses', label: 'Courses' },
   { href: '/availability', label: 'Availability' },
   { href: '/holidays', label: 'Holidays' },
+  { href: '/calendar', label: 'Calendar' },
   { href: '/requests', label: 'Requests' },
   { href: '/classes', label: 'Classes' },
 ] as const;

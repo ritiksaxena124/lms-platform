@@ -12,7 +12,7 @@ export default async function CourseSeriesPage({ params }: { params: Promise<{ i
     <RouteTransition>
       <PageHeader
         title="Class Series"
-        description="The weekly slot this course keeps meeting at, written down until you retire it. Booking still opens minutes from your availability windows, so a series records the pattern rather than filling the calendar."
+        description="The weekly slot this course keeps meeting at, written down until you retire it. Saving one writes the classes it stands for onto your calendar, a month ahead; retiring it closes the ones still to come."
         breadcrumbs={[
           { label: 'Courses', href: '/courses' },
           { label: 'Course', href: `/courses/${id}/edit` },

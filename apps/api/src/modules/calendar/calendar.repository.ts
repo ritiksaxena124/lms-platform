@@ -26,6 +26,20 @@ export class CalendarRepository {
     });
   }
 
+  /**
+   * The course a series is about to be written on, only when this teacher owns it.
+   *
+   * A series used to be read as a note on a course — a thing whose only effect was on the course's
+   * own screens. Since §2c it decides what a person's calendar holds on a Tuesday, which makes "is
+   * this your course" a question the write has to ask rather than a convention the portal keeps.
+   */
+  async findCourseOwned(courseId: string, teacherUserId: string): Promise<{ id: string } | null> {
+    return this.prisma.course.findFirst({
+      where: { id: courseId, teacherUserId },
+      select: { id: true },
+    });
+  }
+
   /** One series owned by this course. */
   async findSeriesOwned(courseId: string, id: string): Promise<ClassSeriesRow | null> {
     return this.prisma.classSeries.findFirst({
