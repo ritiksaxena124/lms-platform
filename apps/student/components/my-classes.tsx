@@ -21,12 +21,14 @@ import {
   BOOKING_STATUS_CODES,
   BOOKING_STATUS_LABELS,
   CANCELLABLE_BOOKING_STATUSES,
+  type AssignedClass,
   type Booking,
   type BookingStatusCode,
   type LiveClassDoor,
 } from '@lms/shared';
 
 import { ApiError, describeFailure } from '@/lib/api';
+import { myAssignedClasses } from '@/lib/cohort-classes';
 import { joinRoom, leaveClass, myBookings } from '@/lib/bookings';
 import { formatClassWindow, formatInstant } from '@/lib/dates';
 
@@ -47,16 +49,56 @@ const TONES: Record<BookingStatusCode, StatusTone> = {
   [BOOKING_STATUS_CODES.NO_SHOW]: 'danger',
 };
 
+/**
+ * One line on this calendar, from either of the two lists that build it.
+ *
+ * To a reader a class they booked and a class the course scheduled are the same thing: a minute
+ * they are expected at. To the platform they are three different things — only the first has a
+ * status of its own, a way out, or a room — so the booking rides along as a whole row or as
+ * `null`, and everything that differs between the two kinds hangs off that one test. A scheduled
+ * class gets no invented status word: `null` here means nobody has answered it, which is truer
+ * than any label this screen could write.
+ */
+interface CalendarRow {
+  /** The two lists come from different tables, so an id from one is not known to differ from an id
+   * from the other. The kind is what makes one list of keys safe. */
+  key: string;
+  course: { id: string; slug: string; title: string };
+  startsAt: string;
+  endsAt: string;
+  booking: Booking | null;
+}
+
+/** One calendar, in the order the classes happen. */
+function mergeRows(booked: Booking[], scheduled: AssignedClass[]): CalendarRow[] {
+  return [
+    ...booked.map((booking): CalendarRow => ({
+      key: `booked-${booking.id}`,
+      course: booking.course,
+      startsAt: booking.startsAt,
+      endsAt: booking.endsAt,
+      booking,
+    })),
+    ...scheduled.map((row): CalendarRow => ({
+      key: `scheduled-${row.id}`,
+      course: row.course,
+      startsAt: row.startsAt,
+      endsAt: row.endsAt,
+      booking: null,
+    })),
+  ].sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt));
+}
+
 interface Settled {
   key: string;
-  classes: Booking[];
+  classes: CalendarRow[];
   /** The instant the read landed. The split below is a claim about that moment, and a clock read
    * while rendering is one instant on the server and another in the browser. */
   now: number;
 }
 
-function isComingUp(booking: Booking, now: number): boolean {
-  return Date.parse(booking.startsAt) > now;
+function isComingUp(row: CalendarRow, now: number): boolean {
+  return Date.parse(row.startsAt) > now;
 }
 
 function standsToLeave(booking: Booking): boolean {
@@ -67,19 +109,23 @@ function standsToLeave(booking: Booking): boolean {
  * The student's own calendar, which is the one list on this portal that is theirs.
  *
  * The rows are read from the person rather than from a course, so a student with three teachers
- * keeps one schedule here. Each row is shown in the student's clock, not the teacher's: the grid
- * that offered the minute belonged to the teacher's week, but the class is something this person
- * has to be awake for, and the same instant on two walls is the one place a mistake costs an
- * hour.
+ * keeps one schedule here. Two routes feed it — the classes this student asked for and the ones a
+ * course's series wrote — and they arrive as one list, because a person has one diary and two
+ * calendars is how somebody misses a class. Each row is shown in the student's clock, not the
+ * teacher's: the grid that offered the minute belonged to the teacher's week, but the class is
+ * something this person has to be awake for, and the same instant on two walls is the one place a
+ * mistake costs an hour.
  *
  * The split is on the date and nothing else. On the status alone a confirmed class would go on
  * being "coming up" after its hour passed, because Phase 4 has nothing that marks a class taught;
  * on whether the minute is still held, a class this student called off would vanish from the week
  * it happened in. The date is the only fact on a row that never changes.
  *
- * Leaving is one press, and the list is read again after it rather than edited in place: whether
+ * Leaving is one press, and both lists are read again after it rather than edited in place: whether
  * the class stood down or the teacher answered it a second earlier, the honest answer is the one
- * the API gives next time it is asked.
+ * the API gives next time it is asked. The pair is read together, and one refusal fails the whole
+ * calendar — half a schedule is the worst thing this screen could draw, because the missing half
+ * looks like a free day.
  */
 export function MyClasses() {
   const router = useRouter();
@@ -110,9 +156,9 @@ export function MyClasses() {
   useEffect(() => {
     let alive = true;
 
-    myBookings()
-      .then((classes) => {
-        if (alive) setSettled({ key, classes, now: Date.now() });
+    Promise.all([myBookings(), myAssignedClasses()])
+      .then(([booked, scheduled]) => {
+        if (alive) setSettled({ key, classes: mergeRows(booked, scheduled), now: Date.now() });
       })
       .catch((error: unknown) => {
         if (alive) setFailure({ key, message: describeFailure(error) });
@@ -182,7 +228,7 @@ export function MyClasses() {
       <EmptyState
         illustration={<Illo src="/illustrations/peep-sitting-17.svg" size="lg" />}
         title="No classes yet"
-        description="A course you are inside has a calendar of its own to book from, and anything you ask for lands here."
+        description="Nothing is booked and no course of yours has put a class on your weeks yet. A course you are inside has a calendar of its own to book from, and anything you ask for lands here."
         actionLabel="Browse the shelf"
         onAction={() => router.push('/')}
       />
@@ -190,8 +236,8 @@ export function MyClasses() {
   }
 
   const doorClock = Math.max(settled.now, doorTick);
-  const upcoming = classes.filter((booking) => isComingUp(booking, settled.now));
-  const earlier = classes.filter((booking) => !isComingUp(booking, settled.now));
+  const upcoming = classes.filter((row) => isComingUp(row, settled.now));
+  const earlier = classes.filter((row) => !isComingUp(row, settled.now));
 
   return (
     <div className="flex flex-col gap-6">
@@ -211,7 +257,7 @@ export function MyClasses() {
 
       <Section
         heading="Coming up"
-        bookings={upcoming}
+        rows={upcoming}
         timezone={user?.timezone}
         clock={doorClock}
         leaving={leaving}
@@ -221,7 +267,7 @@ export function MyClasses() {
       {earlier.length > 0 ? (
         <Section
           heading="Earlier"
-          bookings={earlier}
+          rows={earlier}
           timezone={user?.timezone}
           clock={doorClock}
           leaving={leaving}
@@ -245,10 +291,15 @@ export function MyClasses() {
 /**
  * One half of the calendar. "Coming up: nothing" is drawn rather than hidden, because it is the
  * answer to the question the page was opened to ask.
+ *
+ * A row that came from a series carries the fact that it came from a series, and nothing else: no
+ * status word, no way out, no door. Each of those three is a booking's story, and the platform has
+ * no route behind any of them for a class this student never asked for — a pill that said
+ * "confirmed" here would be reporting a teacher's silence as an answer.
  */
 function Section({
   heading,
-  bookings,
+  rows,
   timezone,
   clock,
   leaving,
@@ -256,7 +307,7 @@ function Section({
   empty,
 }: {
   heading: string;
-  bookings: Booking[];
+  rows: CalendarRow[];
   timezone: string | null | undefined;
   /** The instant the doors are judged against, which moves while the page stands open. */
   clock: number;
@@ -268,68 +319,78 @@ function Section({
     <section className="flex flex-col gap-3">
       <h2 className="text-label uppercase tracking-wide text-ink-faint">{heading}</h2>
 
-      {bookings.length === 0 ? (
+      {rows.length === 0 ? (
         <p className="rounded-card border border-dashed border-line bg-paper px-4 py-5 text-[0.8125rem] text-ink-muted">
           {empty}
         </p>
       ) : (
         <ul aria-label={heading} className="flex flex-col gap-3">
-          {bookings.map((booking) => (
-            <li
-              key={booking.id}
-              data-icon-zone
-              className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-card border border-line bg-surface p-4 sm:p-5"
-            >
-              <div className="min-w-0">
-                <h3 className="text-h3">
-                  <Link
-                    href={`/courses/${booking.course.id}`}
-                    className="text-ink-strong underline-offset-4 hover:underline"
-                  >
-                    {booking.course.title}
-                  </Link>
-                </h3>
-                <div className="mt-1.5 flex items-center gap-1.5">
-                  <StatusPill tone={TONES[booking.status] ?? 'neutral'}>
-                    {BOOKING_STATUS_LABELS[booking.status] ?? booking.status}
-                  </StatusPill>
-                  {booking.type === 'demo' ? (
-                    <StatusPill tone="warning">Trial call</StatusPill>
+          {rows.map((row) => {
+            const booking = row.booking;
+
+            return (
+              <li
+                key={row.key}
+                data-icon-zone
+                className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3 rounded-card border border-line bg-surface p-4 sm:p-5"
+              >
+                <div className="min-w-0">
+                  <h3 className="text-h3">
+                    <Link
+                      href={`/courses/${row.course.id}`}
+                      className="text-ink-strong underline-offset-4 hover:underline"
+                    >
+                      {row.course.title}
+                    </Link>
+                  </h3>
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    {booking ? (
+                      <>
+                        <StatusPill tone={TONES[booking.status] ?? 'neutral'}>
+                          {BOOKING_STATUS_LABELS[booking.status] ?? booking.status}
+                        </StatusPill>
+                        {booking.type === 'demo' ? (
+                          <StatusPill tone="warning">Trial call</StatusPill>
+                        ) : null}
+                      </>
+                    ) : (
+                      <StatusPill tone="neutral">Cohort class</StatusPill>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex min-w-0 flex-col items-start gap-2">
+                  <p className="tabular text-[0.8125rem] text-ink">
+                    <Icon name="clock" size="sm" />
+                    <span className="ml-1.5">
+                      {formatClassWindow(row.startsAt, row.endsAt, timezone)}
+                    </span>
+                  </p>
+                  {booking && standsToLeave(booking) && heading === 'Coming up' ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      loading={leaving === booking.id}
+                      disabled={leaving !== null && leaving !== booking.id}
+                      onClick={() => void onLeave(booking)}
+                    >
+                      Leave this class
+                    </Button>
                   ) : null}
                 </div>
-              </div>
 
-              <div className="flex min-w-0 flex-col items-start gap-2">
-                <p className="tabular text-[0.8125rem] text-ink">
-                  <Icon name="clock" size="sm" />
-                  <span className="ml-1.5">
-                    {formatClassWindow(booking.startsAt, booking.endsAt, timezone)}
-                  </span>
-                </p>
-                {standsToLeave(booking) && heading === 'Coming up' ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    loading={leaving === booking.id}
-                    disabled={leaving !== null && leaving !== booking.id}
-                    onClick={() => void onLeave(booking)}
-                  >
-                    Leave this class
-                  </Button>
+                {booking?.live ? (
+                  <ClassDoor
+                    booking={booking}
+                    door={booking.live}
+                    timezone={timezone}
+                    clock={clock}
+                  />
                 ) : null}
-              </div>
-
-              {booking.live ? (
-                <ClassDoor
-                  booking={booking}
-                  door={booking.live}
-                  timezone={timezone}
-                  clock={clock}
-                />
-              ) : null}
-            </li>
-          ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
