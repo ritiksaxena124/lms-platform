@@ -1312,11 +1312,77 @@ offered at, and everything else about the hour happens somewhere else.
   `lms` role with `CREATEDB` (Prisma needs it for migration shadow databases). The test
   global setup **refuses to run** unless `DATABASE_URL` names `lms_test`, and redacts
   credentials in the error, because the cost of pointing a suite at the dev database is a
-  Saturday morning.
+  Saturday morning. The container stack gets its `lms_test` from
+  `docker/postgres/init-lms-test.sql` for the same reason.
+
+### 16.1 The container stack
+
+`compose.yaml` plus `docker/` is the same product in images. It exists to be handed over, not to
+replace `bun run dev`; nothing in the code changes shape for it.
+
+- **One gateway, five upstreams.** nginx on `:80` routes by `server_name` to `teacher`, `student`,
+  `ops`, `site` and `api`, using the hostnames every `.env.example` already names. That keeps the
+  cookie scope untouched — `COOKIE_DOMAIN=localtest.me`, and a sign-in still carries across the
+  portals in a container for exactly the reason §16 says it carries in development. `COOKIE_SECURE`
+  is `false` here because nothing holds a certificate yet; it flips the moment something does.
+  The API block raises `client_max_body_size` above nginx's default so a lesson upload is not reset
+  mid-file (§10's videos go through the gateway like everything else).
+- **`NEXT_PUBLIC_*` cannot be a runtime variable.** Next inlines it into the client bundle at build
+  time, so the portals receive it as a build `ARG`, and compose reads the value from the
+  `docker/.env.docker` the API also uses — which is why the address in a rendered link and the
+  address the API advertises cannot drift apart. `scripts/docker-check.mjs` fails when a portal
+  reads a public key no Dockerfile passes in, because otherwise the symptom is a portal that talks
+  to `undefined`.
+- **The API's bind address is configuration.** `LISTEN_HOST` defaults to `127.0.0.1`, which is
+  correct on a laptop and unreachable from another container; the image sets `0.0.0.0`. The default
+  is a code-level guarantee about host runs, so the container overrides it rather than the other way
+  round.
+- **Migrations are a one-shot service, not a boot step.** `migrate` runs `prisma migrate deploy`
+  from the same tag the API serves, and the API waits for it to complete successfully, so a
+  container never answers with a schema its image does not contain.
+- **Two build products have to be carried into a production tree deliberately.** `prisma` is a
+  devDependency and the generator writes into `node_modules/.prisma`, so a `--production` install
+  has no client — the API image overlays the generated client and `@prisma` from the build stage.
+  Workspace packages are symlinks under `node_modules/@lms/*`, which a `COPY` turns into dead links,
+  so `@lms/shared` is copied as a real directory. Both failures are boot-time and both were solved
+  by looking, not by guessing.
+- **The portals ship Next's standalone trace.** `output: 'standalone'` writes the subset of files
+  each app actually imports, which is what keeps these images a few hundred megabytes instead of the
+  repository. `next dev` and `next start` are unaffected.
+- **A portal or site image is built on two engines, and one of them is pinned out.** Bun installs the
+  workspace and compiles `@lms/shared`; Node runs `next build`. That split is not a preference — Bun
+  1.2 cannot build a Next 16 app on Linux, where it loads the server runtime through its own CommonJS
+  `require` and reports `Expected CommonJS module to have a function wrapper`. A laptop runs the very
+  same script without noticing, because a Windows `.bin` shim hands it to Node. So `docker/portal.Dockerfile`
+  has a `workspace` stage and a `build` stage, and the runner is Node too: nothing in an image depends
+  on a runtime the product does not already ship. The other half of the lesson is that none of these
+  Dockerfiles may carry a `# syntax=docker/dockerfile:1` header — this engine (BuildKit v0.13) pulls
+  the newest external frontend, that container dies as it starts, and every build then fails with an
+  error naming no file at all. `scripts/docker-check.mjs` refuses the line so it cannot come back.
+- **The seed is behind a profile, and is the one service that claims not to be a live server.**
+  `docker compose --profile tools run seed` writes reference rows and the demo accounts; `up` does
+  neither, because a stack that seeds itself on start puts three known logins on somebody's machine.
+  `assertDemoSeedAllowed` (§7's rule) refuses demo accounts when `NODE_ENV=production`, which is what
+  the image carries — so only the seed service sets `NODE_ENV=development` for itself, in the one
+  place a human asks for them. The API keeps `production`.
+- **Runtime state lives in named volumes.** `pgdata` for rows, `api-storage` for uploaded bytes;
+  `.dockerignore` keeps `.env` files, `apps/api/storage` and `node_modules` out of the build context
+  so neither a secret nor a video is baked into a tag.
+- **The database this stack boots is not the host's least-privilege one.** `POSTGRES_USER` arrives as
+  the container's superuser, because that is the only role the image's entrypoint will create, so it
+  has `CREATEDB` and owns both `lms` and `lms_test` inside that volume. It answers the same URLs the
+  host run uses, which is the convenience; being a superuser is the difference, and §16's
+  least-privilege rule still describes the server you point `apps/api/.env` at.
+- **Nothing is published.** No registry, no deploy workflow, no image outside the machine that built
+  it — consistent with a project whose releases are phase boundaries rather than deploys (§17).
 
 ## 17. Verification
 
-`bun run verify` is the gate: shared build → typecheck → lint → tests, across every package.
+`bun run verify` is the gate: shared build → container check → typecheck → lint → tests, across
+every package. `docker:check` is in that chain because the container shape is the part of the
+repository most likely to be edited by one file at a time — it needs no Docker daemon, so it is
+green on a machine with the daemon stopped, and it is the reason a new `NEXT_PUBLIC_` key cannot
+ship unread in an image.
 
 Tests are written first and are expected to fail before implementation exists. The API
 suite boots the real `AppModule` through supertest, so guards, filters, prefix, CORS and
