@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useId } from 'react';
+import { useId, useState } from 'react';
 
 import { cn } from '../lib/cn';
 import { Icon } from './Icon';
@@ -66,6 +66,16 @@ export interface CalendarProps {
   nextDisabled?: boolean;
   /** The week's own request is in flight: keep the grid, refuse the presses. */
   busy?: boolean;
+  /**
+   * How many chips a column draws before the rest fold behind a press.
+   *
+   * Seven columns are one row, so the tallest day sets the height of the six quiet ones: a teacher
+   * who keeps Monday on four courses gets a Monday of four chips and a Tuesday of four empty boxes.
+   * A grid that cannot be that tall says so here and the overflow stays one press away — folded,
+   * never dropped. With no cap the grid draws every chip it was given, which is what a grid of
+   * minutes to book wants and a calendar of a busy week does not.
+   */
+  maxChipsPerDay?: number;
   className?: string;
 }
 
@@ -139,9 +149,11 @@ export function Calendar({
   previousDisabled = false,
   nextDisabled = false,
   busy = false,
+  maxChipsPerDay,
   className,
 }: CalendarProps) {
   const captionId = useId();
+  const [openDays, setOpenDays] = useState<Record<string, boolean>>({});
 
   return (
     <div
@@ -197,6 +209,12 @@ export function Calendar({
           {days.map((day) => {
             const state = day.state ?? 'default';
             const chips = day.chips ?? [];
+            const cap = maxChipsPerDay ?? Number.POSITIVE_INFINITY;
+            const foldable = chips.length > cap;
+            const expanded = openDays[day.key] === true;
+            const shown = foldable && !expanded ? chips.slice(0, cap) : chips;
+            const hidden = chips.length - shown.length;
+            const columnName = day.date ? `${day.weekday} ${day.date}` : day.weekday;
 
             return (
               <li
@@ -229,7 +247,31 @@ export function Calendar({
                     </span>
                   ) : null
                 ) : (
-                  chips.map((chip) => <Chip key={chip.id} chip={chip} busy={busy} />)
+                  <>
+                    {shown.map((chip) => (
+                      <Chip key={chip.id} chip={chip} busy={busy} />
+                    ))}
+                    {/* Folded, not dropped: the press is the only thing that hides a chip again,
+                        and the day's own name travels with it, because four columns each saying
+                        "+2 more" is one sentence with the days taken out of it. */}
+                    {foldable ? (
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-label={
+                          expanded
+                            ? `Show fewer on ${columnName}`
+                            : `+${hidden} more on ${columnName}`
+                        }
+                        onClick={() =>
+                          setOpenDays((current) => ({ ...current, [day.key]: !expanded }))
+                        }
+                        className={FOLD}
+                      >
+                        {expanded ? 'Show fewer' : `+${hidden} more`}
+                      </button>
+                    ) : null}
+                  </>
                 )}
               </li>
             );
@@ -245,5 +287,13 @@ const NAV_ARROW = [
   'transition-[background-color,color,border-color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
   'hover:border-ink-faint hover:bg-paper hover:text-ink',
   'disabled:pointer-events-none disabled:opacity-55',
+  'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-line',
+].join(' ');
+
+/** Quieter than a chip on purpose: it opens a day, it is not itself something on the calendar. */
+const FOLD = [
+  'w-full rounded-field px-2 py-1 text-center text-[0.6875rem] tabular text-ink-faint',
+  'transition-[background-color,color] duration-[var(--duration-fast)] ease-[var(--ease-out)]',
+  'hover:bg-paper hover:text-ink',
   'focus-visible:outline-none focus-visible:ring-3 focus-visible:ring-brand-line',
 ].join(' ');

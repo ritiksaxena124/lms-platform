@@ -91,8 +91,10 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   availability windows alone.
 - **The dated calendar** — `/calendar` (`/api/v1/classes/teaching`) shows the classes the series wrote,
   the next thirty days in whole weeks. The rows rather than the patterns, because only the table holds
-  the days that were marked off. Nothing on it is clickable: no route accepts an edit to a dated class,
-  and a chip that invited one would be a feature the API refuses to back.
+  the days that were marked off. A day with more classes than a column shows folds the rest behind a
+  press that names the day, and the list under the grid holds all of them either way. No class on it
+  is clickable: no route accepts an edit to a dated class, and a chip that invited one would be a
+  feature the API refuses to back.
 - **The queue, and the classes** — an ask lands in `/requests` as `pending` and holds the minute;
   nothing is a class until the teacher confirms or refuses it. `/classes` holds the answer either
   way, soonest first.

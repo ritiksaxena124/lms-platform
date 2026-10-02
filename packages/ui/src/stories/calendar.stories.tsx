@@ -218,6 +218,28 @@ export const Busy: Story = {
 };
 
 /**
+ * A busy Monday: five classes on one day, and the grid told to show four.
+ *
+ * Seven columns are one row, so the fifth chip would stretch six other empty columns to match it.
+ * The fold keeps the week even and the class one press away — folded, never dropped.
+ */
+export const BusyDay: Story = {
+  args: {
+    label: 'Week of 28 September',
+    caption: 'Your clock, Asia/Kolkata',
+    maxChipsPerDay: 4,
+    days: week(MONDAY, (index, column) => {
+      if (index > 1) return { empty: 'No class' };
+      const times = index === 0 ? ['09:30', '10:30', '11:30', '12:30', '13:30'] : ['09:30'];
+      return {
+        state: index === 0 ? 'today' : 'default',
+        chips: chipsFor(times, column).map((chip) => ({ ...chip, tone: 'confirmed' as const })),
+      };
+    }),
+  },
+};
+
+/**
  * The arrows only appear when someone passes a handler, so a calendar fixed to one week cannot
  * sprout controls that do nothing. `previousDisabled` holds at the earliest bookable week.
  */

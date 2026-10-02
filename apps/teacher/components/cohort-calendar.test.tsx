@@ -161,6 +161,48 @@ describe('CohortCalendar', () => {
     expect(screen.queryByRole('group')).toBeNull();
   });
 
+  /**
+   * A teacher who keeps a weekly class on four of their courses has four classes on that weekday,
+   * and the seven columns of a week are one row: the tallest column decides how tall the six quiet
+   * ones are. So the grid shows four to a day and folds the rest behind a press that names the day,
+   * while the list under it keeps every class — the fold is a shape for the grid, not a edit to
+   * what the teacher has to teach.
+   */
+  it('folds a busy day in the grid and keeps every one of its classes in the list', async () => {
+    const user = userEvent.setup();
+    api.myTeachingClasses.mockResolvedValue(
+      horizon(
+        [0, 1, 2, 3, 4].map((index) =>
+          scheduled({
+            id: `o${index}`,
+            course: {
+              id: `c${index}`,
+              slug: `course-${index}`,
+              title: `Course ${index}`,
+            },
+            startsAt: `2026-09-28T0${4 + index}:00:00.000Z`,
+            endsAt: `2026-09-28T0${4 + index}:45:00.000Z`,
+          }),
+        ),
+      ),
+    );
+
+    render(<CohortCalendar />);
+    await screen.findByRole('group', { name: 'Week of 28 Sept' });
+
+    const monday = column('Week of 28 Sept', '2026-09-28');
+    expect(within(monday).getAllByText(/\d\d:\d\d–\d\d:\d\d/)).toHaveLength(4);
+    expect(within(monday).queryByText('13:30–14:15')).toBeNull();
+
+    const fold = screen.getByRole('button', { name: '+1 more on Mon 28 Sept' });
+    await user.click(fold);
+    expect(within(monday).getAllByText(/\d\d:\d\d–\d\d:\d\d/)).toHaveLength(5);
+
+    const list = screen.getByRole('list', { name: /the week/i });
+    expect(within(list).getAllByRole('listitem')).toHaveLength(5);
+    expect(within(list).getByText('Mon 28 Sept, 13:30–14:15')).toBeInTheDocument();
+  });
+
   it('shows a calendar that never loaded with a way to ask again', async () => {
     const user = userEvent.setup();
     api.myTeachingClasses.mockRejectedValueOnce(

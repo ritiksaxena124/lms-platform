@@ -22,6 +22,14 @@ import { buildTeachingWeeks } from '@/lib/teaching-week';
 import { useSession } from './session-provider';
 
 /**
+ * Four classes to a column. A teacher who keeps a weekly class on four of their courses has four
+ * classes on that weekday, and the tallest column in a week of seven sets the height of the six
+ * quiet ones — so the fifth is folded behind a press that names its day, and every one of them is
+ * in the list under the grid regardless.
+ */
+const CLASSES_A_COLUMN_SHOWS = 4;
+
+/**
  * The teacher's dated calendar: what the sweep wrote down for the weeks ahead.
  *
  * This is the screen that answers "what do I teach on Tuesday", and only the rows can answer it —
@@ -30,7 +38,8 @@ import { useSession } from './session-provider';
  * where the plans are written; nothing here edits them, because a dated class has no write route: the
  * pattern owns it. So every chip is static text — a control on this grid would be a button the API
  * refuses the moment it is pressed — and the detail a column of clock faces cannot hold, the course
- * and how many people are standing for it, is the list under the grid.
+ * and how many people are standing for it, is the list under the grid. The one press the grid does
+ * have folds a busy day, and it writes nothing: it opens the column.
  *
  * Paging moves a whole week at a time and stops at the last one the horizon covers. Past that there
  * is no calendar for the platform to stand behind, and an empty grid would read as a quiet fortnight
@@ -129,6 +138,7 @@ export function CohortCalendar() {
         label={current.label}
         caption={`Your clock, ${zone}`}
         days={current.days}
+        maxChipsPerDay={CLASSES_A_COLUMN_SHOWS}
         onPrevious={() => setWeek(index - 1)}
         onNext={() => setWeek(index + 1)}
         previousDisabled={index === 0}
