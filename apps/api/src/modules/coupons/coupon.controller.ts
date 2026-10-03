@@ -8,11 +8,11 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ROLE_CODES } from '@lms/shared';
+import { PERMISSION_CODES } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { CouponService } from './coupon.service';
 import { CreateCouponDto, UpdateCouponDto, CouponResponse, CouponListResponse } from './dto/coupon.dto';
 
@@ -22,7 +22,7 @@ import { CreateCouponDto, UpdateCouponDto, CouponResponse, CouponListResponse } 
  * All routes are teacher-gated and scoped to courses the calling teacher owns.
  */
 @Controller('courses/:courseId/coupons')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.COUPON_MANAGE)
 export class CouponController {
   constructor(private readonly couponService: CouponService) {}
 

@@ -297,10 +297,11 @@ export class CalendarService {
   /**
    * Refuse a series written on a course the caller does not own.
    *
-   * The route has always been `@Roles(TEACHER)`, which says the caller runs a timetable but not
-   * *this* one. While a series only fed its own course's screens that was a small leak; since §2c a
-   * series is what puts dated classes on a named teacher's month, and a teacher who could schedule
-   * somebody else's course could fill their calendar with classes they never agreed to teach.
+   * The route has always asked for the scheduling capability, which says the caller runs a
+   * timetable but not *this* one. While a series only fed its own course's screens that was a small
+   * leak; since §2c a series is what puts dated classes on a named teacher's month, and a teacher who
+   * could schedule somebody else's course could fill their calendar with classes they never agreed to
+   * teach.
    */
   private async requireOwnCourse(teacherUserId: string, courseId: string): Promise<void> {
     const course = await this.repo.findCourseOwned(courseId, teacherUserId);

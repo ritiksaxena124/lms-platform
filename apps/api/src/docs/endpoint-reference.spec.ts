@@ -4,7 +4,13 @@ import { resolve } from 'node:path';
 import { IsUrl } from 'class-validator';
 import { describe, expect, it } from 'vitest';
 
-import { ACTION_TARGET_TABLE_CODES, ROLE_CODES } from '@lms/shared';
+import {
+  ACTION_TARGET_TABLE_CODES,
+  PERMISSION_CODES,
+  ROLE_CODES,
+  permissionsForRole,
+  type PermissionCode,
+} from '@lms/shared';
 
 import {
   collectEndpoints,
@@ -64,57 +70,90 @@ describe('the endpoint reference', () => {
   });
 
   it('marks the doors a stranger may knock on', () => {
-    expect(find(endpoints, 'GET', '/api/v1/health').access).toEqual({ kind: 'public', roles: [] });
+    expect(find(endpoints, 'GET', '/api/v1/health').access).toEqual({
+      kind: 'public',
+      permissions: [],
+      roles: [],
+    });
     expect(find(endpoints, 'POST', '/api/v1/auth/login').access).toEqual({
       kind: 'public',
+      permissions: [],
       roles: [],
     });
     // A catalog page that answers anyway but reads the session if one arrives: the outline that
     // knows who is asking, so the same URL serves a preview and a paid page.
     expect(find(endpoints, 'GET', '/api/v1/catalog/courses/:id').access).toEqual({
       kind: 'optional-session',
+      permissions: [],
       roles: [],
     });
     expect(find(endpoints, 'GET', '/api/v1/auth/me').access).toEqual({
       kind: 'session',
+      permissions: [],
       roles: [],
     });
   });
 
-  it('inherits a controller-wide role onto every route that does not name one', () => {
-    // The accounts desk declares `@Roles(OPS)` once on the class. A reader of the reference has to
-    // see it on all four routes, because the route that forgets to say it is the least guarded-
-    // looking line on the page.
+  it('inherits a controller-wide capability onto every route that does not name one', () => {
+    // The accounts desk declares `@Permissions(ACCOUNT_MANAGE)` once on the class. A reader of the
+    // reference has to see it on all four routes, because the route that forgets to say it is the
+    // least guarded-looking line on the page.
     expect(find(endpoints, 'GET', '/api/v1/users').access).toEqual({
       kind: 'session',
-      roles: ['ops'],
+      permissions: [PERMISSION_CODES.ACCOUNT_MANAGE],
+      roles: [ROLE_CODES.OPS],
     });
     expect(find(endpoints, 'PATCH', '/api/v1/users/:id/role').access).toEqual({
       kind: 'session',
-      roles: ['ops'],
+      permissions: [PERMISSION_CODES.ACCOUNT_MANAGE],
+      roles: [ROLE_CODES.OPS],
     });
+    // The activity log is a different capability on the same side of the desk: reading what happened
+    // is not the same as deciding what an account is, and the reference prints the difference.
     expect(find(endpoints, 'GET', '/api/v1/actions').access).toEqual({
       kind: 'session',
-      roles: ['ops'],
+      permissions: [PERMISSION_CODES.ACTIVITY_READ],
+      roles: [ROLE_CODES.OPS],
     });
   });
 
-  it('keeps one controller serving two roles split by route', () => {
+  it('keeps one controller serving two sides split by route', () => {
     // `bookings` is the surface where a student and a teacher meet the same table from opposite
-    // sides, so the role belongs to the handler. A method-level `@Roles` has to win over nothing,
-    // and the one route that names no role stays the exception the code says it is.
+    // sides, so the capability belongs to the handler. A method-level `@Permissions` has to win over
+    // nothing, and the one route that names none stays the exception the code says it is.
     expect(find(endpoints, 'GET', '/api/v1/bookings/slots').access).toEqual({
       kind: 'session',
-      roles: ['student'],
+      permissions: [PERMISSION_CODES.BOOKING_REQUEST],
+      roles: [ROLE_CODES.STUDENT],
     });
     expect(find(endpoints, 'POST', '/api/v1/bookings/:id/confirm').access).toEqual({
       kind: 'session',
-      roles: ['teacher'],
+      permissions: [PERMISSION_CODES.BOOKING_ANSWER],
+      roles: [ROLE_CODES.TEACHER],
     });
     expect(find(endpoints, 'POST', '/api/v1/bookings/:id/room').access).toEqual({
       kind: 'session',
+      permissions: [],
       roles: [],
     });
+  });
+
+  it('prints the roles the matrix hands out, which no route writes down', () => {
+    // A route states a capability; which accounts hold it is one table's answer. The two halves of
+    // `access` have to agree, or the page tells a reader about a door the guard does not keep.
+    for (const record of endpoints) {
+      const { permissions, roles } = record.access;
+
+      expect(roles, `${record.method} ${record.path}`).toEqual(
+        permissions.length === 0
+          ? []
+          : (Object.values(ROLE_CODES) as string[]).filter((role) =>
+              permissions.every((code) =>
+                permissionsForRole(role).includes(code as PermissionCode),
+              ),
+            ),
+      );
+    }
   });
 
   it('reports the status each route answers with, defaulting the way Nest does', () => {

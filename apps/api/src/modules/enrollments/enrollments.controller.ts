@@ -1,13 +1,13 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Post } from '@nestjs/common';
 import {
-  ROLE_CODES,
+  PERMISSION_CODES,
   type EnrollmentListResponse,
   type EnrollmentResponse,
 } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { EnrollmentsService } from './enrollments.service';
 // Value import: the validation pipe finds a DTO through emitted parameter metadata, and an
 // erased class would leave every body unchecked.
@@ -16,7 +16,7 @@ import { EnrollDto } from './dto/enroll.dto';
 /**
  * A student's own places in other people's courses.
  *
- * `@Roles(STUDENT)` answers who may hold a place, which is why no handler here has to ask
+ * `@Permissions(ENROLLMENT_HOLD)` answers who may hold a place, which is why no handler here has to ask
  * whether the caller owns the course they are joining: a teacher cannot reach this route at
  * all. Ops is absent for the same reason it is absent from the sign-up form — an internal
  * account does not enroll.
@@ -26,7 +26,7 @@ import { EnrollDto } from './dto/enroll.dto';
  * a cancel cannot reach a stranger's.
  */
 @Controller('enrollments')
-@Roles(ROLE_CODES.STUDENT)
+@Permissions(PERMISSION_CODES.ENROLLMENT_HOLD)
 export class EnrollmentsController {
   constructor(private readonly enrollments: EnrollmentsService) {}
 
