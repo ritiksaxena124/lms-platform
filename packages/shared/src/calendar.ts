@@ -10,7 +10,8 @@
  */
 
 import { expandWindows, type SlotHorizon, type SlotInstant, type WeeklyWindow } from './schedule';
-import type { AttendanceStatusCode } from './lookup-codes';
+import { ATTENDANCE_STATUS_CODES, type AttendanceStatusCode } from './lookup-codes';
+import type { RosterStudent } from './enrollments';
 import { zoneDateKey } from './timezone';
 
 /** The seven days, numbered the way the table stores them: Monday is 1. Re-exported here so
@@ -247,4 +248,67 @@ export interface LearningClassesResponse {
   from: string;
   to: string;
   items: AssignedClass[];
+}
+
+/**
+ * What a teacher said about one name on one class's register.
+ *
+ * Two words, because two answers exist. The third state a line can be in — nobody has marked it —
+ * is carried by `null` on the line rather than by a code, and a label for it would put a word on
+ * the absence of one.
+ */
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusCode, string> = {
+  [ATTENDANCE_STATUS_CODES.PRESENT]: 'Present',
+  [ATTENDANCE_STATUS_CODES.ABSENT]: 'Absent',
+};
+
+/**
+ * One name a dated class is standing for, and the mark on it.
+ *
+ * The student is a `RosterStudent` — an id and a name, no address — for the same reason the course
+ * roster withholds one: this screen answers who was expected, and an email is the field a list
+ * like this picks up by convenience and never puts down.
+ *
+ * `id` is the register line's own key, which a screen never sends back. A teacher marks a *person*,
+ * so the save names students; the row is found from the pair (this class, that person) once the
+ * route has established that the class is the caller's to mark.
+ */
+export interface RollLine {
+  id: string;
+  student: RosterStudent;
+  status: AttendanceStatusCode | null;
+}
+
+/**
+ * One class's register: the names it stands for, and whether a mark may be written right now.
+ *
+ * `canMark` is the server's fact rather than a client comparing `startsAt` against its own clock,
+ * because the two would disagree by whatever the visitor's device is off, and the disagreement
+ * would be a save button on a class that has not happened yet. It stays true forever after the
+ * class starts: a register the teacher forgot to fill in on Monday is a register they can still
+ * fill in on Thursday, and nothing in the platform should get harder to do with age.
+ *
+ * The lines are the names on the sheet — the ones the sweep keeps in step with the course's open
+ * places. A student who has left is not on it: the row stays in the table with its mark, because
+ * "who was meant to be there" is a fact about that day, but a screen that offered a mark for a
+ * person who no longer holds a place would be asking a question the class no longer has.
+ */
+export interface ClassRoll {
+  classId: string;
+  course: { id: string; slug: string; title: string };
+  startsAt: string;
+  endsAt: string;
+  canMark: boolean;
+  lines: RollLine[];
+}
+
+/**
+ * The marks a teacher is making on one class — a whole roll, saved at once.
+ *
+ * A list rather than a single line because that is the act: somebody goes down the names after the
+ * lesson and puts the answer in. `null` on a line clears the mark, which is a correction and not a
+ * non-answer — a line marked absent by mistake goes back to unmarked, not to a word nobody gave.
+ */
+export interface SaveRollInput {
+  lines: Array<{ studentId: string; status: AttendanceStatusCode | null }>;
 }
