@@ -260,6 +260,7 @@ beforeAll(async () => {
     ['gen', 'teacher'],
     ['else', 'teacher'],
     ['thrd', 'teacher'],
+    ['clear', 'teacher'],
     ['one', 'student'],
     ['two', 'student'],
     ['three', 'student'],
@@ -635,9 +636,13 @@ describe('the student’s classes', () => {
   beforeAll(async () => {
     // `four` holds one place in the whole suite, so this list has exactly one course in it and a
     // row from anywhere else is the bug the test is looking for.
-    course = await createPublishedCourse(as('else'), 'Cohort');
+    //
+    // The course is on `clear`, an account whose week has nothing written on it yet: a week is
+    // scheduled at Monday 09:00 through Sunday 09:00 here, and since [[the clash guard]] a teacher
+    // already standing for another course at those minutes could not open a second one on top.
+    course = await createPublishedCourse(as('clear'), 'Cohort');
     await enroll(as('four'), course.id);
-    await scheduleWeek(as('else'), course.id);
+    await scheduleWeek(as('clear'), course.id);
   });
 
   it('lists the classes of a course they hold a place in', async () => {
