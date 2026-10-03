@@ -15,10 +15,11 @@ A portal sends REST to `/api/v1`, and the request passes through the same five h
 1. **Middleware** puts a request id on it, which ends up in the log line, in the `x-request-id`
    response header, and in any error body — so a report that quotes one identifier is enough to find
    the event.
-2. **The guards** decide who may ask. A bearer access token is checked, then the roles the route
-   names. Some routes are marked public; one class of route reads a session if one is offered and
-   asks for nothing if it is not, which is how the catalog can say _this page is yours_ to somebody
-   who is already enrolled without requiring a login.
+2. **The guards** decide who may ask. A bearer access token is checked, then the capabilities the
+   route names — and which accounts hold a capability is one table's answer, not sixty decorators'
+   worth of role names. Some routes are marked public; one class of route reads a session if one is
+   offered and asks for nothing if it is not, which is how the catalog can say _this page is yours_
+   to somebody who is already enrolled without requiring a login.
 3. **The controller** holds the shape of the request and nothing else.
 4. **The service** holds the rules — what may change into what, who owns the row, whether the course
    is live enough for this to be allowed.

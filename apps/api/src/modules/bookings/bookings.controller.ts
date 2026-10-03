@@ -10,7 +10,7 @@ import {
   Query,
 } from '@nestjs/common';
 import {
-  ROLE_CODES,
+  PERMISSION_CODES,
   type Booking,
   type BookingRequest,
   type BookingRoomResponse,
@@ -19,7 +19,7 @@ import {
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { OpenSlotsQueryDto } from './dto/open-slots-query.dto';
@@ -32,16 +32,16 @@ import { OpenSlotsQueryDto } from './dto/open-slots-query.dto';
  * the subset of those their relationship to one course opens, which is why the entitlement is
  * decided here rather than on a screen that would have to be told the rules to apply them.
  *
- * `@Roles(STUDENT)` on this handler rather than the controller, because the teacher's own routes —
- * the requests waiting for an answer, and the answer — are the same table read from the other
- * side, and they belong to a different door.
+ * `@Permissions(BOOKING_REQUEST)` on this handler rather than the controller, because the teacher's
+ * own routes — the requests waiting for an answer, and the answer — are the same table read from the
+ * other side, and they belong to a different door.
  */
 @Controller('bookings')
 export class BookingsController {
   constructor(private readonly bookings: BookingsService) {}
 
   @Get('slots')
-  @Roles(ROLE_CODES.STUDENT)
+  @Permissions(PERMISSION_CODES.BOOKING_REQUEST)
   async slots(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: OpenSlotsQueryDto,
@@ -60,7 +60,7 @@ export class BookingsController {
    */
   @Post()
   @HttpCode(HttpStatus.OK)
-  @Roles(ROLE_CODES.STUDENT)
+  @Permissions(PERMISSION_CODES.BOOKING_REQUEST)
   async create(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: CreateBookingDto,
@@ -77,7 +77,7 @@ export class BookingsController {
    * assembled twice in two places.
    */
   @Get()
-  @Roles(ROLE_CODES.STUDENT)
+  @Permissions(PERMISSION_CODES.BOOKING_REQUEST)
   async mine(@CurrentUser() user: AuthenticatedUser): Promise<{ bookings: Booking[] }> {
     return { bookings: await this.bookings.listOwned(user.id) };
   }
@@ -85,7 +85,7 @@ export class BookingsController {
   /** Let go of a class, and hand its minute back to the teacher's calendar. */
   @Post(':id/cancel')
   @HttpCode(HttpStatus.OK)
-  @Roles(ROLE_CODES.STUDENT)
+  @Permissions(PERMISSION_CODES.BOOKING_REQUEST)
   async cancel(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -96,13 +96,13 @@ export class BookingsController {
   /**
    * The teacher's door: what is waiting for them, what they are teaching, and what they say to it.
    *
-   * Four routes on one table read from the other side, all under `@Roles(TEACHER)` — which is why
-   * the student routes above carry their own `@Roles` rather than a controller-wide one. The
-   * requests are pending only, because the answered ones are not a queue; the class list keeps
-   * them all, because an answered Tuesday is still a Tuesday.
+   * Four routes on one table read from the other side, all under `@Permissions(BOOKING_ANSWER)` —
+   * which is why the student routes above carry their own `@Permissions` rather than a
+   * controller-wide one. The requests are pending only, because the answered ones are not a queue;
+   * the class list keeps them all, because an answered Tuesday is still a Tuesday.
    */
   @Get('requests')
-  @Roles(ROLE_CODES.TEACHER)
+  @Permissions(PERMISSION_CODES.BOOKING_ANSWER)
   async requests(@CurrentUser() user: AuthenticatedUser): Promise<{ requests: BookingRequest[] }> {
     return { requests: await this.bookings.requestsFor(user.id) };
   }
@@ -115,14 +115,14 @@ export class BookingsController {
    * carrying a `?pending=` flag would be the screen's tab structure written into the API.
    */
   @Get('classes')
-  @Roles(ROLE_CODES.TEACHER)
+  @Permissions(PERMISSION_CODES.BOOKING_ANSWER)
   async classes(@CurrentUser() user: AuthenticatedUser): Promise<{ bookings: BookingRequest[] }> {
     return { bookings: await this.bookings.classesFor(user.id) };
   }
 
   @Post(':id/confirm')
   @HttpCode(HttpStatus.OK)
-  @Roles(ROLE_CODES.TEACHER)
+  @Permissions(PERMISSION_CODES.BOOKING_ANSWER)
   async confirm(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -133,7 +133,7 @@ export class BookingsController {
   /** No, which gives the minute back to the teacher's calendar the same write that wrote the no. */
   @Post(':id/reject')
   @HttpCode(HttpStatus.OK)
-  @Roles(ROLE_CODES.TEACHER)
+  @Permissions(PERMISSION_CODES.BOOKING_ANSWER)
   async reject(
     @CurrentUser() user: AuthenticatedUser,
     @Param('id') id: string,
@@ -144,10 +144,10 @@ export class BookingsController {
   /**
    * Ask for the room of a live class, and get the address if the answer is yes.
    *
-   * The one route in this module with no `@Roles`, because it is not a door belonging to one side
-   * of the class: the student who booked it and the teacher who teaches it are both checked against
-   * the row, and everybody else — a stranger, a classmate with a place in the same course, another
-   * teacher — gets the silence a class that never existed gets.
+   * The one route in this module with no `@Permissions`, because it is not a door belonging to one
+   * side of the class: the student who booked it and the teacher who teaches it are both checked
+   * against the row, and everybody else — a stranger, a classmate with a place in the same course,
+   * another teacher — gets the silence a class that never existed gets.
    *
    * A `POST` for a read, on purpose. Its response is a secret with a URL's shape and the only lock
    * on the room, and a `GET` is an invitation to a browser's prefetch, a history entry and any

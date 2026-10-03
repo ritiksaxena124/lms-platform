@@ -557,6 +557,25 @@ these rules hold:
   demotion and a disable all take effect on the next request instead of on the next login.
   That is one indexed lookup per authenticated request, bought deliberately: without it a
   disabled account keeps whatever it was for up to fifteen minutes.
+- **A route states a capability, not a kind of person.** `@Permissions('course.author')` names
+  the decision the route lets its caller make, and `ROLE_PERMISSIONS` — one table in
+  `@lms/shared`, the whole policy — says which roles hold it. The three roles still exist and
+  each still holds one fixed bundle, so this changes the shape of an answer rather than the
+  answer: every route a teacher may call is the same list it was the day before. The shape is
+  worth having because the policy now has one place to look, and because the day a fourth kind
+  of account arrives — a teaching assistant who runs a class but writes no course — it is one
+  entry in that table rather than sixty controllers read again looking for the lines that say
+  `teacher`. Several codes on one route are a conjunction, and a route that names none asks
+  only for a signed-in account: `/auth/me`, and the room of a class the caller holds a place
+  in (§14), are decided by the row they read rather than by anybody's capabilities.
+- **These capabilities are code, not reference rows.** §3 is right that the codes an operator
+  may extend live in the database; these are not those. A route names its permission in a
+  decorator, so a capability that existed only as an `LkpValue` row would be a door no code
+  opens. The failure modes follow from that: a code the table does not carry refuses everybody,
+  which is the correct answer at runtime and a build error in the endpoint reference, because
+  documenting a door nobody can walk through is the worse half of the same mistake. A refusal
+  says `This account is not allowed to do that.` and never names the capability missing, so a
+  403 does not hand a caller the vocabulary the guard reads.
 
 A portal is a client of that design, and inherits its rules:
 
@@ -882,11 +901,11 @@ what an invitation is for.
   `POST /api/v1/enrollments` takes a place by `courseId`, and `POST
 /api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
   place is _worth_ stays the catalog's decision — this module writes the row §11 reads.
-- **The role is the whole of "a teacher cannot enroll in their own course."** The student
-  controller is `@Roles(STUDENT)`, so that request never reaches a query to be checked. When a
-  later phase wants teachers to take places too, the decorator is the one line that changes, and
-  the ownership question it would raise is a decision somebody makes on purpose rather than a hole
-  a service forgot to plug.
+- **The capability is the whole of "a teacher cannot enroll in their own course."** The enrollments
+  controller asks for `enrollment.hold`, which §7's matrix hands to students alone, so that request
+  never reaches a query to be checked. When a later phase wants teachers to take places too, the one
+  line that changes is the matrix — and the ownership question it would raise is a decision somebody
+  makes on purpose rather than a hole a service forgot to plug.
 - **A fourth route reads the same table for the teacher who owns the course.** `GET
 /api/v1/courses/:courseId/roster` answers the question `ix_enrollment_course_roster` was built
   for, and it is addressed through the course rather than through a student, so ownership is the
@@ -1076,8 +1095,9 @@ offered at, and everything else about the hour happens somewhere else.
   the only route that turns a `roomName` into a URL, and it is a `POST` for a read: its response is
   the room's only lock, and a `GET` would be an invitation to a browser's prefetch, a history entry
   and any proxy that keeps responses — so it also leaves with `Cache-Control: no-store`. It carries
-  no `@Roles`, because the two accounts it opens for are read off the row rather than claimed by a
-  role, and everybody else — a stranger, a classmate holding a place in the same course, another
+  no `@Permissions`, because the two accounts it opens for are read off the row rather than claimed
+  by a capability, and everybody else — a stranger, a classmate holding a place in the same course,
+  another
   teacher — gets the identical 404 an invented id gets. The gates run in that order: are you on it,
   does the class stand, does it have a room, is it _now_. Early answers with the same `opensAt` the
   lists publish, so a portal with a wrong clock still counts down to the minute the server unlocks;
@@ -1562,7 +1582,8 @@ worth paging by. The letter body was left out of the query for the same reason �
 the column: a read that does not select a thing cannot leak it.
 
 **The role gate is a courtesy on top of the API's refusal, and it does not redirect.** Every route this
-portal calls is `@Roles(ops)` on the server, so a teacher's session would find out from four 403s; what
+portal calls asks for an operator's capability on the server (§7), so a teacher's session would find
+out from four 403s; what
 `RequireSession` saves them is a page of empty tables dressed up as an ops desk. Sending a
 non-operator to the sign-in page would put a password box in front of somebody who has just proved who
 they are, and "you are signed in" plus "you are not ops" are two facts worth stating together. It was

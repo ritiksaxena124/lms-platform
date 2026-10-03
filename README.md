@@ -530,6 +530,11 @@ which reserves the slot so a reveal never reflows.
   Rows are deactivated with `isActive`; see `ARCHITECTURE.md`.
 - **No enums for business constants.** Reference data lives in `LkpType`/`LkpValue`
   tables, with the code strings typed in `@lms/shared`.
+- **A route states a capability, not a kind of account.** `@Permissions('course.author')`
+  names what the caller has to be able to do, and one `ROLE_PERMISSIONS` table in
+  `@lms/shared` says which roles can. Those codes are the exception to the rule above —
+  they are code, because a decorator asks for them, and a permission that existed only in
+  a table would be a door no code opens.
 - **One error envelope.** Every failure is `{ statusCode, code, message, requestId }`.
 - **Tests before implementation.** A phase starts by making a failing test exist.
 

@@ -9,11 +9,11 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { ROLE_CODES, type Course, type CourseChoice } from '@lms/shared';
+import { PERMISSION_CODES, type Course, type CourseChoice } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { CoursesService } from './courses.service';
 // Value imports: the validation pipe finds a DTO through emitted parameter metadata, and
 // an erased class would leave every body unchecked.
@@ -26,7 +26,7 @@ import { ListCoursesQueryDto } from './dto/list-courses-query.dto';
  * theirs does not exist here.
  */
 @Controller('courses')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.COURSE_AUTHOR)
 export class CoursesController {
   constructor(private readonly courses: CoursesService) {}
 

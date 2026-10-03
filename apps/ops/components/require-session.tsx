@@ -17,9 +17,9 @@ import { useSession } from './session-provider';
  * after the provider has asked.
  *
  * The role check is a courtesy on top of the API's refusal, not the refusal itself. Every route this
- * portal calls is guarded by `@Roles(ops)` on the server, and a teacher's session would find that out
- * from four 403s; what this saves them is a page of empty tables dressed up as an ops desk, and what
- * it saves the platform from is an operator's shoulder shrug at a screen that said nothing.
+ * portal calls asks for an operator's capability on the server, and a teacher's session would find
+ * that out from four 403s; what this saves them is a page of empty tables dressed up as an ops desk,
+ * and what it saves the platform from is an operator's shoulder shrug at a screen that said nothing.
  *
  * A refusal does not redirect. Sending the person to the sign-in page would put a password box in
  * front of somebody who has just proved who they are, and the two facts — you are signed in, and you

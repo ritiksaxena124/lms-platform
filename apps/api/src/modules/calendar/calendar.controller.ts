@@ -5,11 +5,11 @@ import type {
   HolidayListResponse,
   HolidayResponse,
 } from '@lms/shared';
-import { ROLE_CODES } from '@lms/shared';
+import { PERMISSION_CODES } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { CalendarService } from './calendar.service';
 import { CreateClassSeriesDto, UpdateClassSeriesDto } from './dto/class-series.dto';
 import { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
@@ -27,7 +27,7 @@ import { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
  * plan is the account whose dated classes change, and the service refuses the mismatch.
  */
 @Controller('courses/:courseId/series')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.CLASS_SCHEDULE)
 export class ClassSeriesController {
   constructor(private readonly calendar: CalendarService) {}
 
@@ -78,7 +78,7 @@ export class ClassSeriesController {
  * date is blocked every year; a one-off blocks only the stated year.
  */
 @Controller('availability/holidays')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.CLASS_SCHEDULE)
 export class HolidayController {
   constructor(private readonly calendar: CalendarService) {}
 

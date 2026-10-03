@@ -2,12 +2,13 @@ import { PrismaClient } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import type { INestApplication } from '@nestjs/common';
 import { Controller, Get } from '@nestjs/common';
+import { PERMISSION_CODES } from '@lms/shared';
 import { sign } from 'jsonwebtoken';
 import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../src/app.module';
-import { Roles } from '../src/modules/auth/roles.decorator';
+import { Permissions } from '../src/modules/auth/permissions.decorator';
 import { seedLookups } from '../src/reference/seed-lookups';
 import { createTestApp } from './utils/create-test-app';
 
@@ -24,7 +25,7 @@ class GuardProbeController {
   }
 
   @Get('ops-only')
-  @Roles('ops')
+  @Permissions(PERMISSION_CODES.ACCOUNT_MANAGE)
   opsOnly(): { ok: true } {
     return { ok: true } as const;
   }
@@ -136,16 +137,17 @@ describe('the bearer token guard', () => {
     expect(res.body.user).not.toHaveProperty('passwordHash');
   });
 
-  it('lets a signed-in student past a route with no role requirement', async () => {
+  it('lets a signed-in student past a route with no capability requirement', async () => {
     await get('_guard-probe/any-signed-in-user', await bearer('mallory')).expect(200);
   });
 
-  it('refuses a route whose role the token does not carry', async () => {
+  it('refuses a route whose capability the account does not hold', async () => {
     const res = await get('_guard-probe/ops-only', await bearer('alice')).expect(403);
 
     expect(res.body.code).toBe('FORBIDDEN');
-    // The message must not enumerate what the caller is missing.
-    expect(JSON.stringify(res.body)).not.toContain('permissions');
+    // The message must not enumerate what the caller is missing: naming the capability would hand
+    // an attacker the vocabulary the guard reads.
+    expect(JSON.stringify(res.body)).not.toContain(PERMISSION_CODES.ACCOUNT_MANAGE);
   });
 
   it('re-reads the role, so a promotion takes effect without a new token', async () => {

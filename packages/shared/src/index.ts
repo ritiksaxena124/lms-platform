@@ -16,5 +16,6 @@ export * from './lessons';
 export * from './mail-events';
 export * from './mail-outbox';
 export * from './money';
+export * from './permissions';
 export * from './schedule';
 export * from './timezone';

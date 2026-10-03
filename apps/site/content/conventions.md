@@ -29,6 +29,13 @@ invents a value the other has not seen.
 Because reference data is rows, seeding it is part of starting the system, and the seeder has to be
 safe to run while other processes are running it too.
 
+**What a route lets its caller do is the exception.** A capability — `course.author`,
+`booking.answer` — is named in a decorator on the route, so one that lived only in a table would be
+a door no code opens. The list of capabilities and the table saying which roles hold them live in
+`@lms/shared`, and they change in the same commit as the routes that ask for them. The roles
+themselves stay rows: an operator issues accounts and changes what one is, which is a decision made
+while the platform is running, not a release.
+
 ## Every failure has one shape
 
 ```json

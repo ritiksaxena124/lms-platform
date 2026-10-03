@@ -1,13 +1,13 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import {
-  ROLE_CODES,
+  PERMISSION_CODES,
   type LearningClassesResponse,
   type TeachingClassesResponse,
 } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { ClassOccurrenceService } from './class-occurrence.service';
 import { ListClassesQueryDto } from './dto/list-classes-query.dto';
 
@@ -33,7 +33,7 @@ export class ClassOccurrenceController {
 
   /** Every class this teacher teaches in the window, soonest first, with the number standing for it. */
   @Get('teaching')
-  @Roles(ROLE_CODES.TEACHER)
+  @Permissions(PERMISSION_CODES.CLASS_TEACH)
   async teaching(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: ListClassesQueryDto,
@@ -43,7 +43,7 @@ export class ClassOccurrenceController {
 
   /** Every class this student holds a place in, soonest first, carrying their own mark or nothing. */
   @Get('learning')
-  @Roles(ROLE_CODES.STUDENT)
+  @Permissions(PERMISSION_CODES.CLASS_ATTEND)
   async learning(
     @CurrentUser() user: AuthenticatedUser,
     @Query() query: ListClassesQueryDto,
