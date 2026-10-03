@@ -1030,8 +1030,25 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   screen tells "no classes left" apart from "no calendar left". Only the table holds both the days that
   were marked off and the classes a lifted day brought back, which is why `/calendar` shows dated rows
   while `/availability` shows the rule that made them.
+- **The register is answered with two words, and silence is not one of them.** `GET/PUT
+  /api/v1/classes/:id/roll` read and write one dated class's sheet: a line per student holding a place,
+  each holding `present`, `absent` or nothing. Nothing is the honest third value — an unmarked name is
+  the teacher not having said anything about that person, and inventing an `unmarked` code would let a
+  report count "not said" as a verdict. The write is the whole sheet rather than a patch per line,
+  because calling the roll is one act: a per-line route would leave a half-saved sheet behind whenever a
+  tab closed mid-name, and the save returns the roll as the database now holds it rather than echoing
+  what was pressed, so the screen cannot show a mark the write silently dropped.
+- **The roll opens when the class starts, and only its teacher may say it did.** The gate is the
+  server's clock, not the screen's: a save against a class whose minute has not arrived answers `409`,
+  because marking somebody present before the hour is a prediction about a class that has not happened,
+  and the buttons that would make it are not drawn at all — while a sheet left unmarked on Monday stays
+  markable on Thursday, since the roll is a record rather than a countdown. Ownership answers `404` with
+  a message that names no class — the same silence the rest of the calendar keeps about a colleague's
+  rows — and the capability behind both routes is `class.teach`, which §7's guard checks on the request
+  rather than the screen checking it on the teacher.
 - **What holds it:** `apps/api/test/cohort-classes.spec.ts` for the reconcile, the registers and the two
-  reads, `apps/api/test/class-series-clash.spec.ts` for the minute two of one teacher's classes cannot
+  reads, `apps/api/test/class-roll.spec.ts` for the sheet, the whole-sheet save, the two words and the
+  clock, `apps/api/test/class-series-clash.spec.ts` for the minute two of one teacher's classes cannot
   share, beside the schema and route specs named above.
 
 ## 14. Bookings

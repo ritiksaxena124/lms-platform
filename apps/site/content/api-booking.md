@@ -101,3 +101,21 @@ There is no matching write. A [[dated class]] is what a [[series]] comes to at a
 Lists the classes a student is standing for, soonest first, each carrying their own attendance mark or nothing at all — an unanswered class reads as blank rather than as a word the platform invented for it.
 
 These are the [[cohort class]]es: a course the reader holds a [[place]] in, meeting on its teacher's plan rather than on anything this student pressed. The list is read from those places rather than from one class's [[register]], which is how somebody who enrolled five minutes ago sees the term they just joined. The same `from`/`to` window applies.
+
+## GET /api/v1/classes/:id/roll
+
+Reads one [[dated class]]'s [[register]] as the sheet a teacher marks: the class's course and window, the names it stands for with the mark on each, and `canMark` saying whether a mark may be written yet.
+
+The names are the students holding an open place in the course at the moment of the read, alphabetical, and a departed student is not among them — their row stays in the table with whatever mark it carried, because "who was meant to be there" is a fact about that day. Nothing else about a student travels: no address, no joined-on date. A teacher marks a name, and a name is the whole question.
+
+`canMark` is the server's clock rather than something a screen works out for itself, because the two would disagree by whatever the visitor's device is off, and the disagreement would be a save button on a class that has not happened yet. It stays true forever after the class starts: a register forgotten on Monday is a register that can still be filled in on Thursday.
+
+Asks for `class.teach`, and a class that is retired or belongs to another teacher answers `404` with the same sentence either way.
+
+## PUT /api/v1/classes/:id/roll
+
+Writes the marks: a list of `{ studentId, status }` for one class, applied as one transaction.
+
+The save is the whole sheet because that is the act — somebody goes down the names after the lesson — and a line the body does not mention keeps whatever mark it already carried. A `status` of `null` clears a mark, which is a correction rather than a non-answer: a name marked absent by mistake goes back to nobody having said anything, not to a word the platform invented. The two words are `present` and `absent`; anything else answers `400`, as does a name this class is not standing for and a name sent twice.
+
+A class that has not started answers `409` rather than writing anything, and the response is the roll read back after the write, so a screen renders the table's answer instead of the one that was typed. No dated class is created or moved here: the [[series]] still owns the minute, and this writes beside it.
