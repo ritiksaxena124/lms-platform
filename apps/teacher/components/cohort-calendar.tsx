@@ -35,15 +35,19 @@ const CLASSES_A_COLUMN_SHOWS = 4;
  * This is the screen that answers "what do I teach on Tuesday", and only the rows can answer it —
  * the table holds the classes a series stands for *and* the days this teacher marked off, and no
  * recomputation from the patterns holds both. The availability week, the series and the holidays are
- * where the plans are written; nothing here edits them, because a dated class has no write route: the
- * pattern owns it. So every chip is static text — a control on this grid would be a button the API
- * refuses the moment it is pressed — and the detail a column of clock faces cannot hold, the course
- * and how many people are standing for it, is the list under the grid. The one press the grid does
- * have folds a busy day, and it writes nothing: it opens the column.
+ * where the plans are written; nothing here edits them, because a dated class has no write route:
+ * the pattern owns it. The one thing a row does offer is its roll, and that writes beside the class
+ * rather than into it — the names and their marks, never the minute they stand in. So every chip is
+ * static text — a control on this grid would be a button the API refuses the moment it is pressed —
+ * and the detail a column of clock faces cannot hold, the course and how many people are standing
+ * for it, is the list under the grid. The one press the grid does have folds a busy day, and it
+ * writes nothing: it opens the column.
  *
- * Paging moves a whole week at a time and stops at the last one the horizon covers. Past that there
- * is no calendar for the platform to stand behind, and an empty grid would read as a quiet fortnight
- * rather than as the end of what has been written down.
+ * Paging moves a whole week at a time, opens on the week the teacher is standing in, and stops at
+ * the last one the horizon covers. Past that there is no calendar for the platform to stand behind,
+ * and an empty grid would read as a quiet fortnight rather than as the end of what has been written
+ * down. Behind today the window reaches a week, because the class that has already started is the
+ * one whose roll is being marked.
  *
  * The weeks are cut, and the column that is "today" chosen, in the teacher's own zone against the
  * instant the read landed rather than a clock read while rendering: a date worked out during render
@@ -61,7 +65,10 @@ export function CohortCalendar() {
     now: number;
   } | null>(null);
   const [failure, setFailure] = useState<{ key: string; message: string } | null>(null);
-  const [week, setWeek] = useState(0);
+  // Null until the teacher moves: the grid then opens on the week they are standing in, which is not
+  // the first week the window covers now that the read reaches back a week for the class that has
+  // already started.
+  const [week, setWeek] = useState<number | null>(null);
 
   const key = String(attempt);
 
@@ -128,7 +135,8 @@ export function CohortCalendar() {
   }
 
   const weeks = buildTeachingWeeks(calendar, zone, now);
-  const index = Math.min(Math.max(week, 0), weeks.length - 1);
+  const standingIn = weeks.findIndex((row) => row.days.some((day) => day.state === 'today'));
+  const index = Math.min(Math.max(week ?? Math.max(standingIn, 0), 0), weeks.length - 1);
   const current = weeks[index];
   if (!current) return null;
 
@@ -180,6 +188,13 @@ export function CohortCalendar() {
                     {formatClassWindow(row.startsAt, row.endsAt, zone)}
                   </span>
                 </p>
+
+                <Link
+                  href={`/calendar/class/${row.id}`}
+                  className={cn(buttonClass({ variant: 'ghost', size: 'sm' }))}
+                >
+                  Mark the roll
+                </Link>
               </li>
             ))}
           </ul>
