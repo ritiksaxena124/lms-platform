@@ -366,6 +366,25 @@ describe('MyClasses', () => {
       expect(document.querySelector(`a[href="${ROOM_URL}"]`)).toBeNull();
     });
 
+    it('names what an empty room means, so a hold screen is not read as a broken class', async () => {
+      const user = userEvent.setup();
+      vi.setSystemTime(new Date(WHILE_OPEN));
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await user.click(await screen.findByRole('button', { name: 'Join' }));
+      await waitFor(() => expect(document.querySelector('iframe')).not.toBeNull());
+
+      // The room lives on meet.jit.si, which has no way to tell this page whether anybody is in it.
+      // The honest sentence is the one that says what an empty room would mean here, because a
+      // student left inside somebody else's hold screen reads it as the class having failed.
+      expect(screen.getByText(/teacher has not arrived yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/teacher has not arrived yet/i).textContent).toContain(
+        'Fractions, the slow way',
+      );
+    });
+
     it('takes the address back off the page when the student leaves the room', async () => {
       const user = userEvent.setup();
       vi.setSystemTime(new Date(WHILE_OPEN));

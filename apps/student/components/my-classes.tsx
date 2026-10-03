@@ -464,6 +464,10 @@ function Section({
  * entry, a hover status line and a prefetch, three copies of an address meant to be used once
  * (ARCHITECTURE §6, §14). "Leave the room" takes it back off the page, and is worded apart from
  * "Leave this class" above it because the two do very different things.
+ *
+ * The line under the frame is the honest half: the room lives on somebody else's bridge, which has
+ * no way to tell this page who is inside it. So the page says what an empty room means rather than
+ * letting a student sit in another service's hold screen and read it as a class that never happened.
  */
 function ClassDoor({
   booking,
@@ -527,15 +531,22 @@ function ClassDoor({
       </div>
 
       {room ? (
-        <iframe
-          src={room}
-          // No referrer: the address should not reach the video host's logs as a page URL either.
-          referrerPolicy="no-referrer"
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
-          allowFullScreen
-          title={`Live class: ${booking.course.title}`}
-          className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
-        />
+        <>
+          <p className="text-[0.8125rem] text-ink-muted">
+            {`This is the room ${booking.course.title} opened. `}
+            An empty one means the teacher has not arrived yet — the class has not failed, and this
+            page cannot see inside the room, so wait a few minutes before you call it missed.
+          </p>
+          <iframe
+            src={room}
+            // No referrer: the address should not reach the video host's logs as a page URL either.
+            referrerPolicy="no-referrer"
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            allowFullScreen
+            title={`Live class: ${booking.course.title}`}
+            className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
+          />
+        </>
       ) : null}
     </>
   );
