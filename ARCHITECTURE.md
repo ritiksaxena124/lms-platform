@@ -223,6 +223,19 @@ paying for it:
   can ask has one shape on every deployment, and no screen can forget a branch and offer a Join
   button for a room that never was. `none` remains the shipped default for a config that has not
   decided yet; a `JITSI_DOMAIN` the operator did not name is `meet.jit.si`.
+- **A name is not a host.** Tested live on 2026-10-03 against that default, end to end: a student
+  took a minute, the teacher confirmed it, both sides asked the join endpoint and were handed the
+  same address, and the bridge framed inside a portal's own `<iframe>` — the instance sends no
+  `X-Frame-Options` and no `frame-ancestors`, so the embed half of §15's decision holds. What the
+  address did not buy was the conference. The first participant is held at "the conference has not
+  yet started because no moderators have yet arrived" until somebody logs in to a bridge account,
+  and a second room typed by hand answers the same way, so it is that instance's policy against
+  abuse rather than anything in this code. It is the invoice for the handshake §6 declined: a room
+  the API minted from a uuid is a room nobody owns, and a public bridge will not let a stranger
+  start one. Two doors, neither of which rewrites the port — a bridge this deployment runs itself
+  sets its own policy on the same URL shape, or the teacher becomes a moderator once by logging in
+  at the prejoin and the class is then theirs. Which door the product takes is an open decision,
+  not a gap in this section.
 
 It is synchronous on purpose. A port whose only provider needs no network call would be theatre
 wrapped in a `Promise`, and the provider that does need one — signed URLs, a JWT to mint them —
