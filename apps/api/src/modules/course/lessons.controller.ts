@@ -1,9 +1,9 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
-import { ROLE_CODES, type LessonListResponse, type LessonResponse } from '@lms/shared';
+import { PERMISSION_CODES, type LessonListResponse, type LessonResponse } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { LessonsService } from './lessons.service';
 // Value imports: the validation pipe finds a DTO through emitted parameter metadata, and
 // an erased class would leave every body unchecked.
@@ -19,7 +19,7 @@ import { CreateLessonDto, ReorderLessonsDto, UpdateLessonDto } from './dto/lesso
  * their course does on `/courses`.
  */
 @Controller('modules/:moduleId/lessons')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.COURSE_AUTHOR)
 export class LessonsController {
   constructor(private readonly lessons: LessonsService) {}
 

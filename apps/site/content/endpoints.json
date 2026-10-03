@@ -7,6 +7,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "activity.read"
+        ],
         "roles": [
           "ops"
         ]
@@ -297,6 +300,7 @@
       "statusCode": 200,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -429,6 +433,7 @@
       "statusCode": 204,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -452,6 +457,7 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -543,6 +549,7 @@
       "statusCode": 200,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -652,6 +659,7 @@
       "statusCode": 201,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -800,6 +808,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -863,6 +874,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -957,6 +971,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -1053,6 +1070,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -1118,6 +1138,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "availability.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -1199,6 +1222,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "availability.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -1329,6 +1355,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "availability.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -1461,6 +1490,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "availability.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -1544,6 +1576,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.request"
+        ],
         "roles": [
           "student"
         ]
@@ -1661,6 +1696,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.request"
+        ],
         "roles": [
           "student"
         ]
@@ -1801,6 +1839,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.request"
+        ],
         "roles": [
           "student"
         ]
@@ -1920,6 +1961,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.answer"
+        ],
         "roles": [
           "teacher"
         ]
@@ -2039,6 +2083,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.answer"
+        ],
         "roles": [
           "teacher"
         ]
@@ -2158,6 +2205,7 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -2203,6 +2251,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.answer"
+        ],
         "roles": [
           "teacher"
         ]
@@ -2248,6 +2299,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.answer"
+        ],
         "roles": [
           "teacher"
         ]
@@ -2293,6 +2347,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "booking.request"
+        ],
         "roles": [
           "student"
         ]
@@ -2393,6 +2450,7 @@
       "statusCode": 200,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -2602,6 +2660,7 @@
       "statusCode": 200,
       "access": {
         "kind": "optional-session",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -2833,6 +2892,7 @@
       "statusCode": 200,
       "access": {
         "kind": "optional-session",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -2999,6 +3059,7 @@
       "statusCode": 200,
       "access": {
         "kind": "optional-session",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -3025,6 +3086,7 @@
       "statusCode": 200,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -3074,6 +3136,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.attend"
+        ],
         "roles": [
           "student"
         ]
@@ -3182,6 +3247,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.teach"
+        ],
         "roles": [
           "teacher"
         ]
@@ -3296,6 +3364,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -3449,6 +3520,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -3654,6 +3728,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "coupon.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -3767,6 +3844,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "coupon.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -3948,6 +4028,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "coupon.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4062,6 +4145,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "coupon.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4230,6 +4316,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "coupon.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4344,6 +4433,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4433,6 +4525,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4556,6 +4651,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4680,6 +4778,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4770,6 +4871,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4874,6 +4978,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "roster.read"
+        ],
         "roles": [
           "teacher"
         ]
@@ -4987,6 +5094,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5052,6 +5162,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5166,6 +5279,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5281,6 +5397,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "class.schedule"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5347,6 +5466,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5490,6 +5612,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5697,6 +5822,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5840,6 +5968,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -5994,6 +6125,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -6137,6 +6271,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -6280,6 +6417,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -6423,6 +6563,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -6474,6 +6617,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -6525,6 +6671,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "enrollment.hold"
+        ],
         "roles": [
           "student"
         ]
@@ -6618,6 +6767,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "enrollment.hold"
+        ],
         "roles": [
           "student"
         ]
@@ -6734,6 +6886,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "enrollment.hold"
+        ],
         "roles": [
           "student"
         ]
@@ -6829,6 +6984,7 @@
       "statusCode": 200,
       "access": {
         "kind": "public",
+        "permissions": [],
         "roles": []
       },
       "request": {
@@ -6883,6 +7039,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7002,6 +7161,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7156,6 +7318,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7331,6 +7496,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7451,6 +7619,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7571,6 +7742,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7691,6 +7865,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "media.upload"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7775,6 +7952,9 @@
       "statusCode": 201,
       "access": {
         "kind": "session",
+        "permissions": [
+          "media.upload"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7859,6 +8039,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "media.upload"
+        ],
         "roles": [
           "teacher"
         ]
@@ -7887,6 +8070,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "course.author"
+        ],
         "roles": [
           "teacher"
         ]
@@ -8021,6 +8207,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "notification.queue.read"
+        ],
         "roles": [
           "ops"
         ]
@@ -8194,6 +8383,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "teacher.profile.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -8275,6 +8467,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "teacher.profile.manage"
+        ],
         "roles": [
           "teacher"
         ]
@@ -8426,6 +8621,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "account.manage"
+        ],
         "roles": [
           "ops"
         ]
@@ -8599,6 +8797,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "account.manage"
+        ],
         "roles": [
           "ops"
         ]
@@ -8682,6 +8883,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "account.manage"
+        ],
         "roles": [
           "ops"
         ]
@@ -8780,6 +8984,9 @@
       "statusCode": 200,
       "access": {
         "kind": "session",
+        "permissions": [
+          "account.manage"
+        ],
         "roles": [
           "ops"
         ]

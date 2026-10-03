@@ -3,7 +3,7 @@ import { APP_GUARD } from '@nestjs/core';
 
 import { ActionLogModule } from '../action-log/action-log.module';
 import { ACCESS_TOKENS, JwtAccessTokens } from './access-tokens.service';
-import { JwtAuthGuard, RolesGuard } from './auth.guard';
+import { JwtAuthGuard, PermissionsGuard } from './auth.guard';
 import { AuthController } from './auth.controller';
 import { AuthService } from './auth.service';
 import { PASSWORD_HASHER, ScryptPasswordHasher } from './password-hasher.service';
@@ -26,7 +26,7 @@ import { UsersRepository } from './users.repository';
     // the code that owns them. `APP_GUARD` still applies to every route in the
     // application, so a feature module added later is protected before anyone asks.
     { provide: APP_GUARD, useClass: JwtAuthGuard },
-    { provide: APP_GUARD, useClass: RolesGuard },
+    { provide: APP_GUARD, useClass: PermissionsGuard },
   ],
   // `UsersRepository` is exported, not duplicated: a teacher profile writes the working
   // timezone onto the account, and this stays the only module that reads the user row.

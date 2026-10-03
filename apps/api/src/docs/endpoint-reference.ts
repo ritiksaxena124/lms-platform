@@ -15,10 +15,11 @@ import { API_PREFIX } from '../common/http/api-prefix';
 import { AppModule } from '../app.module';
 import { IS_PUBLIC } from '../modules/auth/public.decorator';
 import { OPTIONAL_SESSION } from '../modules/auth/optional-session.decorator';
-import { REQUIRED_ROLES } from '../modules/auth/roles.decorator';
+import { REQUIRED_PERMISSIONS } from '../modules/auth/permissions.decorator';
+import { heldByRoles, isPermissionCode, type PermissionCode } from '@lms/shared';
 import { resolveResponse, type ResponseRecord } from './response-shape';
 
-/** What a caller has to bring, as `JwtAuthGuard` and `RolesGuard` actually decide it. */
+/** What a caller has to bring, as `JwtAuthGuard` and `PermissionsGuard` actually decide it. */
 export interface EndpointAccess {
   /**
    * `public` ignores the session header; `optional-session` reads one if it arrives and asks for
@@ -26,7 +27,16 @@ export interface EndpointAccess {
    * it tests the optional flag first, which is why an optional route never also says it is public.
    */
   kind: 'public' | 'optional-session' | 'session';
-  /** Roles the route names. Empty means any signed-in account, or any caller at all when public. */
+  /** What the route states: the capabilities an account has to hold to get past the guard. */
+  permissions: string[];
+  /**
+   * Which roles the matrix hands those capabilities to, read out of `ROLE_PERMISSIONS` rather than
+   * written down again next to the route. A role is an answer to the question the permissions ask,
+   * and the site prints it because a reader scans for the word they already know.
+   *
+   * Empty means the route names no capability, so any signed-in account passes — or any caller at
+   * all when `kind` is `public`.
+   */
   roles: string[];
 }
 
@@ -148,27 +158,54 @@ function joinPath(controllerPath: string, handlerPath: string): string {
 }
 
 /**
- * The same override the guard applies: a handler's own `@Roles` answers for the handler, and a
- * controller-wide one covers every route that does not name a role of its own.
+ * The same override the guard applies: a handler's own `@Permissions` answers for the handler, and a
+ * controller-wide one covers every route that does not name a capability of its own.
  */
 function accessOf(controller: ClassRef, handler: object): EndpointAccess {
-  const roles = (
-    readMeta<string[]>(REQUIRED_ROLES, handler) ??
-    readMeta<string[]>(REQUIRED_ROLES, controller) ??
-    []
-  ).slice();
+  const permissions = declarable(
+    readMeta<string[]>(REQUIRED_PERMISSIONS, handler) ??
+      readMeta<string[]>(REQUIRED_PERMISSIONS, controller) ??
+      [],
+    controller.name,
+  );
 
   // Optional-session first, because that is the order `JwtAuthGuard` checks, and a route that
   // carried both would otherwise be documented as ignoring a header it actually reads.
   if (readMeta<boolean>(OPTIONAL_SESSION, handler) === true) {
-    return { kind: 'optional-session', roles };
+    return { kind: 'optional-session', permissions, roles: rolesHolding(permissions) };
   }
 
   const isPublic =
     readMeta<boolean>(IS_PUBLIC, handler) === true ||
     readMeta<boolean>(IS_PUBLIC, controller) === true;
 
-  return { kind: isPublic ? 'public' : 'session', roles };
+  return { kind: isPublic ? 'public' : 'session', permissions, roles: rolesHolding(permissions) };
+}
+
+/**
+ * A route can only ask for a capability the matrix hands out.
+ *
+ * The guard would answer an unknown code by refusing everybody — fail closed, which is the right
+ * thing at runtime — but a reference that printed it would be documenting a door nobody can open,
+ * so the export refuses to build instead.
+ */
+function declarable(codes: string[], controllerName: string): PermissionCode[] {
+  return codes.map((code) => {
+    if (!isPermissionCode(code)) {
+      throw new Error(
+        `${controllerName} asks for ${code}, which is not a capability in ROLE_PERMISSIONS`,
+      );
+    }
+    return code;
+  });
+}
+
+/** Every role the matrix gives all of these capabilities to, in the order the roles are declared. */
+function rolesHolding(permissions: PermissionCode[]): string[] {
+  const held = permissions.map((code) => heldByRoles(code));
+  if (held.length === 0) return [];
+
+  return held[0]?.filter((role) => held.every((codes) => codes.includes(role))) ?? [];
 }
 
 function statusCodeOf(handler: object, method: string): number {

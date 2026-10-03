@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Patch, Query } from '@nestjs/common';
 import {
-  ROLE_CODES,
+  PERMISSION_CODES,
   type OpsAccountDetail,
   type OpsAccountListResponse,
   type RoleCode,
@@ -8,7 +8,7 @@ import {
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { AccountsService } from './accounts.service';
 // Value imports: the validation pipe finds a DTO through emitted parameter metadata, and an
 // erased class would leave every body and query string unchecked.
@@ -29,7 +29,7 @@ import { ListUsersQueryDto } from './dto/list-users-query.dto';
  * exists.
  */
 @Controller('users')
-@Roles(ROLE_CODES.OPS)
+@Permissions(PERMISSION_CODES.ACCOUNT_MANAGE)
 export class AccountsController {
   constructor(private readonly accounts: AccountsService) {}
 

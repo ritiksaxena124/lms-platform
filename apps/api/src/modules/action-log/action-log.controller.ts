@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ROLE_CODES, type ActionListResponse } from '@lms/shared';
+import { PERMISSION_CODES, type ActionListResponse } from '@lms/shared';
 
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { ActionLogService } from './action-log.service';
 // Value import: the validation pipe finds a DTO through emitted parameter metadata, and an
 // erased class would leave every query unchecked.
@@ -22,7 +22,7 @@ import { ListActionsQueryDto } from './dto/list-actions-query.dto';
  * route that could file its own rows would be a ledger that answers to whoever asks.
  */
 @Controller('actions')
-@Roles(ROLE_CODES.OPS)
+@Permissions(PERMISSION_CODES.ACTIVITY_READ)
 export class ActionLogController {
   constructor(private readonly actions: ActionLogService) {}
 

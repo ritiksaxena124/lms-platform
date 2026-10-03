@@ -1,9 +1,9 @@
 import { Body, Controller, Get, Put } from '@nestjs/common';
-import { ROLE_CODES } from '@lms/shared';
+import { PERMISSION_CODES } from '@lms/shared';
 
 import { CurrentUser } from '../auth/current-user.decorator';
 import type { AuthenticatedUser } from '../auth/auth.guard';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 // A value import, not `import type`: the validation pipe finds the DTO through the
 // parameter's emitted metadata, and an erased class turns every body into an unchecked
 // `Object` — the endpoint answers 200 to garbage and nothing else notices.
@@ -12,11 +12,11 @@ import { TeacherProfilesService, type TeacherProfileDocument } from './teacher-p
 
 /**
  * A teacher editing their own profile: the id comes from the session, never the body, so
- * there is no route here that can write someone else's rate. `@Roles` is enforced on the
+ * there is no route here that can write someone else's rate. `@Permissions` is enforced on the
  * server — the portal hiding the screen is a convenience, not the check.
  */
 @Controller('teacher/profile')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.TEACHER_PROFILE_MANAGE)
 export class TeacherProfileController {
   constructor(private readonly profiles: TeacherProfilesService) {}
 

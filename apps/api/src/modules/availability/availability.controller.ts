@@ -1,13 +1,13 @@
 import { Body, Controller, Get, HttpCode, HttpStatus, Param, Patch, Post } from '@nestjs/common';
 import {
-  ROLE_CODES,
+  PERMISSION_CODES,
   type AvailabilityRuleListResponse,
   type AvailabilityRuleResponse,
 } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { AvailabilityService } from './availability.service';
 // Value imports: the validation pipe finds a DTO through emitted parameter metadata, and an
 // erased class would leave every body unchecked.
@@ -21,12 +21,13 @@ import { CreateAvailabilityRuleDto, UpdateAvailabilityRuleDto } from './dto/avai
  * a window belongs to is the account, and that is the only ownership here: the id in the address
  * is a lookup key, never a permission.
  *
- * `@Roles(TEACHER)` covers all four routes. A student reading a teacher's availability would be
- * reading a schedule they cannot book against — the open slots a student is shown are instants in
- * the future, derived from these rules by the endpoint that answers them, not this list.
+ * `@Permissions(AVAILABILITY_MANAGE)` covers all four routes. A student reading a teacher's
+ * availability would be reading a schedule they cannot book against — the open slots a student is
+ * shown are instants in the future, derived from these rules by the endpoint that answers them, not
+ * this list.
  */
 @Controller('availability/rules')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.AVAILABILITY_MANAGE)
 export class AvailabilityController {
   constructor(private readonly availability: AvailabilityService) {}
 

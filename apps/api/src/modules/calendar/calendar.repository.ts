@@ -6,6 +6,14 @@ import { PrismaService } from '../../common/prisma/prisma.service';
 export type ClassSeriesRow = Prisma.ClassSeriesGetPayload<{ include: { course: true } }>;
 export type HolidayRow = Prisma.HolidayGetPayload<object>;
 
+/** The three numbers that place one class in a week. The class length is not here because no
+ * read asks about it — a window is where a teacher is standing, and that is what collides. */
+export interface SeriesWindow {
+  weekday: number;
+  startMinutes: number;
+  endMinutes: number;
+}
+
 /**
  * The tables behind a teacher's recurring calendar.
  *
@@ -48,23 +56,47 @@ export class CalendarRepository {
     });
   }
 
-  /** Check if another series exists at this slot for the same course. */
-  async findSeriesOverlap(
-    courseId: string,
-    weekday: number,
-    startMinutes: number,
+  /**
+   * A standing class of this teacher's that covers any of these minutes on this day.
+   *
+   * Half-open, which is what makes Monday 09:00–10:00 and 10:00–11:00 two classes rather than a
+   * collision — the same arithmetic §13's windows already follow. And the search runs across the
+   * teacher's courses, not inside one: the thing that has to be in both rooms is the account, so
+   * Algebra at 09:00–10:30 and Verbs at 10:00–11:00 is one person booked into two places, whatever
+   * the courses say. A closed course is excluded because the generator excludes it too, and a
+   * series on it puts no dated class on anybody's calendar.
+   */
+  async findTeacherClash(
+    teacherUserId: string,
+    window: SeriesWindow,
     exceptId?: string,
   ): Promise<ClassSeriesRow | null> {
     return this.prisma.classSeries.findFirst({
       where: {
-        courseId,
         isActive: true,
-        weekday,
-        startMinutes,
+        course: { teacherUserId, isActive: true },
+        weekday: window.weekday,
+        startMinutes: { lt: window.endMinutes },
+        endMinutes: { gt: window.startMinutes },
         ...(exceptId ? { id: { not: exceptId } } : {}),
       },
       include: { course: true },
     });
+  }
+
+  /** The retired series sitting on this opening minute for this course, if there is one. The
+   * business key is unique among retired rows as well as standing ones, so a class written again
+   * at a minute this course has used before is that row reopened, not a twin beside it. */
+  async findRetiredSeriesAt(
+    courseId: string,
+    weekday: number,
+    startMinutes: number,
+  ): Promise<ClassSeriesRow | null> {
+    const row = await this.prisma.classSeries.findUnique({
+      where: { courseId_weekday_startMinutes: { courseId, weekday, startMinutes } },
+      include: { course: true },
+    });
+    return row && !row.isActive ? row : null;
   }
 
   /** All holidays for one teacher, newest first. */

@@ -261,7 +261,6 @@ describe('the route table the API exports', () => {
 
 describe('an endpoint explained section by section', () => {
   const page = readDoc('api-auth');
-
   function route(method: string, path: string): EndpointDoc {
     const found = exportedEndpoints().find(
       (endpoint) => endpoint.method === method && endpoint.path === path,
@@ -324,6 +323,26 @@ describe('an endpoint explained section by section', () => {
 
   it('tells the reader which class serves the route', () => {
     expect(page.html).toContain('AuthController.login');
+  });
+
+  it('prints the capability a gated route asks for', () => {
+    // The card answers two different readers: one who wants to know whether their account gets in,
+    // which is what "Who may call" says, and one who is writing a decorator and needs the exact code
+    // the guard reads. The words come from the export rather than being retyped here, so a route
+    // re-guarded under a new capability moves both halves of the card at once.
+    const gated = route('GET', '/api/v1/users');
+    const card = cardFor('get-users');
+
+    expect(gated.access.permissions).toEqual(['account.manage']);
+    expect(card).toContain('Asks for');
+    expect(card).toContain(`<code>${gated.access.permissions[0]}</code>`);
+    expect(card).toContain('ops');
+  });
+
+  it('leaves the capability line off a route that names none', () => {
+    // A signed-in account of any role gets in, so there is no code to print — and an empty line
+    // would read as the export having failed to look rather than as the route having nothing to say.
+    expect(cardFor('post-auth-logout')).not.toContain('Asks for');
   });
 
   it('refuses to explain a route the API does not answer', () => {
@@ -491,8 +510,13 @@ describe('every exported route has a section somewhere', () => {
 
     for (const slug of docSlugs()) {
       const html = readDoc(slug).html;
-      const matches = [...html.matchAll(/<h2 id="[^"]*">((?:GET|POST|PUT|PATCH|DELETE)\s+\/[^<]+)<\/h2>/g)];
-      headingsByPage.set(slug, matches.map((m) => m[1] ?? ''));
+      const matches = [
+        ...html.matchAll(/<h2 id="[^"]*">((?:GET|POST|PUT|PATCH|DELETE)\s+\/[^<]+)<\/h2>/g),
+      ];
+      headingsByPage.set(
+        slug,
+        matches.map((m) => m[1] ?? ''),
+      );
     }
 
     for (const endpoint of exported) {
@@ -514,9 +538,9 @@ describe('every exported route has a section somewhere', () => {
 describe('a term a reader may guess wrong', () => {
   /** The marked words on one page, each with the id of the sentence attached to it. */
   function marks(html: string): { word: string; tipId: string }[] {
-    return [...html.matchAll(/<span class="doc-term"[^>]*aria-describedby="([^"]+)">([^<]+)</g)].map(
-      (match) => ({ word: match[2] ?? '', tipId: match[1] ?? '' }),
-    );
+    return [
+      ...html.matchAll(/<span class="doc-term"[^>]*aria-describedby="([^"]+)">([^<]+)</g),
+    ].map((match) => ({ word: match[2] ?? '', tipId: match[1] ?? '' }));
   }
 
   it('hangs the glossary sentence on the word, in the page’s own markup', () => {

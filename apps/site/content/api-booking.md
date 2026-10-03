@@ -42,7 +42,7 @@ Retires an existing [[holiday]] so that date is no longer blocked.
 
 ## GET /api/v1/bookings
 
-Lists bookings filtered by role. Teachers see bookings for their own courses; students see their own enrollments; ops sees everything. Query parameters support filtering by course, status, and date range.
+Lists the classes the signed-in student asked for or was granted. Every row is read through the session and no id in an address picks somebody else's list. Asking at this address is a student's capability (`booking.request`): a teacher reads the same table from the other side through the requests and class-list routes below, and an operator has no route to it at all.
 
 Each booking record carries its current state (`requested`, `confirmed`, `refused`, `cancelled`) and the room assignment if one exists.
 

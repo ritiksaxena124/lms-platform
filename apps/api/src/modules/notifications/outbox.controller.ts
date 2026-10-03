@@ -1,7 +1,7 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ROLE_CODES, type OutboxListResponse } from '@lms/shared';
+import { PERMISSION_CODES, type OutboxListResponse } from '@lms/shared';
 
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 // Value import: the validation pipe finds a DTO through emitted parameter metadata, and an
 // erased class would leave every query unchecked.
 import { ListOutboxQueryDto } from './dto/list-outbox-query.dto';
@@ -22,7 +22,7 @@ import { OutboxService } from './outbox.service';
  * how many times a person gets told the same thing.
  */
 @Controller('outbox')
-@Roles(ROLE_CODES.OPS)
+@Permissions(PERMISSION_CODES.NOTIFICATION_QUEUE_READ)
 export class OutboxController {
   constructor(private readonly queue: OutboxService) {}
 

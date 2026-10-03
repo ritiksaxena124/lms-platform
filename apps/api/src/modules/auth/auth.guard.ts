@@ -7,13 +7,13 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-import { ACCOUNT_STATUS_CODES, API_ERROR_CODES } from '@lms/shared';
-import type { RoleCode } from '@lms/shared';
+import { ACCOUNT_STATUS_CODES, API_ERROR_CODES, permissionsForRole } from '@lms/shared';
+import type { PermissionCode, RoleCode } from '@lms/shared';
 import type { Request } from 'express';
 
 import { identifyInLogContext } from '../../common/logging/log-context';
 import { ACCESS_TOKENS, type AccessTokenPort } from './access-tokens.service';
-import { REQUIRED_ROLES } from './roles.decorator';
+import { REQUIRED_PERMISSIONS } from './permissions.decorator';
 import { IS_PUBLIC } from './public.decorator';
 import { OPTIONAL_SESSION } from './optional-session.decorator';
 import { UsersRepository } from './users.repository';
@@ -21,7 +21,7 @@ import { UsersRepository } from './users.repository';
 /** What a handler may assume about whoever called it. Set by `JwtAuthGuard` or never. */
 export interface AuthenticatedUser {
   id: string;
-  /** Read from the account, not from the token — see `RolesGuard`. */
+  /** Read from the account, not from the token — see `PermissionsGuard`. */
   role: RoleCode;
 }
 
@@ -109,11 +109,11 @@ export class JwtAuthGuard implements CanActivate {
 }
 
 @Injectable()
-export class RolesGuard implements CanActivate {
+export class PermissionsGuard implements CanActivate {
   constructor(private readonly reflector: Reflector) {}
 
   canActivate(context: ExecutionContext): boolean {
-    const required = this.reflector.getAllAndOverride<RoleCode[]>(REQUIRED_ROLES, [
+    const required = this.reflector.getAllAndOverride<PermissionCode[]>(REQUIRED_PERMISSIONS, [
       context.getHandler(),
       context.getClass(),
     ]);
@@ -126,7 +126,11 @@ export class RolesGuard implements CanActivate {
         message: 'Sign in to continue.',
       });
     }
-    if (!required.includes(user.role)) {
+
+    // The matrix, read fresh: no capability is stored on the account, so what a role can do is a
+    // fact about the code rather than about a row somebody could edit into a wider door.
+    const held = permissionsForRole(user.role);
+    if (!required.every((code) => held.includes(code))) {
       throw new ForbiddenException({
         code: API_ERROR_CODES.FORBIDDEN,
         message: 'This account is not allowed to do that.',

@@ -176,9 +176,13 @@ Lists recurring weekly class series scheduled for a course. Each [[series]] defi
 
 Creates a new recurring weekly class series for the specified course.
 
+Three rules decide whether the write is accepted, and all three refuse with `409`. The window has to close after it opens, the class has to fit inside the window, and no class this teacher already stands for may cover any minute of it. The third is asked across every course the account runs, because the thing that has to be in both rooms is the teacher rather than the course: Monday 09:00–10:00 on Algebra and Monday 10:00–11:00 on Verbs is a timetable, and Monday 09:30 on either is one person booked into two places. Two classes that meet at the edge are not a collision — the overlap is refused, the touch is not — and the refusal names the day, the span and the course that already holds it. Two teachers at the same minute on the same weekday is a normal Tuesday in a marketplace, so that is never a clash.
+
 ## PATCH /api/v1/courses/:courseId/series/:id
 
 Updates an existing class series schedule for the course.
+
+The same three rules apply to the window the edit would produce, with the row being edited left out of the search — otherwise a teacher could never press Save on a class they had not moved. A series that has been retired and is written again at the same opening minute on the same course is that row brought back rather than a second one beside it, because a course holds one plan per day and minute for as long as it exists.
 
 ## POST /api/v1/courses/:courseId/series/:id/retire
 
