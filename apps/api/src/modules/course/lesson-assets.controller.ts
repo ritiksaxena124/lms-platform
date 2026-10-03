@@ -1,10 +1,10 @@
 import { Controller, Get, HttpCode, HttpStatus, Param, Post, Req, Res } from '@nestjs/common';
-import { ROLE_CODES, type AttachLessonAssetResponse, type LessonAssetResponse } from '@lms/shared';
+import { PERMISSION_CODES, type AttachLessonAssetResponse, type LessonAssetResponse } from '@lms/shared';
 import type { Request, Response } from 'express';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { Roles } from '../auth/roles.decorator';
+import { Permissions } from '../auth/permissions.decorator';
 import { LessonAssetsService } from './lesson-assets.service';
 
 /**
@@ -16,7 +16,7 @@ import { LessonAssetsService } from './lesson-assets.service';
  * `replace`.
  */
 @Controller('modules/:moduleId/lessons/:lessonId/asset')
-@Roles(ROLE_CODES.TEACHER)
+@Permissions(PERMISSION_CODES.MEDIA_UPLOAD)
 export class LessonAssetsController {
   constructor(private readonly assets: LessonAssetsService) {}
 

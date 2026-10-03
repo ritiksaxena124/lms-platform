@@ -223,6 +223,19 @@ paying for it:
   can ask has one shape on every deployment, and no screen can forget a branch and offer a Join
   button for a room that never was. `none` remains the shipped default for a config that has not
   decided yet; a `JITSI_DOMAIN` the operator did not name is `meet.jit.si`.
+- **A name is not a host.** Tested live on 2026-10-03 against that default, end to end: a student
+  took a minute, the teacher confirmed it, both sides asked the join endpoint and were handed the
+  same address, and the bridge framed inside a portal's own `<iframe>` — the instance sends no
+  `X-Frame-Options` and no `frame-ancestors`, so the embed half of §15's decision holds. What the
+  address did not buy was the conference. The first participant is held at "the conference has not
+  yet started because no moderators have yet arrived" until somebody logs in to a bridge account,
+  and a second room typed by hand answers the same way, so it is that instance's policy against
+  abuse rather than anything in this code. It is the invoice for the handshake §6 declined: a room
+  the API minted from a uuid is a room nobody owns, and a public bridge will not let a stranger
+  start one. Two doors, neither of which rewrites the port — a bridge this deployment runs itself
+  sets its own policy on the same URL shape, or the teacher becomes a moderator once by logging in
+  at the prejoin and the class is then theirs. Which door the product takes is an open decision,
+  not a gap in this section.
 
 It is synchronous on purpose. A port whose only provider needs no network call would be theatre
 wrapped in a `Promise`, and the provider that does need one — signed URLs, a JWT to mint them —
@@ -544,6 +557,25 @@ these rules hold:
   demotion and a disable all take effect on the next request instead of on the next login.
   That is one indexed lookup per authenticated request, bought deliberately: without it a
   disabled account keeps whatever it was for up to fifteen minutes.
+- **A route states a capability, not a kind of person.** `@Permissions('course.author')` names
+  the decision the route lets its caller make, and `ROLE_PERMISSIONS` — one table in
+  `@lms/shared`, the whole policy — says which roles hold it. The three roles still exist and
+  each still holds one fixed bundle, so this changes the shape of an answer rather than the
+  answer: every route a teacher may call is the same list it was the day before. The shape is
+  worth having because the policy now has one place to look, and because the day a fourth kind
+  of account arrives — a teaching assistant who runs a class but writes no course — it is one
+  entry in that table rather than sixty controllers read again looking for the lines that say
+  `teacher`. Several codes on one route are a conjunction, and a route that names none asks
+  only for a signed-in account: `/auth/me`, and the room of a class the caller holds a place
+  in (§14), are decided by the row they read rather than by anybody's capabilities.
+- **These capabilities are code, not reference rows.** §3 is right that the codes an operator
+  may extend live in the database; these are not those. A route names its permission in a
+  decorator, so a capability that existed only as an `LkpValue` row would be a door no code
+  opens. The failure modes follow from that: a code the table does not carry refuses everybody,
+  which is the correct answer at runtime and a build error in the endpoint reference, because
+  documenting a door nobody can walk through is the worse half of the same mistake. A refusal
+  says `This account is not allowed to do that.` and never names the capability missing, so a
+  403 does not hand a caller the vocabulary the guard reads.
 
 A portal is a client of that design, and inherits its rules:
 
@@ -869,11 +901,11 @@ what an invitation is for.
   `POST /api/v1/enrollments` takes a place by `courseId`, and `POST
 /api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
   place is _worth_ stays the catalog's decision — this module writes the row §11 reads.
-- **The role is the whole of "a teacher cannot enroll in their own course."** The student
-  controller is `@Roles(STUDENT)`, so that request never reaches a query to be checked. When a
-  later phase wants teachers to take places too, the decorator is the one line that changes, and
-  the ownership question it would raise is a decision somebody makes on purpose rather than a hole
-  a service forgot to plug.
+- **The capability is the whole of "a teacher cannot enroll in their own course."** The enrollments
+  controller asks for `enrollment.hold`, which §7's matrix hands to students alone, so that request
+  never reaches a query to be checked. When a later phase wants teachers to take places too, the one
+  line that changes is the matrix — and the ownership question it would raise is a decision somebody
+  makes on purpose rather than a hole a service forgot to plug.
 - **A fourth route reads the same table for the teacher who owns the course.** `GET
 /api/v1/courses/:courseId/roster` answers the question `ix_enrollment_course_roster` was built
   for, and it is addressed through the course rather than through a student, so ownership is the
@@ -969,6 +1001,16 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   still handed the availability rules alone, and that is a decision rather than a gap: a slot is a
   minute one student claims for themselves and a series is a timetable a course keeps, so running both
   through one expansion would sell the same hour twice.
+- **A teacher cannot be in two rooms.** Writing a series asks the three questions §13 asks of a window —
+  it closes after it opens, the class fits inside it, and no standing class covers a minute of it — with
+  one difference: the clash search runs across the teacher's *courses*, not inside the one being written.
+  Algebra at Monday 09:00–10:30 and Verbs at Monday 10:00–11:00 is one person booked into two places on
+  two rows that never mention each other, and since §2c both come out as dated classes on the same
+  account's calendar. Touching is not overlapping, so 10:30 is a legal opening minute; another teacher's
+  minute is never a clash, because the body in the room belongs to one account; and the edit is compared
+  against everything except itself, or Save would be a collision on a class nobody moved. A class written
+  again at an opening minute its own course used in a retired term is that row reopened, since the
+  business key is unique among retired rows too.
 - **Reconcile, not generate.** Each run works out what the horizon should hold *now* and moves the rows
   that differ — creating what is new, lifting the flag on what a day off freed, dropping it on what a
   pattern no longer stands for. An appender leaves behind every class an edited pattern stopped meaning;
@@ -989,7 +1031,8 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   were marked off and the classes a lifted day brought back, which is why `/calendar` shows dated rows
   while `/availability` shows the rule that made them.
 - **What holds it:** `apps/api/test/cohort-classes.spec.ts` for the reconcile, the registers and the two
-  reads, beside the schema and route specs named above.
+  reads, `apps/api/test/class-series-clash.spec.ts` for the minute two of one teacher's classes cannot
+  share, beside the schema and route specs named above.
 
 ## 14. Bookings
 
@@ -1052,8 +1095,9 @@ offered at, and everything else about the hour happens somewhere else.
   the only route that turns a `roomName` into a URL, and it is a `POST` for a read: its response is
   the room's only lock, and a `GET` would be an invitation to a browser's prefetch, a history entry
   and any proxy that keeps responses — so it also leaves with `Cache-Control: no-store`. It carries
-  no `@Roles`, because the two accounts it opens for are read off the row rather than claimed by a
-  role, and everybody else — a stranger, a classmate holding a place in the same course, another
+  no `@Permissions`, because the two accounts it opens for are read off the row rather than claimed
+  by a capability, and everybody else — a stranger, a classmate holding a place in the same course,
+  another
   teacher — gets the identical 404 an invented id gets. The gates run in that order: are you on it,
   does the class stand, does it have a room, is it _now_. Early answers with the same `opensAt` the
   lists publish, so a portal with a wrong clock still counts down to the minute the server unlocks;
@@ -1538,7 +1582,8 @@ worth paging by. The letter body was left out of the query for the same reason �
 the column: a read that does not select a thing cannot leak it.
 
 **The role gate is a courtesy on top of the API's refusal, and it does not redirect.** Every route this
-portal calls is `@Roles(ops)` on the server, so a teacher's session would find out from four 403s; what
+portal calls asks for an operator's capability on the server (§7), so a teacher's session would find
+out from four 403s; what
 `RequireSession` saves them is a page of empty tables dressed up as an ops desk. Sending a
 non-operator to the sign-in page would put a password box in front of somebody who has just proved who
 they are, and "you are signed in" plus "you are not ops" are two facts worth stating together. It was

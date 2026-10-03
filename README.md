@@ -451,7 +451,11 @@ number: `v0.9.0` closes Phases 11 and 12, the two apps outside the product, `v0.
 and `v0.14.0` / `v0.14.1` close Phase 9 — the coupon and payment API, then its screens on both portals
 with the tests around them. `v0.14.0` also carries Phase 10's tables, endpoints and teacher screens,
 which is why that row reads Partial inside a published tag: a tag marks the gate, and the table says
-what is behind it.
+what is behind it. After that the numbers stopped tracking phases altogether, because not everything
+worth shipping is a roadmap row: `v0.15.2` carried the container stack, `v0.16.0` carried Phase 10's
+second stage — a series that generates its cohort classes — and `v0.17.0` carries the capability layer
+under the three roles. A release closes a phase or makes something a person can finally do; both are
+boundaries.
 
 ```
 bun run release v0.8.0 --title="Phase 8: the ops portal"
@@ -530,6 +534,11 @@ which reserves the slot so a reveal never reflows.
   Rows are deactivated with `isActive`; see `ARCHITECTURE.md`.
 - **No enums for business constants.** Reference data lives in `LkpType`/`LkpValue`
   tables, with the code strings typed in `@lms/shared`.
+- **A route states a capability, not a kind of account.** `@Permissions('course.author')`
+  names what the caller has to be able to do, and one `ROLE_PERMISSIONS` table in
+  `@lms/shared` says which roles can. Those codes are the exception to the rule above —
+  they are code, because a decorator asks for them, and a permission that existed only in
+  a table would be a door no code opens.
 - **One error envelope.** Every failure is `{ statusCode, code, message, requestId }`.
 - **Tests before implementation.** A phase starts by making a failing test exist.
 

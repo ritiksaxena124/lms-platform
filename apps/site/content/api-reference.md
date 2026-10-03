@@ -9,7 +9,7 @@ decorators that decide them, so a new controller shows up here whether anybody r
 ```
 
 Regenerate it with `bun run --filter @lms/api docs:export`. A test compares the committed file
-against the application on every gate, so a renamed route or a new `@Roles` turns the build red
+against the application on every gate, so a renamed route or a new `@Permissions` turns the build red
 rather than leaving this page politely wrong.
 
 ## Getting a session

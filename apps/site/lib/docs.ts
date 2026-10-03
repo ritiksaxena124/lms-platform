@@ -81,7 +81,13 @@ export interface EndpointDoc {
   method: string;
   path: string;
   statusCode: number;
-  access: { kind: 'public' | 'optional-session' | 'session'; roles: string[] };
+  access: {
+    kind: 'public' | 'optional-session' | 'session';
+    /** The capability the route states, in the guard's own words. */
+    permissions: string[];
+    /** Which accounts hold every one of them — read off the matrix, never written by hand. */
+    roles: string[];
+  };
   request: EndpointRequestDoc;
   response: EndpointResponseDoc;
   controller: string;
@@ -260,13 +266,25 @@ export function docGroups(): DocGroup[] {
 
 /**
  * The one sentence a reader needs beside a path: not the decorator's word for it but who, in
- * practice, gets past the guard.
+ * practice, gets past the guard. A route now names a capability rather than a role, and the roles
+ * printed here are the matrix's answer to that capability — see `permissionLabel` for the code
+ * itself, which the per-route card shows beside these words.
  */
 function accessLabel(access: EndpointDoc['access']): string {
   if (access.kind === 'public') return 'anyone';
   if (access.kind === 'optional-session') return 'anyone, session read if offered';
 
   return access.roles.length > 0 ? access.roles.join(' or ') : 'any signed-in account';
+}
+
+/**
+ * What the route asks for, in the words a caller would put in a `@Permissions()`.
+ *
+ * Kept apart from `accessLabel` because the two answers serve different readers: one wants to know
+ * whether their account gets in, the other is writing the decorator and needs the exact code.
+ */
+function permissionLabel(access: EndpointDoc['access']): string | null {
+  return access.permissions.length > 0 ? access.permissions.join(' and ') : null;
 }
 
 function resourceOf(path: string): string {
@@ -377,14 +395,17 @@ function fieldFlag(field: RequestFieldDoc): string {
 function fieldRules(field: RequestFieldDoc): string {
   // An enumerated field states its set twice otherwise, once as a sentence and once as the words a
   // caller may actually send. The chips are the more useful of the two.
-  const rules = field.values.length > 0
-    ? field.rules.filter((rule) => !rule.startsWith('one of:'))
-    : field.rules;
+  const rules =
+    field.values.length > 0
+      ? field.rules.filter((rule) => !rule.startsWith('one of:'))
+      : field.rules;
 
   const parts = rules.map((rule) => escapeHtml(rule));
 
   if (field.values.length > 0) {
-    parts.push(`one of ${field.values.map((value) => `<code>${escapeHtml(value)}</code>`).join(' ')}`);
+    parts.push(
+      `one of ${field.values.map((value) => `<code>${escapeHtml(value)}</code>`).join(' ')}`,
+    );
   }
 
   return parts.join(' · ');
@@ -448,7 +469,8 @@ function responseFields(response: EndpointResponseDoc): string {
   }
 
   const own = keyTable(`Answers <code>${escapeHtml(response.declared)}</code>`, response.fields);
-  const note = response.note === '' ? '' : `<p class="endpoint-note">${noteText(response.note)}</p>`;
+  const note =
+    response.note === '' ? '' : `<p class="endpoint-note">${noteText(response.note)}</p>`;
 
   // The nested keys go under a fold rather than in the open: a course page answers with five objects
   // deep, and a reader who came for one field should still be able to see the whole card at once.
@@ -474,11 +496,13 @@ function responseFields(response: EndpointResponseDoc): string {
 function endpointCard(method: string, path: string): string {
   const endpoint = endpointOf(method, path);
   const { request, response } = endpoint;
+  const asked = permissionLabel(endpoint.access);
 
   return [
     '<div class="endpoint-card">',
     '<dl class="endpoint-facts">',
     `<div><dt>Who may call</dt><dd>${escapeHtml(accessLabel(endpoint.access))}</dd></div>`,
+    ...(asked ? [`<div><dt>Asks for</dt><dd><code>${escapeHtml(asked)}</code></dd></div>`] : []),
     `<div><dt>Success</dt><dd><code>${endpoint.statusCode}</code></dd></div>`,
     ...(request.params.length > 0
       ? [

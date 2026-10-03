@@ -18,7 +18,7 @@ description a stranger could act on, a merge, and a tag only when the gate is gr
 branch off `main` silently excludes whatever has already been integrated.
 
 ```
-main ──────●───────────────────●  (tag v0.15.1)
+main ──────●───────────────────●  (latest tag: v0.17.0)
             ╲                 ╱
 release ─────╲───●───●────────   fixes only, nothing new
               ╲       ╱
@@ -220,15 +220,16 @@ Patches **accumulate and go out together**. Six fixes are one tag, not six. With
 number stops carrying information and the repository ends up with a hundred releases that all mean
 "something small changed".
 
-The version line today: `v0.15.1` is published on origin at `fb33ba3`, and `develop`, `release` and `main` are
-that same commit. So the next patch on that line is **`v0.15.2`**, and the next new capability is
-**`v0.16.0`**.
+The version line today: the newest tag is **`v0.17.0`**, and `release` and `develop` are the history that
+led into it. So the next repair on that line is **`v0.17.1`**, and the next thing a user could not do
+before is **`v0.18.0`**. Read `git log --oneline <newest tag>..develop` before choosing a number — the
+answer is in what has landed since the last tag, not in what this file last said.
 
 Cutting a release:
 
 ```
-bun run release v0.15.1 --title="Patch: the student reading path"
-bun run release v0.15.1 --dry-run          # look first
+bun run release v0.17.0 --title="RBAC: a route states the capability it needs"
+bun run release v0.17.0 --dry-run          # look first
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main`, and a tag that already exists on
@@ -275,5 +276,23 @@ to it in full.
 3. `fix/coupon-currency-and-kit` off `develop`: the hardcoded `INR`, the raw Tailwind classes, the dead pill
    branch, the dialog description. PR → `develop`.
 4. `develop` → `release` → `main`, then `bun run release v0.15.1 --title="Patch: the student reading path"`.
-5. The module screen and the calendar that generates are a **new capability**: `v0.16.0`, and the README phase
-   row moves from `Partial` to `Done` in the same PR chain.
+5. The container stack came next as **`v0.15.2`** — a patch, because it is not a roadmap row and nobody
+   could not reach a page without it. **`v0.16.0`** then carried Phase 10's second stage, a series that
+   generates its cohort classes, and that row still reads `Partial`: a tag marks the gate, the table says
+   what is behind it.
+
+## Worked example — the chain that landed `v0.17.0`
+
+Three PRs, one each, all into `develop`, then one minor for all three:
+
+1. `feat/series-clash-guard`: a teacher may add a class on a day they already teach, as long as the two
+   windows do not overlap. A capability, not a repair — what shipped before refused the day.
+2. `docs/live-bridge-finding`: what the public Jitsi bridge actually answers for a live class, recorded
+   where the next reader will find it instead of rediscovering it.
+3. `feat/rbac-permissions`: the capability layer under the three roles — the matrix in `@lms/shared`,
+   `@Permissions` and its guard replacing `@Roles` and its guard, and the reference printing the code
+   behind every address.
+
+Number chosen once, at the end: **minor**, because two of the three let somebody do something they could
+not do at `v0.16.0`. The docs PR rode along rather than waiting for a patch of its own — a tag is expensive,
+and a page nobody can reach is not a release.
