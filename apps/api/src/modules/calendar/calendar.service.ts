@@ -1,13 +1,15 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import type {
   ClassSeriesListResponse,
   ClassSeriesResponse,
   HolidayListResponse,
   HolidayResponse,
 } from '@lms/shared';
+import { weekdayLabel, wallClock } from '@lms/shared';
 
 import { PrismaService } from '../../common/prisma/prisma.service';
-import { CalendarRepository } from './calendar.repository';
+import { CalendarRepository, type ClassSeriesRow, type SeriesWindow } from './calendar.repository';
 import { ClassOccurrenceService } from './class-occurrence.service';
 import type { CreateClassSeriesDto, UpdateClassSeriesDto } from './dto/class-series.dto';
 import type { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
@@ -25,6 +27,22 @@ import type { CreateHolidayDto, UpdateHolidayDto } from './dto/holiday.dto';
  * twice over; it is the sweep running *now* rather than on the next hour, because a teacher who
  * has just edited their week is looking at the screen that shows it.
  */
+/**
+ * A class this teacher is already standing for, sitting in the way of the one being written.
+ *
+ * Named by its day, its span and its course, because a teacher who runs four courses through a
+ * Monday needs to be told which one they just walked into — and the rule is said alongside the
+ * refusal, so the fix (open this class when that one closes) is readable without a search.
+ */
+function taken(held: ClassSeriesRow): ConflictException {
+  const span = `${weekdayLabel(held.weekday)} ${wallClock(held.startMinutes)}–${wallClock(
+    held.endMinutes,
+  )}`;
+  return new ConflictException(
+    `${span} is already taken by ${held.course.title}. A class may open the minute that one closes; no two of yours cover the same minutes.`,
+  );
+}
+
 @Injectable()
 export class CalendarService {
   constructor(
@@ -60,11 +78,14 @@ export class CalendarService {
   ): Promise<ClassSeriesResponse> {
     await this.requireOwnCourse(teacherUserId, courseId);
 
-    const overlap = await this.repo.findSeriesOverlap(courseId, dto.weekday, dto.startMinutes);
-    if (overlap) {
-      throw new ConflictException('A series already exists at this time for this course.');
-    }
+    const window: SeriesWindow = {
+      weekday: dto.weekday,
+      startMinutes: dto.startMinutes,
+      endMinutes: dto.endMinutes,
+    };
 
+    // The shape is settled before the calendar is read, because a window that closes before it
+    // opens covers no minutes at all and cannot be compared against anything.
     if (dto.endMinutes <= dto.startMinutes) {
       throw new ConflictException('The window must end after it starts.');
     }
@@ -73,15 +94,34 @@ export class CalendarService {
       throw new ConflictException('The class does not fit inside the window.');
     }
 
-    const series = await this.prisma.classSeries.create({
-      data: {
-        courseId,
-        weekday: dto.weekday,
-        startMinutes: dto.startMinutes,
-        endMinutes: dto.endMinutes,
-        durationMinutes: dto.durationMinutes,
-      },
-    });
+    await this.requireFree(teacherUserId, window);
+
+    // The opening minute may already be on this course from a term it retired. That row is brought
+    // back rather than written a twin, because the business key is unique among retired rows too
+    // and a second statement on it would answer as a database error.
+    const retired = await this.repo.findRetiredSeriesAt(
+      courseId,
+      window.weekday,
+      window.startMinutes,
+    );
+
+    let series;
+    try {
+      series = retired
+        ? await this.prisma.classSeries.update({
+            where: { id: retired.id },
+            data: {
+              endMinutes: dto.endMinutes,
+              durationMinutes: dto.durationMinutes,
+              isActive: true,
+            },
+          })
+        : await this.prisma.classSeries.create({
+            data: { courseId, ...window, durationMinutes: dto.durationMinutes },
+          });
+    } catch (error) {
+      throw this.orTakenOnTheMinute(teacherUserId, courseId, error, window);
+    }
 
     const withCourse = await this.repo.findSeriesOwned(courseId, series.id);
     if (!withCourse) throw new NotFoundException('Series not found after creation.');
@@ -110,6 +150,8 @@ export class CalendarService {
     const endMinutes = dto.endMinutes ?? existing.endMinutes;
     const durationMinutes = dto.durationMinutes ?? existing.durationMinutes;
 
+    const window: SeriesWindow = { weekday, startMinutes, endMinutes };
+
     if (endMinutes <= startMinutes) {
       throw new ConflictException('The window must end after it starts.');
     }
@@ -118,15 +160,18 @@ export class CalendarService {
       throw new ConflictException('The class does not fit inside the window.');
     }
 
-    const overlap = await this.repo.findSeriesOverlap(courseId, weekday, startMinutes, id);
-    if (overlap) {
-      throw new ConflictException('Another series already exists at this time for this course.');
-    }
+    // Compared against everything except itself, or a teacher could never press Save on a class
+    // they had not moved.
+    await this.requireFree(teacherUserId, window, id);
 
-    await this.prisma.classSeries.update({
-      where: { id },
-      data: { weekday, startMinutes, endMinutes, durationMinutes },
-    });
+    try {
+      await this.prisma.classSeries.update({
+        where: { id },
+        data: { ...window, durationMinutes },
+      });
+    } catch (error) {
+      throw this.orTakenOnTheMinute(teacherUserId, courseId, error, window);
+    }
 
     const withCourse = await this.repo.findSeriesOwned(courseId, id);
     if (!withCourse) throw new NotFoundException('Series not found after update.');
@@ -262,6 +307,43 @@ export class CalendarService {
     if (!course) {
       throw new NotFoundException('No course here is yours to schedule.');
     }
+  }
+
+  /** No class this teacher is already standing for may cover any minute of this window. A class
+   * may touch another at the edge — 09:00–10:00 and 10:00–11:00 are a timetable, not a collision. */
+  private async requireFree(
+    teacherUserId: string,
+    window: SeriesWindow,
+    exceptId?: string,
+  ): Promise<void> {
+    const held = await this.repo.findTeacherClash(teacherUserId, window, exceptId);
+    if (held) throw taken(held);
+  }
+
+  /**
+   * The database refused a write the checks above allowed, or the checks were right.
+   *
+   * Two tabs saving the same class both pass `requireFree`, and the business key is what catches
+   * the second one; an edit can also land on a minute this course used in a retired term, which no
+   * standing-overlap read can see. Either way the teacher gets the answer the check would have
+   * given rather than a stack trace about an index. Anything that is not a unique violation is
+   * still a bug and goes back unchanged.
+   */
+  private async orTakenOnTheMinute(
+    teacherUserId: string,
+    courseId: string,
+    error: unknown,
+    window: SeriesWindow,
+  ): Promise<unknown> {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== 'P2002') {
+      return error;
+    }
+
+    const held =
+      (await this.repo.findTeacherClash(teacherUserId, window)) ??
+      (await this.repo.findRetiredSeriesAt(courseId, window.weekday, window.startMinutes));
+
+    return held ? taken(held) : error;
   }
 
   private toSeriesResponse(series: {

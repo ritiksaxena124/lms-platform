@@ -969,6 +969,16 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   still handed the availability rules alone, and that is a decision rather than a gap: a slot is a
   minute one student claims for themselves and a series is a timetable a course keeps, so running both
   through one expansion would sell the same hour twice.
+- **A teacher cannot be in two rooms.** Writing a series asks the three questions §13 asks of a window —
+  it closes after it opens, the class fits inside it, and no standing class covers a minute of it — with
+  one difference: the clash search runs across the teacher's *courses*, not inside the one being written.
+  Algebra at Monday 09:00–10:30 and Verbs at Monday 10:00–11:00 is one person booked into two places on
+  two rows that never mention each other, and since §2c both come out as dated classes on the same
+  account's calendar. Touching is not overlapping, so 10:30 is a legal opening minute; another teacher's
+  minute is never a clash, because the body in the room belongs to one account; and the edit is compared
+  against everything except itself, or Save would be a collision on a class nobody moved. A class written
+  again at an opening minute its own course used in a retired term is that row reopened, since the
+  business key is unique among retired rows too.
 - **Reconcile, not generate.** Each run works out what the horizon should hold *now* and moves the rows
   that differ — creating what is new, lifting the flag on what a day off freed, dropping it on what a
   pattern no longer stands for. An appender leaves behind every class an edited pattern stopped meaning;
@@ -989,7 +999,8 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   were marked off and the classes a lifted day brought back, which is why `/calendar` shows dated rows
   while `/availability` shows the rule that made them.
 - **What holds it:** `apps/api/test/cohort-classes.spec.ts` for the reconcile, the registers and the two
-  reads, beside the schema and route specs named above.
+  reads, `apps/api/test/class-series-clash.spec.ts` for the minute two of one teacher's classes cannot
+  share, beside the schema and route specs named above.
 
 ## 14. Bookings
 
