@@ -188,6 +188,18 @@ export function expandSeries(
 export const OCCURRENCE_HORIZON_DAYS = 30;
 
 /**
+ * How far back a dated-class read reaches when the caller asks for no window.
+ *
+ * The horizon is forward because rows have to be written before a class happens; this is the other
+ * half of the same stretch, because a class does not stop being somebody's appointment at its start
+ * minute. A teacher marks a roll *after* the hour it was due, and the word they write is read by a
+ * student on the very same list — so a calendar that begins at `now` loses a class at exactly the
+ * moment it becomes the interesting one. Seven days, because a teacher who lost a week still has a
+ * week to answer for, and no further back a portal has to draw.
+ */
+export const OCCURRENCE_LOOKBACK_DAYS = 7;
+
+/**
  * One dated class, as the teacher who teaches it reads it.
  *
  * `endsAt` is not stored — the row keeps a start and a length — for the same reason a booking

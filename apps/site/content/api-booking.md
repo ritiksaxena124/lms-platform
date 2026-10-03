@@ -94,13 +94,13 @@ Query parameters control the date range, course filter, and teacher filter. Slot
 
 Lists the dated classes a teacher teaches, soonest first. Each row names the course, the start and end instants, how long the class runs and how many students are expected — the number that tells a teacher whether Monday is a lesson or a room full of people.
 
-There is no matching write. A [[dated class]] is what a [[series]] comes to at a particular minute, so it is produced by the generation sweep rather than asked for: `from` and `to` bound the window, and leaving both out returns the thirty days the sweep keeps filled. A window wider than those thirty days is refused with `400` — nothing is written that far ahead, so the ask would only gather every class this caller owns into one response.
+There is no matching write. A [[dated class]] is what a [[series]] comes to at a particular minute, so it is produced by the generation sweep rather than asked for: `from` and `to` bound the window, and leaving both out returns the thirty days the sweep keeps filled plus a week behind now — a class stays on the calendar after its own start minute, which is when the [[register]] under it is actually being marked. A window wider than that stretch of thirty-seven days is refused with `400` — nothing is written that far ahead, so the ask would only gather every class this caller owns into one response.
 
 ## GET /api/v1/classes/learning
 
 Lists the classes a student is standing for, soonest first, each carrying their own attendance mark or nothing at all — an unanswered class reads as blank rather than as a word the platform invented for it.
 
-These are the [[cohort class]]es: a course the reader holds a [[place]] in, meeting on its teacher's plan rather than on anything this student pressed. The list is read from those places rather than from one class's [[register]], which is how somebody who enrolled five minutes ago sees the term they just joined. The same `from`/`to` window applies.
+These are the [[cohort class]]es: a course the reader holds a [[place]] in, meeting on its teacher's plan rather than on anything this student pressed. The list is read from those places rather than from one class's [[register]], which is how somebody who enrolled five minutes ago sees the term they just joined. The same `from`/`to` window applies — including the week it reaches behind now, which is what keeps yesterday's mark on a class this student sat in.
 
 ## GET /api/v1/classes/:id/roll
 

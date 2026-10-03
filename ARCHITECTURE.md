@@ -1025,9 +1025,12 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   a holiday so the screen is true the moment the form closes, and no route at all that accepts a dated
   class from a caller.
 - **Both calendars read the rows rather than the patterns.** `GET /api/v1/classes/teaching` and `GET
-  /api/v1/classes/learning` take a window a caller may leave off, defaulting to the horizon the sweep
-  keeps so that number lives in `@lms/shared` alone, and echo the bounds they used — which is how a
-  screen tells "no classes left" apart from "no calendar left". Only the table holds both the days that
+  /api/v1/classes/learning` take a window a caller may leave off, defaulting to a week behind now plus
+  the horizon the sweep keeps — both numbers live in `@lms/shared` alone — and echo the bounds they
+  used, which is how a screen tells "no classes left" apart from "no calendar left". The week behind
+  is not a courtesy: a roll is marked after the class starts, and a read that began at this instant
+  would drop the class at the minute it became the interesting one, taking the teacher's link to its
+  sheet and the student's sight of the mark with it. Only the table holds both the days that
   were marked off and the classes a lifted day brought back, which is why `/calendar` shows dated rows
   while `/availability` shows the rule that made them.
 - **The register is answered with two words, and silence is not one of them.** `GET/PUT

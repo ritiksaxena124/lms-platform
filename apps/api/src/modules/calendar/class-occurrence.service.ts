@@ -8,6 +8,7 @@ import { Cron, CronExpression } from '@nestjs/schedule';
 import {
   LKP_TYPE_CODES,
   OCCURRENCE_HORIZON_DAYS,
+  OCCURRENCE_LOOKBACK_DAYS,
   expandSeries,
   type AssignedClass,
   type AttendanceStatusCode,
@@ -405,25 +406,31 @@ function lineKey(occurrenceId: string, studentUserId: string): string {
 }
 
 /**
- * The stretch a list covers, defaulting to the horizon the sweep keeps.
+ * The stretch a list covers: a week of history, then the horizon the sweep keeps.
  *
  * The caller's bounds are returned as written when they were given: a screen that asked for a week
- * is shown the week it asked for, and one that asked for nothing is shown the month the platform
+ * is shown the week it asked for, and one that asked for nothing is shown the stretch the platform
  * still stands behind. A window that ends before it starts is not an error worth a status code —
  * it is an empty list, and the two bounds say so.
  *
- * A window wider than the horizon is refused rather than answered. The rows do not exist that far
- * ahead, so the ask brings no more calendar — only every class this caller owns in one response.
+ * The default reaches back before `now` because the roll is written after the class starts, and both
+ * portals read with no window: a calendar beginning at this instant drops a class at its own start
+ * minute, which is the moment its sheet opens and the moment the teacher's mark lands on the
+ * student's list.
+ *
+ * A window wider than the kept stretch is refused rather than answered. The rows do not exist that
+ * far ahead, so the ask brings no more calendar — only every class this caller owns in one response.
  */
 function windowOf(query: ListClassesQueryDto, now: Date): { from: Date; to: Date } {
-  const from = query.from ? new Date(query.from) : now;
+  const from = query.from
+    ? new Date(query.from)
+    : new Date(now.getTime() - OCCURRENCE_LOOKBACK_DAYS * MS_PER_DAY);
   const to = query.to
     ? new Date(query.to)
     : new Date(now.getTime() + OCCURRENCE_HORIZON_DAYS * MS_PER_DAY);
-  if (to.getTime() - from.getTime() > OCCURRENCE_HORIZON_DAYS * MS_PER_DAY) {
-    throw new BadRequestException(
-      `A class window may not be wider than ${OCCURRENCE_HORIZON_DAYS} days.`,
-    );
+  const widestDays = OCCURRENCE_HORIZON_DAYS + OCCURRENCE_LOOKBACK_DAYS;
+  if (to.getTime() - from.getTime() > widestDays * MS_PER_DAY) {
+    throw new BadRequestException(`A class window may not be wider than ${widestDays} days.`);
   }
   return { from, to };
 }

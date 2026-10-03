@@ -141,6 +141,35 @@ describe('CohortCalendar', () => {
     expect(screen.getByRole('group', { name: 'Week of 19 Oct' })).toBeInTheDocument();
   });
 
+  it('opens on the week the teacher is standing in, not on the first week the window reaches', async () => {
+    const user = userEvent.setup();
+    // The read carries a week of history so the class that started this morning keeps its place on
+    // the calendar — and the roll a teacher marks after the hour is still reachable. That makes the
+    // first week the response covers a week the teacher has already taught, and a calendar that
+    // opened there would show last week before this one.
+    vi.setSystemTime(new Date('2026-09-30T03:00:00.000Z'));
+    api.myTeachingClasses.mockResolvedValue({
+      from: '2026-09-23T03:00:00.000Z',
+      to: '2026-10-28T03:00:00.000Z',
+      items: [
+        scheduled({
+          id: 'o0',
+          startsAt: '2026-09-24T04:00:00.000Z',
+          endsAt: '2026-09-24T04:45:00.000Z',
+        }),
+        scheduled(),
+      ],
+    });
+
+    render(<CohortCalendar />);
+
+    await screen.findByRole('group', { name: 'Week of 28 Sept' });
+    expect(screen.queryByRole('group', { name: 'Week of 21 Sept' })).toBeNull();
+
+    await user.click(screen.getByRole('button', { name: 'Previous week' }));
+    expect(column('Week of 21 Sept', '2026-09-24')).toHaveTextContent('09:30–10:15');
+  });
+
   it('says so when the week it is showing has nothing in it', async () => {
     api.myTeachingClasses.mockResolvedValue(
       horizon([
