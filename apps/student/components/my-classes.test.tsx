@@ -470,6 +470,27 @@ describe('MyClasses', () => {
       expect(within(rowOf('Veena Basics')).queryByText(/confirmed|pending|not marked/i)).toBeNull();
     });
 
+    it('shows the mark a teacher made on this line, beside the fact that it is a cohort class', async () => {
+      assignedClasses.myAssignedClasses.mockResolvedValue([
+        cohort({ status: 'present' }),
+        cohort({
+          id: 'o9',
+          course: { id: 'c3', slug: 'tabla', title: 'Tabla Basics' },
+          status: 'absent',
+        }),
+      ]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Veena Basics');
+      expect(rowOf('Veena Basics')).toHaveTextContent('Present');
+      expect(rowOf('Tabla Basics')).toHaveTextContent('Absent');
+      // The kind of row and the answer on it are two facts, and a pill that replaced one with the
+      // other would leave a student guessing whether a class they were marked present in was one
+      // they booked or one the course put on their week.
+      expect(rowOf('Veena Basics')).toHaveTextContent('Cohort class');
+    });
+
     it('offers no way out of a class the series booked, and no room either', async () => {
       bookings.myBookings.mockResolvedValue([booking()]);
       assignedClasses.myAssignedClasses.mockResolvedValue([cohort()]);
