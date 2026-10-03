@@ -100,6 +100,13 @@ describe('CohortCalendar', () => {
     expect(screen.getByText('6 students expected')).toBeInTheDocument();
   });
 
+  it('sends a row to the roll it stands for, because marking happens on the day', async () => {
+    render(<CohortCalendar />);
+
+    const roll = await screen.findByRole('link', { name: 'Mark the roll' });
+    expect(roll).toHaveAttribute('href', '/calendar/class/o1');
+  });
+
   it('counts one student as one student', async () => {
     api.myTeachingClasses.mockResolvedValue(horizon([scheduled({ studentsExpected: 1 })]));
 
