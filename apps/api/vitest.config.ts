@@ -21,7 +21,7 @@ export default defineConfig({
     // Four forks is a third of the cores and well inside what the server holds: the suite is a
     // little slower, and wrong by a lot less often.
     pool: 'forks',
-    poolOptions: { forks: { maxForks: 4 } },
+    maxWorkers: 4,
   },
   plugins: [
     swc.vite({

@@ -14,10 +14,10 @@ export default defineConfig({
     include: ['{lib,components,app}/**/*.test.{ts,tsx}'],
     setupFiles: ['test/setup.ts'],
     css: false,
-    // Two threads is the cap this box needs while all six packages test together: uncapped, one
+    // Two workers is the cap this box needs while all six packages test together: uncapped, one
     // portal asks for eleven workers and every `userEvent` wait on the machine slows down, so a
     // suite that passes in three seconds alone starts failing at fifteen (§17).
-    poolOptions: { threads: { maxThreads: 2 } },
+    maxWorkers: 2,
     testTimeout: 15_000,
   },
 });

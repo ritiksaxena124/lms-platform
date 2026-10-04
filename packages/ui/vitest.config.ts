@@ -12,7 +12,7 @@ export default defineConfig({
     // gate ran: while five packages tested at once this one lost `PasswordField` and `Calendar` to
     // 5-second timeouts and passed both alone. Same cap as the portals, same reason — the
     // component is not what a starvation timeout measures.
-    poolOptions: { threads: { maxThreads: 2 } },
+    maxWorkers: 2,
     testTimeout: 15_000,
   },
 });

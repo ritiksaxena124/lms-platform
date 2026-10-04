@@ -16,7 +16,7 @@ export default defineConfig({
     css: false,
     // The same cap the portals test under (§17): this package renders static markup, so it is the
     // cheapest suite in the workspace, but it still runs beside five others that are not.
-    poolOptions: { threads: { maxThreads: 2 } },
+    maxWorkers: 2,
     testTimeout: 15_000,
   },
 });
