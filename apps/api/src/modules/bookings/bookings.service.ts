@@ -20,6 +20,7 @@ import {
   SLOT_DENIAL_CODES,
   SLOT_ENTITLEMENT_CODES,
   expandWindows,
+  holidayForInstant,
   liveClassWindow,
   slotAt,
   stretchesOverlap,
@@ -36,6 +37,7 @@ import {
 
 import { ActionRecorder } from '../action-log/action-recorder';
 import { AvailabilityRepository } from '../availability/availability.repository';
+import { CalendarRepository } from '../calendar/calendar.repository';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
 import { MailQueue } from '../notifications/mail-queue.service';
 import { ReferenceService } from '../../reference/reference.service';
@@ -226,11 +228,14 @@ interface Entitlement {
  * The grid is never stored, so nothing here repairs a table when a teacher changes their week:
  * the windows are expanded across the coming horizon in the *teacher's* zone — the account's, not
  * the course's, because that is what decides when their classes are — and then cut down by the
- * two facts that make an offer undeliverable. A minute a standing booking is still running
- * through goes, and a minute already gone by never arrives. The first is cut with the same
- * arithmetic the booking write applies: a grid that hid only the exact minute another class
- * started on would offer a square it then refused, and the student would learn about the
- * collision by clicking it.
+ * three facts that make an offer undeliverable. A minute a standing booking is still running
+ * through goes, a minute already gone by never arrives, and a minute on a day the teacher has
+ * marked off goes with the whole of that day — the blocker the cohort calendar has honoured since
+ * §13, which a weekly window cannot say on its own because a window names a weekday and a holiday
+ * names one date. The first is cut with the same arithmetic the booking write applies: a grid that
+ * hid only the exact minute another class started on would offer a square it then refused, and the
+ * student would learn about the collision by clicking it. The third is cut by the same function the
+ * write asks, on the same date, so the two halves cannot disagree.
  *
  * The entitlement is decided before a single window is read, so a student with no right to the
  * calendar cannot cost the platform a week of expansion, and so the reason can be stated rather
@@ -246,6 +251,7 @@ export class BookingsService {
   constructor(
     private readonly bookings: BookingsRepository,
     private readonly rules: AvailabilityRepository,
+    private readonly calendar: CalendarRepository,
     private readonly enrollments: EnrollmentsRepository,
     private readonly reference: ReferenceService,
     private readonly mail: MailQueue,
@@ -276,6 +282,7 @@ export class BookingsService {
     }
 
     const windows = await this.rules.listActive(course.teacherUserId);
+    const holidays = await this.calendar.listHolidays(course.teacherUserId);
     const held = await this.bookings.heldStretches(
       course.teacherUserId,
       await this.statusIds(BLOCKING_BOOKING_STATUSES),
@@ -285,6 +292,10 @@ export class BookingsService {
     const slots: OpenSlot[] = expandWindows(windows, course.teacher.timezone, { from, to })
       .filter(
         (slot) =>
+          // A day the teacher marked off is a day they do not teach, so every class it holds goes
+          // rather than only the minute they were looking at. Judged on their own local date, which
+          // is the rule the cohort sweep already applies to a repeated class (§13).
+          holidayForInstant(holidays, slot.startsAt, course.teacher.timezone) === null &&
           // The square goes if any standing class runs through it — the same question the write asks.
           !held.some((stretch) =>
             stretchesOverlap(stretch, {
@@ -344,6 +355,19 @@ export class BookingsService {
     const tile = slotAt(windows, course.teacher.timezone, startsAt);
     if (!tile) {
       throw fieldError('startsAt', 'This teacher does not keep a class open at that minute.');
+    }
+
+    // The day off is asked of the same function the grid used, on the same date, so that "offered"
+    // and "bookable" remain one question. A student pressing a square the teacher marked off after
+    // the screen drew it is refused here rather than confirmed and then quietly cancelled — and the
+    // teacher's own reason, which may be a private one, stays out of the answer.
+    const away = holidayForInstant(
+      await this.calendar.listHolidays(course.teacherUserId),
+      tile.startsAt,
+      course.teacher.timezone,
+    );
+    if (away) {
+      throw fieldError('startsAt', 'This teacher is away on that day.');
     }
 
     const result = await this.bookings.request({

@@ -18,7 +18,7 @@ description a stranger could act on, a merge, and a tag only when the gate is gr
 branch off `main` silently excludes whatever has already been integrated.
 
 ```
-main ──────●───────────────────●  (latest tag: v0.18.0)
+main ──────●───────────────────●  (latest tag: v0.18.1)
             ╲                 ╱
 release ─────╲───●───●────────   fixes only, nothing new
               ╲       ╱
@@ -220,16 +220,16 @@ Patches **accumulate and go out together**. Six fixes are one tag, not six. With
 number stops carrying information and the repository ends up with a hundred releases that all mean
 "something small changed".
 
-The version line today: the newest tag is **`v0.18.0`**, and `release` and `develop` are the history that
-led into it. So the next repair on that line is **`v0.18.1`**, and the next thing a user could not do
+The version line today: the newest tag is **`v0.18.1`**, and `release` and `develop` are the history that
+led into it. So the next repair on that line is **`v0.18.2`**, and the next thing a user could not do
 before is **`v0.19.0`**. Read `git log --oneline <newest tag>..develop` before choosing a number — the
 answer is in what has landed since the last tag, not in what this file last said.
 
 Cutting a release:
 
 ```
-bun run release v0.18.0 --title="Phase 10 Stage 3: the roll a teacher marks"
-bun run release v0.18.0 --dry-run          # look first
+bun run release v0.18.1 --title="Patch: a day off is not offered as a class"
+bun run release v0.18.1 --dry-run          # look first
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main`, and a tag that already exists on
@@ -254,6 +254,12 @@ action — once, for that number — not as an assumed last step of a task.
   publishes — not in a docs file, a test fixture printed in CI, or a screenshot.
 - **Money is stored in minor units** with a currency beside it, and an amount is never formatted with a
   hardcoded currency code.
+- **Two version pins are advisories, not taste.** Every workspace asks for Vitest 4 because the advisory on
+  `vitest`/`@vitest/mocker` (GHSA-82fw-gwwq-j7x9) is fixed only at 4.1.11, and the root `package.json`
+  `overrides` holds `deepmerge-ts` at 8 for the same reason: Prisma 6 and 7 both declare 7.1.5, and
+  GHSA-ggr8-5vv4-36mx is fixed only at 8.0.0. Prisma's own use of it is one named import, `deepmerge`, which
+  8 still exports with the same call shape. Drop either pin only when the package that declares it moves
+  past the fix itself.
 
 ## Where documentation lives
 
