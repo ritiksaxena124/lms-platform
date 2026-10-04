@@ -18,7 +18,7 @@ export default defineConfig({
     // and an uncapped portal suite asks for eleven workers on a twelve-core box. A `userEvent`
     // test then starves rather than fails, and the timeout it hits says nothing about the
     // component under it.
-    poolOptions: { threads: { maxThreads: 2 } },
+    maxWorkers: 2,
     testTimeout: 15_000,
   },
 });
