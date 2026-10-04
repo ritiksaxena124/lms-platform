@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   ATTENDANCE_STATUS_LABELS,
   expandSeries,
+  holidayForInstant,
   holidayOn,
   seriesWindow,
   type ClassRoll,
@@ -181,6 +182,37 @@ describe('holidays', () => {
     expect(startsOf(evening, 'America/New_York', week)).toEqual(['2026-10-06T01:00:00.000Z']);
     expect(startsOf(evening, 'America/New_York', week, [holiday('2026-10-06')])).toHaveLength(1);
     expect(startsOf(evening, 'America/New_York', week, [holiday('2026-10-05')])).toEqual([]);
+  });
+
+  it('answers for a single instant, so a grid and a booking write ask it the same way', () => {
+    // The cohort calendar asks in bulk while filling a month, and the 1:1 calendar asks once about
+    // the minute a student pressed. Both are the same question — is the teacher home for the class
+    // on the day their clock shows — and this is the one place that says how the instant becomes a
+    // day. A second copy is how the two halves would drift apart into offering and refusing the
+    // same square.
+    const kolkataMidnight = new Date('2026-10-04T19:00:00.000Z');
+    const marked = holiday('2026-10-05');
+
+    expect(holidayForInstant([marked], kolkataMidnight, 'Asia/Kolkata')).toBe(marked);
+    // The UTC date is the 4th, and a holiday written for the 4th means nothing to this class.
+    expect(holidayForInstant([holiday('2026-10-04')], kolkataMidnight, 'Asia/Kolkata')).toBeNull();
+    expect(holidayForInstant([], kolkataMidnight, 'Asia/Kolkata')).toBeNull();
+    // Recurring and retired keep meaning what they mean in the bulk path, because this is the
+    // same test with the date worked out first.
+    expect(
+      holidayForInstant(
+        [holiday('2025-10-05', { isRecurringAnnual: true })],
+        kolkataMidnight,
+        'Asia/Kolkata',
+      ),
+    ).not.toBeNull();
+    expect(
+      holidayForInstant(
+        [holiday('2026-10-05', { isActive: false })],
+        kolkataMidnight,
+        'Asia/Kolkata',
+      ),
+    ).toBeNull();
   });
 });
 
