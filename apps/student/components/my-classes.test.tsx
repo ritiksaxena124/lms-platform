@@ -366,6 +366,25 @@ describe('MyClasses', () => {
       expect(document.querySelector(`a[href="${ROOM_URL}"]`)).toBeNull();
     });
 
+    it('names what an empty room means, so a hold screen is not read as a broken class', async () => {
+      const user = userEvent.setup();
+      vi.setSystemTime(new Date(WHILE_OPEN));
+      bookings.myBookings.mockResolvedValue([booking()]);
+
+      render(<MyClasses />);
+
+      await user.click(await screen.findByRole('button', { name: 'Join' }));
+      await waitFor(() => expect(document.querySelector('iframe')).not.toBeNull());
+
+      // The room lives on meet.jit.si, which has no way to tell this page whether anybody is in it.
+      // The honest sentence is the one that says what an empty room would mean here, because a
+      // student left inside somebody else's hold screen reads it as the class having failed.
+      expect(screen.getByText(/teacher has not arrived yet/i)).toBeInTheDocument();
+      expect(screen.getByText(/teacher has not arrived yet/i).textContent).toContain(
+        'Fractions, the slow way',
+      );
+    });
+
     it('takes the address back off the page when the student leaves the room', async () => {
       const user = userEvent.setup();
       vi.setSystemTime(new Date(WHILE_OPEN));
@@ -468,6 +487,27 @@ describe('MyClasses', () => {
       // The attendance vocabulary is not this stage's, and an invented word on an unmarked row
       // would read as a mark the teacher never made.
       expect(within(rowOf('Veena Basics')).queryByText(/confirmed|pending|not marked/i)).toBeNull();
+    });
+
+    it('shows the mark a teacher made on this line, beside the fact that it is a cohort class', async () => {
+      assignedClasses.myAssignedClasses.mockResolvedValue([
+        cohort({ status: 'present' }),
+        cohort({
+          id: 'o9',
+          course: { id: 'c3', slug: 'tabla', title: 'Tabla Basics' },
+          status: 'absent',
+        }),
+      ]);
+
+      render(<MyClasses />);
+
+      await screen.findByText('Veena Basics');
+      expect(rowOf('Veena Basics')).toHaveTextContent('Present');
+      expect(rowOf('Tabla Basics')).toHaveTextContent('Absent');
+      // The kind of row and the answer on it are two facts, and a pill that replaced one with the
+      // other would leave a student guessing whether a class they were marked present in was one
+      // they booked or one the course put on their week.
+      expect(rowOf('Veena Basics')).toHaveTextContent('Cohort class');
     });
 
     it('offers no way out of a class the series booked, and no room either', async () => {

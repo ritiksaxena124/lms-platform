@@ -41,6 +41,33 @@ const SHEET_ROW = {
   isActive: true,
 } as const satisfies Prisma.ClassAttendanceSelect;
 
+/** A line as the teacher who marks it reads it: the person, and the answer on the line. */
+export type RollLineRow = Prisma.ClassAttendanceGetPayload<{ select: typeof ROLL_LINE }>;
+
+const ROLL_LINE = {
+  id: true,
+  studentUserId: true,
+  student: { select: { id: true, fullName: true } },
+  status: { select: { code: true } },
+} as const satisfies Prisma.ClassAttendanceSelect;
+
+/** One class with its sheet under it, as much of it as a roll needs to answer with. */
+export type RollClassRow = Prisma.ClassOccurrenceGetPayload<{ select: typeof ROLL_CLASS }>;
+
+const ROLL_CLASS = {
+  id: true,
+  startsAt: true,
+  durationMinutes: true,
+  course: { select: { id: true, slug: true, title: true } },
+  attendances: {
+    where: { isActive: true },
+    // Down the sheet in the order a person reads it. Two names the same is possible, so the line
+    // id breaks the tie and the list stays the same shape every time it is read.
+    orderBy: [{ student: { fullName: 'asc' } }, { id: 'asc' }],
+    select: ROLL_LINE,
+  },
+} as const satisfies Prisma.ClassOccurrenceSelect;
+
 /** One class the generator has decided exists, before it has a row. */
 export type NewOccurrence = {
   seriesId: string;
@@ -175,6 +202,52 @@ export class ClassOccurrenceRepository {
       data: { isActive },
     });
     return moved.count;
+  }
+
+  /**
+   * One class and the sheet under it, for the teacher the class is theirs.
+   *
+   * The caller's id is in the `where` rather than checked afterwards, which is how every other read
+   * in this file answers a stranger: the address is a lookup key, and a class that is not yours is
+   * the same answer as a class that was never written.
+   *
+   * A retired class is not here either. Retiring a row is the sweep saying this class will not
+   * happen, and a register nobody will stand in front of has no answers to write down.
+   */
+  async classForRoll(teacherUserId: string, occurrenceId: string): Promise<RollClassRow | null> {
+    const found = await this.prisma.classOccurrence.findFirst({
+      where: { id: occurrenceId, teacherUserId, isActive: true },
+      select: ROLL_CLASS,
+    });
+    return found ?? null;
+  }
+
+  /**
+   * Write the marks, one statement per answer rather than one per name.
+   *
+   * The groups are already split by the caller, so a class of thirty people is three statements and
+   * one round trip. They go through `$transaction` as a list because the answers are one decision:
+   * a roll that saved the presents and lost the absents on the way is a sheet that says something
+   * the teacher never said.
+   *
+   * `isActive: true` is on every write, so a mark cannot land on the line of a person who no longer
+   * holds a place. Their row and its answer stay for the history to read; they are just not on the
+   * sheet anybody is marking now.
+   */
+  async markSheet(
+    occurrenceId: string,
+    groups: Array<{ statusValueId: string | null; studentUserIds: string[] }>,
+  ): Promise<void> {
+    const writes = groups
+      .filter((group) => group.studentUserIds.length > 0)
+      .map((group) =>
+        this.prisma.classAttendance.updateMany({
+          where: { occurrenceId, studentUserId: { in: group.studentUserIds }, isActive: true },
+          data: { statusValueId: group.statusValueId },
+        }),
+      );
+
+    if (writes.length > 0) await this.prisma.$transaction(writes);
   }
 
   /**

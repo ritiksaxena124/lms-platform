@@ -11,8 +11,10 @@ import { apiGet } from './api';
  * neither, because there is no route that would accept a student quitting their own cohort. The
  * screen that draws them together is the only place allowed to pretend they are one kind of row.
  *
- * No window is asked for, so nothing here can drift from the horizon the sweep itself keeps, and no
- * screen has to know what a `ScheduledClass` is in order to page across a month.
+ * No window is asked for, so nothing here can drift from the stretch the platform keeps, and no
+ * screen has to know what a `ScheduledClass` is in order to page across a month. That stretch reaches
+ * back a week before now on purpose: the teacher's mark on a row is written after the class starts,
+ * so a list that began at this instant would drop the class at the very minute it gained an answer.
  */
 export async function myAssignedClasses(): Promise<AssignedClass[]> {
   const response = await apiGet<LearningClassesResponse>('/classes/learning', '', {

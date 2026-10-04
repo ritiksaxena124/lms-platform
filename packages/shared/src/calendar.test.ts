@@ -1,12 +1,15 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ATTENDANCE_STATUS_LABELS,
   expandSeries,
   holidayOn,
   seriesWindow,
+  type ClassRoll,
   type HolidayPattern,
   type SeriesPattern,
 } from './calendar';
+import { ATTENDANCE_STATUS_CODES } from './lookup-codes';
 import { getZoneParts } from './timezone';
 
 /**
@@ -197,5 +200,45 @@ describe('the awkward clock', () => {
 
     const after = series({ weekday: 7, startMinutes: 180, endMinutes: 210, durationMinutes: 30 });
     expect(startsOf(after, 'America/New_York', thatSunday)).toEqual(['2026-03-08T07:00:00.000Z']);
+  });
+});
+
+describe('the register a teacher marks', () => {
+  it('has a word for every answer the write can put on a line, and for nothing else', () => {
+    // Present and absent are the whole vocabulary. The third answer a line can carry is *no*
+    // answer — a class nobody has marked yet — and that is carried by the absence of a status
+    // rather than by a code, so a label for it would be a word for a thing that did not happen.
+    const codes = Object.values(ATTENDANCE_STATUS_CODES);
+    expect(codes).toEqual([ATTENDANCE_STATUS_CODES.PRESENT, ATTENDANCE_STATUS_CODES.ABSENT]);
+
+    for (const code of codes) {
+      expect(ATTENDANCE_STATUS_LABELS[code]).toBeTruthy();
+    }
+    expect(Object.keys(ATTENDANCE_STATUS_LABELS)).toHaveLength(codes.length);
+  });
+
+  it('reads as one class, its names, and whether a mark may be written at all', () => {
+    // The shape is the contract between the route that answers a roll and the two screens that
+    // show it, so it is worth one test that a whole roll can be written down: `canMark` travels
+    // with the rows because the server owns the clock, and a screen that decided for itself would
+    // open a save button on a class that has not started for one of the two.
+    const roll: ClassRoll = {
+      classId: 'class-1',
+      course: { id: 'course-1', slug: 'linear-algebra', title: 'Linear Algebra' },
+      startsAt: '2026-10-05T03:30:00.000Z',
+      endsAt: '2026-10-05T04:30:00.000Z',
+      canMark: true,
+      lines: [
+        { id: 'line-1', student: { id: 'student-1', fullName: 'Asha' }, status: null },
+        {
+          id: 'line-2',
+          student: { id: 'student-2', fullName: 'Bilal' },
+          status: ATTENDANCE_STATUS_CODES.PRESENT,
+        },
+      ],
+    };
+
+    expect(roll.lines.filter((line) => line.status === null)).toHaveLength(1);
+    expect(roll.lines.map((line) => line.student.id)).toEqual(['student-1', 'student-2']);
   });
 });
