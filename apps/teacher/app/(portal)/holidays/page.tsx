@@ -9,7 +9,7 @@ export default function HolidaysPage() {
     <RouteTransition>
       <PageHeader
         title="Holidays"
-        description="Days you don't teach — festivals, personal days off, or recurring annual observances. A marked-off day takes that date's classes off your calendar, and lifting it puts them back. The minutes students book come from your availability windows, which these do not close."
+        description="Days you don't teach — festivals, personal days off, or recurring annual observances. A marked-off day takes that date's classes off your calendar, and lifting it puts them back. It closes the booking grid for that day too: students are not offered a minute you are away for."
       />
       <div className="mt-6 max-w-xl">
         <HolidayManager />
