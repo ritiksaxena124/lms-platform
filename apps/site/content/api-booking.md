@@ -30,7 +30,7 @@ Lists all holidays (blocked teaching dates) scheduled by the authenticated teach
 
 ## POST /api/v1/availability/holidays
 
-Creates a new holiday date entry to block classes on that date for the calling teacher.
+Creates a new holiday date entry to block classes on that date for the calling teacher. The day leaves the cohort calendar, and the same day leaves the [[slot]] grid a student books from — a teacher who is away is not offered.
 
 ## PATCH /api/v1/availability/holidays/:id
 
@@ -38,7 +38,7 @@ Updates an existing holiday date, reason, or recurring annual status.
 
 ## POST /api/v1/availability/holidays/:id/retire
 
-Retires an existing [[holiday]] so that date is no longer blocked.
+Retires an existing [[holiday]]. The date teaches again — its cohort classes come back on the next sweep and the booking grid offers that day once more.
 
 ## GET /api/v1/bookings
 
@@ -48,7 +48,7 @@ Each booking record carries its current state (`requested`, `confirmed`, `refuse
 
 ## POST /api/v1/bookings
 
-Requests a new booking for a specific availability slot. The request body identifies the slot, the course, and any special requirements. The server checks for calendar conflicts and capacity limits before creating the booking in `requested` state.
+Requests a new booking for a specific [[slot]]. The request body identifies the course and the minute. The server asks that minute the same questions the grid was built from — a window open then, no standing class running through it, and a date the teacher has not marked off — and refuses one that fails any of them as a `startsAt` validation error rather than writing a booking it would later have to cancel.
 
 Automatic confirmation may occur if the teacher has enabled [[instant-book]]; otherwise the teacher must explicitly confirm or refuse.
 
@@ -86,9 +86,9 @@ Each request includes the student's name, the requested slot, and how long the r
 
 ## GET /api/v1/bookings/slots
 
-Lists available time slots generated from active availability rules. Slots are computed on demand for a given date range; they reflect current rules, existing bookings, and capacity limits.
+Lists the [[slot]]s a student may ask for in one course: the teacher's week expanded into instants, minus the minutes a standing class still holds and minus every day the teacher has marked off as a [[holiday]].
 
-Query parameters control the date range, course filter, and teacher filter. Slots already booked are excluded from the response.
+`course` is the only parameter — the id the API issued or the slug a catalog link carries. The response also says who the reader is to the course (`entitlement`, and `denial` when it is nothing), because "enroll first" and "you already used your trial call" are two screens rather than one empty list. Nothing is stored about a slot: the grid is worked out on every read, so a window edited or a day retired shows up on the student's calendar with no table to keep in step — and the booking write asks the same questions of the same minute, so a square is offered exactly when it can be taken.
 
 ## GET /api/v1/classes/teaching
 

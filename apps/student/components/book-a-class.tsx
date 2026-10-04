@@ -198,7 +198,7 @@ export function BookAClass({ courseId }: { courseId: string }) {
       <EmptyState
         illustration={<Illo src="/illustrations/peep-sitting-17.svg" size="lg" />}
         title="No class to take right now"
-        description={`Either this teacher keeps no open windows, or every minute in the next ${BOOKING_HORIZON_DAYS} days is held by somebody else. Ask them for a time, or check back after they update their availability.`}
+        description={`Either this teacher keeps no open windows, has marked off every day ahead of you, or has had every minute in the next ${BOOKING_HORIZON_DAYS} days held by somebody else. Ask them for a time, or check back after they update their availability.`}
       />
     );
   }

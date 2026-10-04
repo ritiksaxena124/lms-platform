@@ -152,6 +152,27 @@ export function holidayOn(holidays: HolidayPattern[], localDate: string): Holida
 }
 
 /**
+ * The holiday that closes the day a class instant falls on, or nothing.
+ *
+ * The instant is converted to a date on the teacher's own clock rather than read as a UTC day,
+ * which is the same fact for most of the year and a different one at midnight: a 00:30 class in
+ * Kolkata is a 19:00 instant on the day before, and a teacher who marks off Monday has closed that
+ * class whether or not the database filed it on Sunday.
+ *
+ * This is the only place the conversion happens. The cohort calendar asks it in bulk while a sweep
+ * fills a month, and the 1:1 calendar asks it about the grid it shows and again about the minute a
+ * student pressed; a second copy of the rule is how those three would drift into offering a square
+ * one of them then refuses.
+ */
+export function holidayForInstant(
+  holidays: HolidayPattern[],
+  instant: Date,
+  timeZone: string,
+): HolidayPattern | null {
+  return holidayOn(holidays, zoneDateKey(instant, timeZone));
+}
+
+/**
  * Every class one series opens inside `horizon`, oldest first, with the marked-off days gone.
  *
  * Deliberately a single series rather than a list: the sweep that fills a calendar has to know
@@ -159,10 +180,8 @@ export function holidayOn(holidays: HolidayPattern[], localDate: string): Holida
  * would throw the answer away. `holidays` is the teacher's own list — a blocker belongs to the
  * person who does not teach, not to the course.
  *
- * The holiday test runs on each class's *own* local date rather than the date of the tile it came
- * from, which is the same fact for most of the year and a different one at midnight: a 00:30 class
- * in Kolkata is a 19:00 instant on the day before, and a teacher who marks off Monday has closed
- * that class whether or not the database filed it on Sunday.
+ * Each class is tested against its own local date, which is `holidayForInstant`'s rule rather than
+ * one this function re-decides.
  */
 export function expandSeries(
   series: SeriesPattern,
@@ -172,7 +191,7 @@ export function expandSeries(
 ): SlotInstant[] {
   if (!series.isActive) return [];
   return expandWindows([seriesWindow(series)], timeZone, horizon).filter(
-    (slot) => holidayOn(holidays, zoneDateKey(slot.startsAt, timeZone)) === null,
+    (slot) => holidayForInstant(holidays, slot.startsAt, timeZone) === null,
   );
 }
 

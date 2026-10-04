@@ -998,9 +998,13 @@ startMinutes])` is a business key that outlives `isActive` (§2). Two tabs savin
   wrote them. A sweep reconciles the two into `class_occurrence`: one row per class the patterns stand
   for over a rolling 30-day horizon (`OCCURRENCE_HORIZON_DAYS`), dated in the teacher's zone, with
   `class_attendance` holding one line per student who holds a place in that course. The booking grid is
-  still handed the availability rules alone, and that is a decision rather than a gap: a slot is a
-  minute one student claims for themselves and a series is a timetable a course keeps, so running both
-  through one expansion would sell the same hour twice.
+  handed the availability rules and the teacher's days off, and nothing of `class_series`, and that is a
+  decision rather than a gap: a slot is a minute one student claims for themselves and a series is a
+  timetable a course keeps, so running both through one expansion would sell the same hour twice. A day
+  off is not part of that bargain — it belongs to the person, not to a pattern, and a weekly window names
+  a weekday while a holiday names one date — so the 1:1 grid drops every offer on a marked day and the
+  write refuses the minute anyway, both through `holidayForInstant`, which converts the class's instant
+  to the teacher's local date in the one place that decision is made.
 - **A teacher cannot be in two rooms.** Writing a series asks the three questions §13 asks of a window —
   it closes after it opens, the class fits inside it, and no standing class covers a minute of it — with
   one difference: the clash search runs across the teacher's *courses*, not inside the one being written.
@@ -1062,13 +1066,18 @@ offered at, and everything else about the hour happens somewhere else.
 
 - **The grid is derived, never stored.** `GET /api/v1/bookings/slots?course=` expands the
   teacher's windows across a rolling 30-day horizon (`BOOKING_HORIZON_DAYS`) in their zone and
-  subtracts the minutes already held. There is no `slot` table to keep in step with a teacher's
-  edit, which is the whole reason a booking reads `AvailabilityModule` and `EnrollmentsModule`
-  through their own services rather than reaching for their tables.
+  subtracts the minutes already held and the days already marked off. There is no `slot` table to
+  keep in step with a teacher's edit, which is the whole reason a booking reads another module's
+  rows through the repository that module exports — `AvailabilityModule` for the week,
+  `EnrollmentsModule` for the place, `CalendarModule` for the days off — rather than reaching for
+  their tables.
 - **One function answers "what is on the calendar" and "may this minute be booked."**
   `slotAt` in `packages/shared/src/schedule.ts` is the same expansion the grid came from, so an
   offer and a booking cannot have different answers about the same minute — and a student who
   sends a time that was never on any grid is refused for that reason, not by a length check.
+  `holidayForInstant` is the same promise about a day: the grid hides the marked date and the write
+  refuses a minute inside it, so a class is never confirmed and then quietly cancelled because the
+  teacher went away after the screen drew the square.
 - **A day is a set of instants, so a DST change moves a class rather than mislabelling it.** The
   window is wall clock; the row is UTC. A February class and a March class at the same clock face
   in Kolkata are two hours apart in the table, which is exactly what the student agreed to.

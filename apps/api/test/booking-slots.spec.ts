@@ -510,4 +510,117 @@ describe('the open class times a student is offered', () => {
     await readSlots(undefined, course.id).expect(401);
     await readSlots(teacher, course.id).expect(403);
   });
+
+  /**
+   * A day the teacher marked off is a day they do not teach.
+   *
+   * The cohort calendar has always known this: the sweep drops an occurrence landing on a holiday,
+   * so a repeated class simply does not appear that week (§13). The 1:1 grid is derived from weekly
+   * windows rather than read out of a table, and a window says which weekday a teacher keeps open —
+   * it says nothing about that person being away on one of them. Until this, a teacher who marked a
+   * festival off their calendar still offered it as a free class, and the write still took the
+   * minute. The two halves are tested side by side because they are one promise: a square is
+   * offered exactly when it can be booked.
+   */
+  describe('a day the teacher has marked off', () => {
+    // Read in the teacher's zone, never as a UTC day: a 00:30 class in Kolkata is a 19:00 instant
+    // on the day before, and a teacher who marks off Monday has closed that class either way.
+    const formatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: TEACHER_ZONE,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const dayKey = (startsAt: string) => formatter.format(new Date(startsAt));
+
+    const markOff = (date: string, owner = teacherId) =>
+      prisma.holiday.create({ data: { teacherUserId: owner, date } });
+
+    const askFor = (token: string, startsAt: string) =>
+      request(app.getHttpServer())
+        .post('/api/v1/bookings')
+        .set('Authorization', `Bearer ${token}`)
+        .send({ course: course.id, startsAt });
+
+    /** The validation half of the error envelope, which is where a screen finds the field to redden. */
+    function validation(body: Record<string, unknown>): Record<string, string[]> {
+      return (body.details as { validation: Record<string, string[]> }).validation;
+    }
+
+    afterAll(async () => {
+      const quiet = await userIdFor('slotqt');
+      await prisma.holiday.deleteMany({ where: { teacherUserId: { in: [teacherId, quiet] } } });
+    });
+
+    it('comes off the grid, taking every class that day holds with it', async () => {
+      const before = await slotsFor(enrolled, course.id);
+      const away = before.slots[4];
+      if (!away) throw new Error('This grid needs a class to mark off.');
+      const closed = dayKey(away.startsAt);
+
+      await markOff(closed);
+
+      const after = await slotsFor(enrolled, course.id);
+      expect(after.slots.map((slot) => slot.startsAt)).not.toContain(away.startsAt);
+      // A day off closes the day, not the one minute the teacher was looking at: every offer that
+      // shares its local date goes, however many windows that weekday keeps open.
+      expect(after.slots.filter((slot) => dayKey(slot.startsAt) === closed)).toEqual([]);
+      expect(after.slots).toHaveLength(
+        before.slots.filter((slot) => dayKey(slot.startsAt) !== closed).length,
+      );
+    });
+
+    it('is not bookable either, so the grid and the write answer the same question', async () => {
+      // A day the grid still offers, marked off now: the student could have been looking at the
+      // screen before the teacher went away, and the minute they press has to be refused on the way
+      // in rather than confirmed and then quietly cancelled.
+      const slot = firstSlot(await slotsFor(enrolled, course.id));
+      await markOff(dayKey(slot.startsAt));
+      const studentId = await userIdFor('slotin');
+      const at = {
+        courseId: course.id,
+        studentUserId: studentId,
+        startsAt: new Date(slot.startsAt),
+      };
+      const written = await prisma.booking.count({ where: at });
+
+      const res = await askFor(enrolled, slot.startsAt).expect(400);
+
+      expect(res.body.code).toBe('VALIDATION_FAILED');
+      expect(validation(res.body).startsAt).toBeDefined();
+      // The refusal wrote nothing, which is the point: a request row here would hold a minute the
+      // teacher is away for until the expiry sweep noticed.
+      expect(await prisma.booking.count({ where: at })).toBe(written);
+    });
+
+    it('closes nothing for a teacher who never marked it', async () => {
+      // A holiday belongs to the person who does not teach, not to the course: two teachers can
+      // both run a published course, and one's festival cannot empty the other's calendar.
+      const before = await slotsFor(enrolled, course.id);
+      const quietId = await userIdFor('slotqt');
+      await markOff(dayKey(firstSlot(before).startsAt), quietId);
+
+      const after = await slotsFor(enrolled, course.id);
+      expect(after.slots.map((slot) => slot.startsAt)).toEqual(
+        before.slots.map((slot) => slot.startsAt),
+      );
+    });
+
+    it('opens the day again once the teacher takes the mark off it', async () => {
+      const slot = firstSlot(await slotsFor(enrolled, course.id));
+      const marked = await markOff(dayKey(slot.startsAt));
+
+      expect((await slotsFor(enrolled, course.id)).slots.map((s) => s.startsAt)).not.toContain(
+        slot.startsAt,
+      );
+
+      // Retiring a holiday is the teacher saying they are home after all. The row stays — nothing
+      // here is ever deleted — and the grid goes back to what the windows say.
+      await prisma.holiday.update({ where: { id: marked.id }, data: { isActive: false } });
+
+      expect((await slotsFor(enrolled, course.id)).slots.map((s) => s.startsAt)).toContain(
+        slot.startsAt,
+      );
+    });
+  });
 });
