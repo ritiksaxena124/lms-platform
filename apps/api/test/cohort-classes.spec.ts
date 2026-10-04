@@ -48,6 +48,9 @@ const START_MINUTES = 540;
 const WINDOW_MINUTES = 60;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 const HORIZON_DAYS = 30;
+// How far back a calendar read reaches without anybody asking for it: a class the teacher taught an
+// hour ago is still on their list, and the mark on it still on the student's.
+const LOOKBACK_DAYS = 7;
 
 interface TeachingRow {
   id: string;
@@ -583,12 +586,13 @@ describe('the teacher’s dated calendar', () => {
 
   it('refuses a window wider than the calendar is kept for', async () => {
     // Rows only exist inside the horizon the sweep fills, so a wider ask is not a bigger calendar: it
-    // is a request to pull every class this teacher owns into one response.
+    // is a request to pull every class this teacher owns into one response. The lookback a default
+    // read carries is part of the allowance, not a discount on the month ahead.
     const from = new Date('2020-01-01T00:00:00.000Z');
     const at = (days: number) => new Date(from.getTime() + days * MS_PER_DAY);
 
-    await teaching(as('thrd'), { from, to: at(HORIZON_DAYS) }).expect(200);
-    await teaching(as('thrd'), { from, to: at(HORIZON_DAYS + 1) }).expect(400);
+    await teaching(as('thrd'), { from, to: at(HORIZON_DAYS + LOOKBACK_DAYS) }).expect(200);
+    await teaching(as('thrd'), { from, to: at(HORIZON_DAYS + LOOKBACK_DAYS + 1) }).expect(400);
   });
 
   it('names the course, the hour and the number standing for it', async () => {
@@ -663,7 +667,7 @@ describe('the student’s classes', () => {
 
   it('refuses the window the teacher’s door refuses', async () => {
     const from = new Date('2020-01-01T00:00:00.000Z');
-    const to = new Date(from.getTime() + (HORIZON_DAYS + 1) * MS_PER_DAY);
+    const to = new Date(from.getTime() + (HORIZON_DAYS + LOOKBACK_DAYS + 1) * MS_PER_DAY);
 
     await learning(as('four'), { from, to }).expect(400);
   });
@@ -689,5 +693,50 @@ describe('the student’s classes', () => {
   it('is the student’s door only', async () => {
     await learning(as('else')).expect(403);
     await learning().expect(401);
+  });
+});
+
+describe('a class whose minute has gone by', () => {
+  // Neither portal asks for a window, so the default is what a teacher is actually shown: the whole
+  // of a calendar read on a Tuesday afternoon. It has to hold the class that started this morning,
+  // because that is the class whose roll gets marked, and the student's list has to hold it for the
+  // same reason — the word on their row is written after the minute, not before it.
+  let course: { id: string; slug: string };
+
+  beforeAll(async () => {
+    await open('hist', 'teacher');
+    await open('sixth', 'student');
+    course = await createPublishedCourse(as('hist'), 'History');
+    await enroll(as('sixth'), course.id);
+    await scheduleWeek(as('hist'), course.id);
+
+    // Stand this calendar up as it stood ten days ago. The sweep writes every row it is owed from
+    // the instant it is handed, so running it at that older instant leaves a week and a half of
+    // dated classes behind it — real history, written by the real writer, with nothing faked here.
+    await sweeper.reconcileTeacher(await named('hist'), new Date(Date.now() - 10 * MS_PER_DAY));
+  });
+
+  it('stays on the teacher’s list for a week, and no longer', async () => {
+    const now = Date.now();
+    const list = await seenTeaching(as('hist'));
+
+    expect(list.filter((row) => Date.parse(row.startsAt) < now).length).toBeGreaterThan(0);
+    for (const row of list) {
+      expect(Date.parse(row.startsAt)).toBeGreaterThanOrEqual(now - LOOKBACK_DAYS * MS_PER_DAY);
+    }
+    // The lookback is added to the window rather than taken out of it: a month ahead is still a
+    // month ahead, which is what the sweep keeps filled.
+    const furthest = Math.max(...list.map((row) => Date.parse(row.startsAt)));
+    expect(furthest).toBeGreaterThan(now + 20 * MS_PER_DAY);
+  });
+
+  it('keeps the mark reachable on the student’s list at the same reach', async () => {
+    const now = Date.now();
+    const list = await seenLearning(as('sixth'));
+
+    expect(list.some((row) => Date.parse(row.startsAt) < now)).toBe(true);
+    for (const row of list) {
+      expect(Date.parse(row.startsAt)).toBeGreaterThanOrEqual(now - LOOKBACK_DAYS * MS_PER_DAY);
+    }
   });
 });

@@ -19,11 +19,13 @@ Two phases are delivered only halfway, and the honest version of that belongs he
 commit message:
 
 - **Phase 10 — the calendar.** A weekly series now writes dated classes and a marked-off day takes them
-  out again; the teacher reads those rows on `/calendar`, and a student meets them on their own list
-  beside the classes they booked. Two things are missing. Every dated class carries a register of the
-  names holding a place and nothing answers it, so `completed` and `no_show` stay unreachable until a
-  teacher can mark a class that has happened. And the booking grid still expands the availability
-  windows alone, so a day off stops a cohort class rather than a minute a student asks for.
+  out again; the teacher reads those rows on `/calendar`, marks the register beside one of them at
+  `/calendar/class/{id}`, and a student meets the class — and the teacher's word about their own name —
+  on their list beside the classes they booked. Two things are still missing: the same answer for a class
+  a student booked rather than one a course scheduled — `completed` and `no_show` stay seeded booking
+  statuses no code writes, so a one-to-one class ends with nobody having said it happened — and the
+  booking grid, which still expands the availability windows alone, so a day off stops a cohort class
+  rather than a minute a student asks for.
 - **Phase 9 — money.** A teacher issues discount codes, a learner redeems one while enrolling, and the
   discounted amount is filed as a `payment` row. No provider is connected and no money moves.
 
@@ -92,9 +94,14 @@ See [Phases](#phases) for what each phase promised and what it delivered.
 - **The dated calendar** — `/calendar` (`/api/v1/classes/teaching`) shows the classes the series wrote,
   the next thirty days in whole weeks. The rows rather than the patterns, because only the table holds
   the days that were marked off. A day with more classes than a column shows folds the rest behind a
-  press that names the day, and the list under the grid holds all of them either way. No class on it
-  is clickable: no route accepts an edit to a dated class, and a chip that invited one would be a
-  feature the API refuses to back.
+  press that names the day, and the list under the grid holds all of them either way. Nothing on a row
+  edits the class — no route accepts a dated class from a caller, and a chip that invited one would be
+  a feature the API refuses to back — but each row links to the roll beside it.
+- **The roll beside a class** — `/calendar/class/[classId]` (`GET`/`PUT /api/v1/classes/:id/roll`) lists
+  every student holding a place in that course and lets the teacher say _present_ or _absent_ beside a
+  name, or nothing at all. The sheet opens when the class's minute arrives — the server decides that, so
+  the buttons are not drawn on a class that has not started — and the whole sheet is sent as one save,
+  because calling the roll is one act rather than one per name.
 - **The queue, and the classes** — an ask lands in `/requests` as `pending` and holds the minute;
   nothing is a class until the teacher confirms or refuses it. `/classes` holds the answer either
   way, soonest first.
@@ -134,7 +141,9 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   shows the same class in the student's own timezone, _Leave this class_ gives the minute back
   while it still stands, and Join opens the room for the class happening now. The classes a course's
   series scheduled (`/api/v1/classes/learning`) arrive on that same list in the order they happen,
-  wearing one pill and no door — nobody booked them, so there is no minute to give back.
+  wearing no door — nobody booked them, so there is no minute to give back — and beside the pill that
+  says so, the one word the teacher wrote about their own name, or nothing at all while the roll is
+  still unmarked.
 
 ### The operator's desk
 
@@ -171,7 +180,8 @@ two things it may change.
   against what the code says now; the phase table is read out of this README at build time. Three
   ways of saying the same thing: a page cannot report a fact the source has stopped holding.
 
-Money and attendance are still ahead — [Phases](#phases) says in which order they arrive.
+A cohort class now gets its roll marked, and a student reads the teacher's word about their own
+name; money is still ahead — [Phases](#phases) says in which order.
 
 ---
 
@@ -454,8 +464,9 @@ which is why that row reads Partial inside a published tag: a tag marks the gate
 what is behind it. After that the numbers stopped tracking phases altogether, because not everything
 worth shipping is a roadmap row: `v0.15.2` carried the container stack, `v0.16.0` carried Phase 10's
 second stage — a series that generates its cohort classes — and `v0.17.0` carries the capability layer
-under the three roles. A release closes a phase or makes something a person can finally do; both are
-boundaries.
+under the three roles. `v0.18.0` is the third: the roll beside a dated class, the teacher's one word per
+name, and that word reading back to the student whose name it is. A release closes a phase or makes
+something a person can finally do; both are boundaries.
 
 ```
 bun run release v0.8.0 --title="Phase 8: the ops portal"
@@ -567,9 +578,11 @@ decision was made, and what was deliberately left out.
 Two of those rows need their notes read with them. **9** shipped the codes, the redemption and the
 `payment` row, and no provider behind any of it. **10** shipped its tables, endpoints and screens and
 now the sweep that turns a series into dated classes and takes a marked-off day's classes out from
-under it — but nothing answers the register beside a class, so no class is yet taught or missed, and the
-booking grid is still expanded from the availability windows alone, so a day off stops a cohort class
-rather than a minute a student asks for. The rest of the table means what it says.
+under it, plus the register beside one of them — a teacher marks a class's roll and the student sees
+their own word. Two things keep that row Partial: a _booked_ class still has nobody who can say it
+happened, since `completed` and `no_show` stay seeded booking statuses no code writes, and the booking
+grid is still expanded from the availability windows alone, so a day off stops a cohort class rather
+than a minute a student asks for. The rest of the table means what it says.
 
 ### All thirteen, in order
 
@@ -578,10 +591,10 @@ putting a door in front of what the two before it had only recorded, and 11–12
 sit outside it — the face and the manual. 9 and 10 sit where they do because of what has to exist
 before their shape stops moving, and both are now half-built rather than unbuilt: each wrote its
 tables, its endpoints and its screens, and each left out the part that would have changed what the
-older phases do — Phase 9 a charge behind the price, Phase 10 the mark on a class and any effect on
-the minutes the booking grid offers. That is recorded on the rows above rather than smoothed over. 13
-was added on
-2026-09-30, after 12 closed, because a route table is a catalogue and not a manual.
+older phases do — Phase 9 a charge behind the price, Phase 10 the mark on a class a student booked
+rather than one a course scheduled, and any effect on the minutes the booking grid offers. That is
+recorded on the rows above rather than smoothed over. 13 was added on 2026-09-30, after 12 closed,
+because a route table is a catalogue and not a manual.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -624,14 +637,18 @@ was added on
   reads.
 - **Phase 10 — the teacher's calendar.** A course's classes repeating weekly, and the holidays and
   no-class days that stop a date being taught at all. Both are edits to what §13's windows mean, so they
-  come after booking, video and both portals have settled. **Delivered except the mark:** the
+  come after booking, video and both portals have settled. **Delivered, mark and all:** the
   `class_series` and `holiday` tables, their endpoints and their screens were already in, and an hourly
   sweep now reconciles them into `class_occurrence` — a dated class with its `class_attendance` register
   beside it — so a series stands for real classes and a holiday takes that date's away. The teacher reads
   the rows at `/calendar`, a student meets them on `/my-classes`, and the booking grid is untouched: it
   still expands the availability windows alone, because a cohort class is a timetable rather than minutes
-  to claim. What is missing is the answer on the register — nothing marks a class taught or missed, so
-  `completed` and `no_show` stay unreachable for a cohort class.
+  to claim. The answer on the register arrived last: `GET` and `PUT /classes/:id/roll` read and write one
+  class's sheet — a name, and `present` or `absent` beside it, nothing said about a name nobody has
+  marked — with the teacher marking at `/calendar/class/{id}` and the student seeing their own word on
+  the row in their list. What is still not in the phase is the same answer for a _booked_ class:
+  `completed` and `no_show` remain seeded booking statuses no code writes, because a one-to-one class
+  ends when the room empties and nobody has been given a way to say so.
 - **Phase 11 — the product's face.** A public website a school or a teacher reads before anybody
   signs up: an `apps/*` workspace member on `@lms/ui` and `@lms/shared`, and not a second backend.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
@@ -953,8 +970,9 @@ the database, and every generated table on the site is a reading of what the cod
 than a second copy of it that can drift. The table above is what the docs site publishes, and what the
 public page points at. Nothing is left unstarted in the table, but two rows are not the whole thing
 they were scoped as: Phase 9 wrote its coupons and its `payment` rows without a payment provider behind
-them, and Phase 10 now reconciles its series and holidays into a dated calendar without the booking
-grid ever reading either, or anybody marking a class taught. Those are the two
+them, and Phase 10 now reconciles its series and holidays into a dated calendar and marks the roll
+beside one of its classes — without the booking grid ever reading either, and with no way for a class
+a student booked rather than a course scheduled to be said it happened. Those are the two
 places where a phase is closed on paper and open in the product.
 
 ## Environment variables

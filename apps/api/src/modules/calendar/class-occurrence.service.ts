@@ -1,21 +1,36 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { Cron, CronExpression } from '@nestjs/schedule';
 import {
+  LKP_TYPE_CODES,
   OCCURRENCE_HORIZON_DAYS,
+  OCCURRENCE_LOOKBACK_DAYS,
   expandSeries,
   type AssignedClass,
   type AttendanceStatusCode,
+  type ClassRoll,
   type LearningClassesResponse,
+  type RollLine,
   type ScheduledClass,
   type SeriesPattern,
   type TeachingClassesResponse,
 } from '@lms/shared';
 
 import { AppLogger } from '../../common/logging/app-logger.service';
+import { ReferenceService } from '../../reference/reference.service';
 import { EnrollmentsRepository } from '../enrollments/enrollments.repository';
 import { CalendarRepository } from './calendar.repository';
-import { ClassOccurrenceRepository, type NewOccurrence } from './class-occurrence.repository';
+import {
+  ClassOccurrenceRepository,
+  type NewOccurrence,
+  type RollClassRow,
+} from './class-occurrence.repository';
 import type { ListClassesQueryDto } from './dto/list-classes-query.dto';
+import type { SaveRollDto } from './dto/class-roll.dto';
 
 const MS_PER_MINUTE = 60_000;
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
@@ -58,6 +73,7 @@ export class ClassOccurrenceService {
     private readonly occurrences: ClassOccurrenceRepository,
     private readonly calendar: CalendarRepository,
     private readonly enrollments: EnrollmentsRepository,
+    private readonly reference: ReferenceService,
   ) {}
 
   /**
@@ -269,6 +285,114 @@ export class ClassOccurrenceService {
       })),
     };
   }
+
+  /**
+   * The sheet under one dated class: every name it is standing for, and what the teacher said.
+   *
+   * Read one class at a time because that is the size of the question. A week of classes is a list
+   * of days; who came is a list of people, and putting the two on one screen is how a teacher
+   * marks Thursday's absent on Wednesday's roll.
+   */
+  async roll(teacherUserId: string, classId: string, now = new Date()): Promise<ClassRoll> {
+    return toRoll(await this.rollRow(teacherUserId, classId), now);
+  }
+
+  /**
+   * Write the teacher's answers on one class's sheet, and read the sheet back.
+   *
+   * Three rules, and each of them is a mistake this route refuses to make possible.
+   *
+   * The class has to have started. Attendance is a report about an event; a report filed before the
+   * event is a prediction, and the platform has no door that lets a person write one down as fact.
+   *
+   * Every name has to be on this class's sheet. A body that answers for a stranger is either a
+   * screen that has gone stale or a caller guessing ids, and both deserve a refusal rather than a
+   * write that lands nowhere — so the whole request is checked before a single line moves, and one
+   * bad name stops the roll instead of quietly dropping it.
+   *
+   * And the answer is the whole roll, read again after the write. The teacher's screen and the
+   * table agree on what was saved because the screen is shown the table, not what it meant to send.
+   */
+  async saveRoll(
+    teacherUserId: string,
+    classId: string,
+    input: SaveRollDto,
+    now = new Date(),
+  ): Promise<ClassRoll> {
+    const row = await this.rollRow(teacherUserId, classId);
+
+    if (row.startsAt.getTime() > now.getTime()) {
+      throw new ConflictException('A class that has not started has no attendance to write yet.');
+    }
+
+    const names = input.lines.map((line) => line.studentId);
+    if (new Set(names).size !== names.length) {
+      throw new BadRequestException('Say one thing about each name on the roll.');
+    }
+
+    const onSheet = new Set(row.attendances.map((line) => line.studentUserId));
+    if (names.some((studentId) => !onSheet.has(studentId))) {
+      throw new BadRequestException('Every name on a roll is a name this class is standing for.');
+    }
+
+    const codes = [
+      ...new Set(input.lines.map((line) => line.status).filter((code): code is string => !!code)),
+    ];
+    const values = await this.reference.valuesByCodes(LKP_TYPE_CODES.ATTENDANCE_STATUS, codes);
+    const idOf = new Map(values.map((value) => [value.code, value.id]));
+
+    if (codes.some((code) => !idOf.has(code))) {
+      throw new BadRequestException('The register knows only present and absent.');
+    }
+
+    // One bucket per answer, so a thirty-name roll is three statements rather than thirty. The
+    // `null` bucket is the corrections: a mark taken back goes to unmarked, which is the state the
+    // line was in before anybody answered, and not to a word for a thing that did not happen.
+    const buckets = new Map<string | null, string[]>();
+    for (const line of input.lines) {
+      const statusValueId = line.status ? (idOf.get(line.status) ?? null) : null;
+      const bucket = buckets.get(statusValueId) ?? [];
+      bucket.push(line.studentId);
+      buckets.set(statusValueId, bucket);
+    }
+
+    await this.occurrences.markSheet(
+      row.id,
+      [...buckets].map(([statusValueId, studentUserIds]) => ({ statusValueId, studentUserIds })),
+    );
+
+    return toRoll(await this.rollRow(teacherUserId, classId), now);
+  }
+
+  /** The class the caller is marking, or the answer every other teacher-owned route gives. */
+  private async rollRow(teacherUserId: string, classId: string): Promise<RollClassRow> {
+    const row = await this.occurrences.classForRoll(teacherUserId, classId);
+    if (!row) throw new NotFoundException('No class here is yours to mark.');
+    return row;
+  }
+}
+
+/**
+ * The row, in the shape the roll's two doors answer with.
+ *
+ * `canMark` is computed here rather than stored: the class either has started or it has not, and
+ * which of the two it is depends on the clock the answer is being given at.
+ */
+function toRoll(row: RollClassRow, now: Date): ClassRoll {
+  return {
+    classId: row.id,
+    course: row.course,
+    startsAt: row.startsAt.toISOString(),
+    endsAt: new Date(row.startsAt.getTime() + row.durationMinutes * MS_PER_MINUTE).toISOString(),
+    canMark: row.startsAt.getTime() <= now.getTime(),
+    lines: row.attendances.map<RollLine>((line) => ({
+      id: line.id,
+      student: line.student,
+      // The lookup column is text to Prisma and a code to everybody else, and the write above only
+      // ever puts one of the two seeded answers on a line.
+      status: (line.status?.code ?? null) as AttendanceStatusCode | null,
+    })),
+  };
 }
 
 /** The pair that makes a dated class the same one twice: the pattern and the instant. */
@@ -282,25 +406,31 @@ function lineKey(occurrenceId: string, studentUserId: string): string {
 }
 
 /**
- * The stretch a list covers, defaulting to the horizon the sweep keeps.
+ * The stretch a list covers: a week of history, then the horizon the sweep keeps.
  *
  * The caller's bounds are returned as written when they were given: a screen that asked for a week
- * is shown the week it asked for, and one that asked for nothing is shown the month the platform
+ * is shown the week it asked for, and one that asked for nothing is shown the stretch the platform
  * still stands behind. A window that ends before it starts is not an error worth a status code —
  * it is an empty list, and the two bounds say so.
  *
- * A window wider than the horizon is refused rather than answered. The rows do not exist that far
- * ahead, so the ask brings no more calendar — only every class this caller owns in one response.
+ * The default reaches back before `now` because the roll is written after the class starts, and both
+ * portals read with no window: a calendar beginning at this instant drops a class at its own start
+ * minute, which is the moment its sheet opens and the moment the teacher's mark lands on the
+ * student's list.
+ *
+ * A window wider than the kept stretch is refused rather than answered. The rows do not exist that
+ * far ahead, so the ask brings no more calendar — only every class this caller owns in one response.
  */
 function windowOf(query: ListClassesQueryDto, now: Date): { from: Date; to: Date } {
-  const from = query.from ? new Date(query.from) : now;
+  const from = query.from
+    ? new Date(query.from)
+    : new Date(now.getTime() - OCCURRENCE_LOOKBACK_DAYS * MS_PER_DAY);
   const to = query.to
     ? new Date(query.to)
     : new Date(now.getTime() + OCCURRENCE_HORIZON_DAYS * MS_PER_DAY);
-  if (to.getTime() - from.getTime() > OCCURRENCE_HORIZON_DAYS * MS_PER_DAY) {
-    throw new BadRequestException(
-      `A class window may not be wider than ${OCCURRENCE_HORIZON_DAYS} days.`,
-    );
+  const widestDays = OCCURRENCE_HORIZON_DAYS + OCCURRENCE_LOOKBACK_DAYS;
+  if (to.getTime() - from.getTime() > widestDays * MS_PER_DAY) {
+    throw new BadRequestException(`A class window may not be wider than ${widestDays} days.`);
   }
   return { from, to };
 }

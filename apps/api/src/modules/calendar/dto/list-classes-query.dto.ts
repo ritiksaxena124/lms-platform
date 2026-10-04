@@ -10,9 +10,11 @@ import { IsISO8601, IsOptional } from 'class-validator';
  * the next window without converting anything.
  *
  * Neither is required, and the default is not a guess the caller has to remember: leaving both out
- * asks for the horizon the generation sweep keeps filled, which is the only stretch where an empty
- * Tuesday means nobody teaches rather than meaning the platform stopped writing rows a month ago.
- * A screen that wants a specific week says so, and gets exactly that week.
+ * asks for the horizon the generation sweep keeps filled, plus a week behind now — a class does not
+ * stop being somebody's appointment at its start minute, and the roll under it is marked after it.
+ * Together those are the only stretch where an empty Tuesday means nobody teaches rather than
+ * meaning the platform stopped writing rows a month ago. A screen that wants a specific week says
+ * so, and gets exactly that week.
  */
 export class ListClassesQueryDto {
   @IsOptional()
