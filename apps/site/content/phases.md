@@ -45,11 +45,13 @@ place opens. That is the whole of it: **nothing is charged.** There is no paymen
 that return each year. Both now have consequences. A sweep reconciles them into dated classes over the
 next thirty days, so a series stands for real classes on the teacher's `/calendar`, a marked-off day
 takes that date's classes out and puts them back when it is lifted, and a student meets the same rows on
-their own list beside the classes they booked. What the phase still does not do is answer them: every
-dated class carries a register of the names holding a place and nothing marks one taught or missed, and
-**the booking grid still expands the availability windows alone** — deliberately, since a cohort class is
-a timetable rather than minutes to claim, but it is the promise the phase was scoped with and it is on
-the row above.
+their own list beside the classes they booked. A dated class carries the register its course implies: a
+name holding a place, with `present` or `absent` beside it once the teacher says so at
+`/calendar/class/{id}`, and nothing at all about a name nobody has marked. The day off now reaches past
+the sweep as well — a marked date leaves the booking grid too, so a student is never offered a minute
+their teacher is away for. What the phase still does not answer is the one-to-one class at its end:
+`completed` and `no_show` stay seeded booking statuses that nothing writes, so a class a student booked
+finishes with nobody having said it happened.
 
 ## Where the reasoning lives
 
