@@ -18,7 +18,7 @@ description a stranger could act on, a merge, and a tag only when the gate is gr
 branch off `main` silently excludes whatever has already been integrated.
 
 ```
-main ──────●───────────────────●  (latest tag: v0.18.0)
+main ──────●───────────────────●  (latest tag: v0.18.1)
             ╲                 ╱
 release ─────╲───●───●────────   fixes only, nothing new
               ╲       ╱
@@ -220,16 +220,16 @@ Patches **accumulate and go out together**. Six fixes are one tag, not six. With
 number stops carrying information and the repository ends up with a hundred releases that all mean
 "something small changed".
 
-The version line today: the newest tag is **`v0.18.0`**, and `release` and `develop` are the history that
-led into it. So the next repair on that line is **`v0.18.1`**, and the next thing a user could not do
+The version line today: the newest tag is **`v0.18.1`**, and `release` and `develop` are the history that
+led into it. So the next repair on that line is **`v0.18.2`**, and the next thing a user could not do
 before is **`v0.19.0`**. Read `git log --oneline <newest tag>..develop` before choosing a number — the
 answer is in what has landed since the last tag, not in what this file last said.
 
 Cutting a release:
 
 ```
-bun run release v0.18.0 --title="Phase 10 Stage 3: the roll a teacher marks"
-bun run release v0.18.0 --dry-run          # look first
+bun run release v0.18.1 --title="Patch: a day off is not offered as a class"
+bun run release v0.18.1 --dry-run          # look first
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main`, and a tag that already exists on

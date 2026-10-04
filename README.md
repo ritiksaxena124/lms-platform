@@ -466,8 +466,10 @@ what is behind it. After that the numbers stopped tracking phases altogether, be
 worth shipping is a roadmap row: `v0.15.2` carried the container stack, `v0.16.0` carried Phase 10's
 second stage — a series that generates its cohort classes — and `v0.17.0` carries the capability layer
 under the three roles. `v0.18.0` is the third: the roll beside a dated class, the teacher's one word per
-name, and that word reading back to the student whose name it is. A release closes a phase or makes
-something a person can finally do; both are boundaries.
+name, and that word reading back to the student whose name it is. `v0.18.1` is the repair pair that followed
+it: a date a teacher marked off no longer opens as a one-to-one slot, and the two dependency advisories the
+security scan was still carrying are closed. A release closes a phase or makes something a person can finally
+do; both are boundaries.
 
 ```
 bun run release v0.8.0 --title="Phase 8: the ops portal"
