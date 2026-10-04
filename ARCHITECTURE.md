@@ -1482,7 +1482,7 @@ vitest processes sharing one box stopped being a gate: the teacher's 245 tests f
 alone and were timing single `userEvent` waits past fifteen seconds inside the parallel run, with a
 different set of files failing every time — which is a gate measuring the machine, not the code.
 Ordering is the cheapest cap there is, so the per-suite caps stay as well: the API holds at four
-forks (§16's Prisma pool), the UI kit and the three portals at two threads each, and a component test
+forks (§16's Prisma pool), the UI kit and the three portals at two workers each, and a component test
 waits fifteen seconds rather than vitest's five. The numbers were set by running the gate until it
 stopped being wrong, not by a theory about core counts.
 

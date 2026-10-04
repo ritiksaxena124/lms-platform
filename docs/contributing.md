@@ -254,6 +254,12 @@ action — once, for that number — not as an assumed last step of a task.
   publishes — not in a docs file, a test fixture printed in CI, or a screenshot.
 - **Money is stored in minor units** with a currency beside it, and an amount is never formatted with a
   hardcoded currency code.
+- **Two version pins are advisories, not taste.** Every workspace asks for Vitest 4 because the advisory on
+  `vitest`/`@vitest/mocker` (GHSA-82fw-gwwq-j7x9) is fixed only at 4.1.11, and the root `package.json`
+  `overrides` holds `deepmerge-ts` at 8 for the same reason: Prisma 6 and 7 both declare 7.1.5, and
+  GHSA-ggr8-5vv4-36mx is fixed only at 8.0.0. Prisma's own use of it is one named import, `deepmerge`, which
+  8 still exports with the same call shape. Drop either pin only when the package that declares it moves
+  past the fix itself.
 
 ## Where documentation lives
 
