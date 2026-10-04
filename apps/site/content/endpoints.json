@@ -6948,7 +6948,7 @@
                 "name": "isActive",
                 "optional": false,
                 "type": "boolean",
-                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel."
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel — except on a place whose money has not arrived yet, which is closed because it has never been open. The payment beside it tells those two apart, which is why a response that carries one carries the other."
               },
               {
                 "name": "enrolledAt",
@@ -7036,13 +7036,19 @@
       },
       "response": {
         "kind": "json",
-        "declared": "EnrollmentResponse",
-        "note": "",
+        "declared": "PlaceResponse",
+        "note": "What taking a place, or paying for one, answers with: the place as it now stands, and the attempt that moved it — `null` where nothing was ever owed. The two travel together because neither is a complete answer on its own. A place that is closed and a place that is waiting on money are the same `isActive: false`, and a receipt beside a place the student already opened would be a claim about a purchase they did not just make.",
         "fields": [
           {
             "name": "enrollment",
             "optional": false,
             "type": "Enrollment",
+            "note": ""
+          },
+          {
+            "name": "payment",
+            "optional": false,
+            "type": "EnrollmentPayment | null",
             "note": ""
           }
         ],
@@ -7067,7 +7073,7 @@
                 "name": "isActive",
                 "optional": false,
                 "type": "boolean",
-                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel."
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel — except on a place whose money has not arrived yet, which is closed because it has never been open. The payment beside it tells those two apart, which is why a response that carries one carries the other."
               },
               {
                 "name": "enrolledAt",
@@ -7080,6 +7086,48 @@
                 "optional": false,
                 "type": "string",
                 "note": ""
+              }
+            ]
+          },
+          {
+            "name": "EnrollmentPayment",
+            "note": "One attempt at the money for a place, as the student is told about it. This is the `payment` row, not a gateway object: the amount is what this platform quoted, the status is where this platform's ledger says the attempt stands, and the reference is whatever the provider named it by — `null` when nothing outside this process was ever asked, which is the case for a place that cost nothing and for one whose payment has not been attempted yet.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "amountMinorUnits",
+                "optional": false,
+                "type": "number",
+                "note": "Minor units, in the currency below. `0` means the place was settled at nothing — a free course, or a coupon that reached zero — not a charge that happened to be small."
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "string",
+                "note": "ISO 4217, read from the currency row the course's own price is quoted against."
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "PaymentStatusCode",
+                "note": ""
+              },
+              {
+                "name": "providerReference",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "error",
+                "optional": false,
+                "type": "string | null",
+                "note": "Why a refused attempt was refused, when there is one. Nothing on a place that is still waiting, and nothing on one that settled."
               }
             ]
           },
@@ -7165,7 +7213,7 @@
                 "name": "isActive",
                 "optional": false,
                 "type": "boolean",
-                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel."
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel — except on a place whose money has not arrived yet, which is closed because it has never been open. The payment beside it tells those two apart, which is why a response that carries one carries the other."
               },
               {
                 "name": "enrolledAt",
@@ -7209,6 +7257,152 @@
       },
       "controller": "EnrollmentsController",
       "handler": "cancel"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/enrollments/:id/pay",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "permissions": [
+          "enrollment.hold"
+        ],
+        "roles": [
+          "student"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": []
+      },
+      "response": {
+        "kind": "json",
+        "declared": "PlaceResponse",
+        "note": "What taking a place, or paying for one, answers with: the place as it now stands, and the attempt that moved it — `null` where nothing was ever owed. The two travel together because neither is a complete answer on its own. A place that is closed and a place that is waiting on money are the same `isActive: false`, and a receipt beside a place the student already opened would be a claim about a purchase they did not just make.",
+        "fields": [
+          {
+            "name": "enrollment",
+            "optional": false,
+            "type": "Enrollment",
+            "note": ""
+          },
+          {
+            "name": "payment",
+            "optional": false,
+            "type": "EnrollmentPayment | null",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Enrollment",
+            "note": "",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "EnrollmentCourse",
+                "note": ""
+              },
+              {
+                "name": "isActive",
+                "optional": false,
+                "type": "boolean",
+                "note": "Whether the place is open right now. A closed row is a student who left, not a row that was removed, and only the second reading survives a cancel — except on a place whose money has not arrived yet, which is closed because it has never been open. The payment beside it tells those two apart, which is why a response that carries one carries the other."
+              },
+              {
+                "name": "enrolledAt",
+                "optional": false,
+                "type": "string",
+                "note": "When the place was first taken. Returning after leaving does not move it."
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "EnrollmentPayment",
+            "note": "One attempt at the money for a place, as the student is told about it. This is the `payment` row, not a gateway object: the amount is what this platform quoted, the status is where this platform's ledger says the attempt stands, and the reference is whatever the provider named it by — `null` when nothing outside this process was ever asked, which is the case for a place that cost nothing and for one whose payment has not been attempted yet.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "amountMinorUnits",
+                "optional": false,
+                "type": "number",
+                "note": "Minor units, in the currency below. `0` means the place was settled at nothing — a free course, or a coupon that reached zero — not a charge that happened to be small."
+              },
+              {
+                "name": "currency",
+                "optional": false,
+                "type": "string",
+                "note": "ISO 4217, read from the currency row the course's own price is quoted against."
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "PaymentStatusCode",
+                "note": ""
+              },
+              {
+                "name": "providerReference",
+                "optional": false,
+                "type": "string | null",
+                "note": ""
+              },
+              {
+                "name": "error",
+                "optional": false,
+                "type": "string | null",
+                "note": "Why a refused attempt was refused, when there is one. Nothing on a place that is still waiting, and nothing on one that settled."
+              }
+            ]
+          },
+          {
+            "name": "EnrollmentCourse",
+            "note": "The course a place is in, in the three fields a student needs to recognise it.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "slug",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "title",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "EnrollmentsController",
+      "handler": "pay"
     },
     {
       "method": "GET",

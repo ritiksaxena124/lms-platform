@@ -3,6 +3,7 @@ import {
   PERMISSION_CODES,
   type EnrollmentListResponse,
   type EnrollmentResponse,
+  type PlaceResponse,
 } from '@lms/shared';
 
 import type { AuthenticatedUser } from '../auth/auth.guard';
@@ -36,14 +37,40 @@ export class EnrollmentsController {
   }
 
   /** `200` even the first time: taking a place twice is one place, and a client that had to
-   * handle `201` and `200` differently would be branching on history it cannot know. */
+   * handle `201` and `200` differently would be branching on history it cannot know.
+   *
+   * The answer carries the payment beside the enrollment because a place that is closed and a place
+   * that is waiting on money are the same `isActive: false`, and only the second half tells them
+   * apart. */
   @Post()
   @HttpCode(HttpStatus.OK)
   async enroll(
     @CurrentUser() user: AuthenticatedUser,
     @Body() dto: EnrollDto,
-  ): Promise<EnrollmentResponse> {
-    return { enrollment: await this.enrollments.enroll(user.id, dto) };
+  ): Promise<PlaceResponse> {
+    return this.enrollments.enroll(user.id, dto);
+  }
+
+  /**
+   * Answer for the money a held place owes.
+   *
+   * A press, not a checkout: there is no body, because the amount and the currency are what this
+   * platform already wrote on the ledger row, and a body that could name a number would be a student
+   * choosing their own price. The id is the enrollment's — the same one the enroll answer gave — so
+   * the place being paid for is the caller's own and nothing else can be addressed here.
+   *
+   * Idempotent in the same direction as the enroll press: a second pay on a settled attempt reports
+   * the attempt that completed rather than asking the gateway again, so a double click is one charge.
+   * A refused charge replies `200` with a `failed` payment, because the place moved into a state and
+   * the portal's job is to show it.
+   */
+  @Post(':id/pay')
+  @HttpCode(HttpStatus.OK)
+  async pay(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+  ): Promise<PlaceResponse> {
+    return this.enrollments.pay(user.id, id);
   }
 
   /** The id here is the enrollment's, not the course's — the caller's own list sends it, and
