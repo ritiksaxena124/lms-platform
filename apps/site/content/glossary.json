@@ -10,7 +10,7 @@
   "cohort class": "A dated class a course scheduled for everyone holding a place in it, rather than one a student asked for.",
   "register": "The names beside one dated class — every student holding a place in its course — before anybody has marked who came.",
   "roll": "The register once the teacher has answered it — `present`, `absent`, or nothing beside a name nobody has marked — and not the roster, which is a course's whole class list.",
-  "holiday": "A date a teacher marks off, once or every year, so none of their series runs that day.",
+  "holiday": "A date a teacher marks off, once or every year, so neither a series nor the booking grid reaches that day.",
   "slot": "One bookable window of one teacher's calendar, refused to a second request once it is taken.",
   "instant-book": "A booking the system confirms the moment it is asked for rather than leaving it for the teacher.",
   "retire": "To take a row out of use by clearing its active flag, leaving the row and everything that points at it.",
