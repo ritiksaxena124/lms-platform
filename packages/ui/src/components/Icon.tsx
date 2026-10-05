@@ -25,7 +25,8 @@ export type IconName =
   | 'arrow-right'
   | 'chevron-left'
   | 'chevron-right'
-  | 'user';
+  | 'user'
+  | 'video-camera';
 
 /** Ordered, not a `keyof`: the story gallery and the test that guards it walk
  * this list, so a name added to the union without artwork fails loudly. */
@@ -39,6 +40,7 @@ export const ICON_NAMES = [
   'chevron-left',
   'chevron-right',
   'user',
+  'video-camera',
 ] as const satisfies readonly IconName[];
 
 const ARTWORK: Record<IconName, ReactNode> = {
@@ -90,6 +92,12 @@ const ARTWORK: Record<IconName, ReactNode> = {
     <>
       <circle cx="10" cy="7.4" r="3.3" />
       <path d="M4.4 16.6c0-2.7 2.5-4.4 5.6-4.4s5.6 1.7 5.6 4.4" />
+    </>
+  ),
+  'video-camera': (
+    <>
+      <rect x="2.5" y="5.5" width="11" height="9" rx="2" />
+      <path d="M13.5 8.5l4-2.5v8l-4-2.5" />
     </>
   ),
 };

@@ -495,14 +495,20 @@ function ClassDoor({
 
   if (clock < opensAt) {
     return (
-      <p className="text-[0.8125rem] text-ink-faint">
-        {`Door opens ${formatInstant(door.opensAt, timezone)}`}
+      <p className="flex items-center gap-1.5 text-[0.8125rem] text-ink-faint">
+        <Icon name="clock" size="sm" />
+        {`Opens ${formatInstant(door.opensAt, timezone)}`}
       </p>
     );
   }
 
   if (clock > closesAt) {
-    return <p className="text-[0.8125rem] text-ink-faint">Door closed</p>;
+    return (
+      <p className="flex items-center gap-1.5 text-[0.8125rem] text-ink-faint">
+        <Icon name="video-camera" size="sm" />
+        Door closed
+      </p>
+    );
   }
 
   async function join(): Promise<void> {
@@ -520,19 +526,30 @@ function ClassDoor({
 
   return (
     <>
-      <div className="flex items-center gap-1.5">
-        <Button type="button" size="sm" loading={asking} onClick={() => void join()}>
-          Join
-        </Button>
-        {room ? (
-          <Button type="button" size="sm" variant="ghost" onClick={() => setRoom(null)}>
-            Leave the room
+      {!room ? (
+        <div className="flex flex-col gap-2 rounded-field border border-brand-soft bg-brand-soft p-3">
+          <div className="flex items-center gap-2">
+            <Icon name="video-camera" size="md" className="text-brand-deep" />
+            <span className="text-label font-semibold text-brand-deep">Live class is open</span>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="secondary"
+            loading={asking}
+            onClick={() => void join()}
+            className="w-full justify-center"
+          >
+            Join video call
           </Button>
-        ) : null}
-      </div>
-
-      {room ? (
+        </div>
+      ) : (
         <>
+          <div className="flex items-center gap-1.5">
+            <Button type="button" size="sm" variant="ghost" onClick={() => setRoom(null)}>
+              Leave the room
+            </Button>
+          </div>
           <p className="text-[0.8125rem] text-ink-muted">
             {`This is the room ${booking.course.title} opened. `}
             An empty one means the teacher has not arrived yet — the class has not failed, and this
@@ -548,7 +565,7 @@ function ClassDoor({
             className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
           />
         </>
-      ) : null}
+      )}
     </>
   );
 }
