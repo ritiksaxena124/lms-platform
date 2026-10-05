@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  THEME_STORAGE_KEY,
   type ThemeMode,
   getStoredTheme,
   resolveTheme,
@@ -23,6 +22,7 @@ export function useTheme() {
   // Initialise from storage (client-only).
   useEffect(() => {
     const stored = getStoredTheme();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setMode(stored);
     setResolved(resolveTheme(stored));
   }, []);

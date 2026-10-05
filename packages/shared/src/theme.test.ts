@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { THEME_STORAGE_KEY, getStoredTheme, resolveTheme, setStoredTheme } from './theme';
 
 // Mock localStorage and matchMedia for Node environment
@@ -18,6 +18,7 @@ beforeEach(() => {
   mockDarkPreference = false;
   
   // Set up global mocks
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   (globalThis as any).window = {
     localStorage: mockLocalStorage,
     matchMedia: (query: string) => ({
@@ -34,6 +35,7 @@ beforeEach(() => {
 });
 
 afterEach(() => {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   delete (globalThis as any).window;
 });
 
