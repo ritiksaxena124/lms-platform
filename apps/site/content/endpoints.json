@@ -41,7 +41,7 @@
             "conditional": false,
             "nested": false,
             "rules": [
-              "one of: account_registered, signed_in, signed_out, session_replay_detected, account_status_changed, account_role_changed, teacher_profile_saved, course_created, course_updated, course_published, course_unpublished, course_archived, course_unarchived, course_demo_bookings_changed, course_module_created, course_module_updated, course_module_deactivated, course_modules_reordered, lesson_created, lesson_updated, lesson_published, lesson_unpublished, lesson_deactivated, lessons_reordered, lesson_asset_attached, availability_rule_created, availability_rule_updated, availability_rule_retired, enrollment_joined, enrollment_left, booking_requested, booking_confirmed, booking_refused, booking_cancelled, booking_expired"
+              "one of: account_registered, signed_in, signed_out, session_replay_detected, account_status_changed, account_role_changed, teacher_profile_saved, course_created, course_updated, course_published, course_unpublished, course_archived, course_unarchived, course_demo_bookings_changed, course_module_created, course_module_updated, course_module_deactivated, course_modules_reordered, lesson_created, lesson_updated, lesson_published, lesson_unpublished, lesson_deactivated, lessons_reordered, lesson_asset_attached, availability_rule_created, availability_rule_updated, availability_rule_retired, enrollment_joined, enrollment_left, booking_requested, booking_confirmed, booking_refused, booking_cancelled, booking_expired, booking_completed, booking_no_show"
             ],
             "values": [
               "account_registered",
@@ -78,7 +78,9 @@
               "booking_confirmed",
               "booking_refused",
               "booking_cancelled",
-              "booking_expired"
+              "booking_expired",
+              "booking_completed",
+              "booking_no_show"
             ]
           },
           {
@@ -1832,6 +1834,142 @@
       },
       "controller": "BookingsController",
       "handler": "create"
+    },
+    {
+      "method": "POST",
+      "path": "/api/v1/bookings/:id/attendance",
+      "statusCode": 200,
+      "access": {
+        "kind": "session",
+        "permissions": [
+          "booking.answer"
+        ],
+        "roles": [
+          "teacher"
+        ]
+      },
+      "request": {
+        "params": [
+          "id"
+        ],
+        "query": [],
+        "body": [
+          {
+            "name": "status",
+            "optional": false,
+            "conditional": false,
+            "nested": false,
+            "rules": [
+              "A class either happened or it did not."
+            ],
+            "values": [
+              "completed",
+              "no_show"
+            ]
+          }
+        ]
+      },
+      "response": {
+        "kind": "json",
+        "declared": "{ booking: Booking }",
+        "note": "",
+        "fields": [
+          {
+            "name": "booking",
+            "optional": false,
+            "type": "Booking",
+            "note": ""
+          }
+        ],
+        "types": [
+          {
+            "name": "Booking",
+            "note": "A class a student has asked for. `endsAt` is not stored — the table keeps a start and a length — but a screen that shows a calendar square has to say when the class is over, and making three portals add sixty minutes in three slightly different ways is how a lesson ends up finishing at two times. There is no student on it and no teacher either. A request is read from the door that owns it: a student's own list needs no names on its rows, and the teacher's list of requests is a separate shape that adds the student back, because that is the fact they are asking about.",
+            "fields": [
+              {
+                "name": "id",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "course",
+                "optional": false,
+                "type": "{ id: string; slug: string; title: string }",
+                "note": "Named rather than id-only, because the list a student reads is one row per course and a screen that had to look the title up per row would be doing the join the query already has."
+              },
+              {
+                "name": "type",
+                "optional": false,
+                "type": "BookingTypeCode",
+                "note": ""
+              },
+              {
+                "name": "status",
+                "optional": false,
+                "type": "BookingStatusCode",
+                "note": ""
+              },
+              {
+                "name": "live",
+                "optional": false,
+                "type": "LiveClassDoor | null",
+                "note": "The hours this class can be entered, or null when there is no door to open: an unconfirmed request has no room, and a cancelled or expired one has no class. Not a URL, on purpose."
+              },
+              {
+                "name": "startsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "endsAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "durationMinutes",
+                "optional": false,
+                "type": "number",
+                "note": ""
+              },
+              {
+                "name": "createdAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "updatedAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          },
+          {
+            "name": "LiveClassDoor",
+            "note": "The span a live class can be entered: the door a few minutes before the first minute, and a grace after the last. Only the window travels. A Jitsi room has no password — its name is the lock — so the address is handed out by the join endpoint, to one person who has just been checked, rather than riding along on a list the browser keeps, caches and logs (ARCHITECTURE §6). A portal reads this to decide whether to draw a door at all and when to say \"it opens at 09:25\"; it gets the key by asking.",
+            "fields": [
+              {
+                "name": "opensAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              },
+              {
+                "name": "closesAt",
+                "optional": false,
+                "type": "string",
+                "note": ""
+              }
+            ]
+          }
+        ]
+      },
+      "controller": "BookingsController",
+      "handler": "attendance"
     },
     {
       "method": "POST",
