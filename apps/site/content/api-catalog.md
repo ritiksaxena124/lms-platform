@@ -76,7 +76,7 @@ Answer for the money a held place owes. `student` role required, and the id is t
 
 This is a press, not a checkout: there is no body, because the amount, the currency and the attempt are already written on the ledger row and read back from it rather than recomputed from the course. A teacher who re-priced the course after the learner was quoted charges that learner nothing new — the number the learner saw is the number the gateway is given, which is the only reading under which "the price I was shown" means anything.
 
-The answer is the same `{ enrollment, payment }` pair, and the place is open in it exactly when the money arrived. A `completed` attempt is reported rather than re-asked, so pressing twice is one charge, one letter, and one row. A refused charge is a `200` with `payment.status: "failed"` and the reason in `payment.error`, not an error envelope — it is a state the place moved into, the same way a booking a teacher declines is. The place stays shut, and the next press asks for a *new* row quoting the same amount: the refusal happened and stays in the ledger.
+The answer is the same `{ enrollment, payment }` pair, and the place is open in it exactly when the money arrived. A `completed` attempt is reported rather than re-asked, so pressing twice is one charge, one letter, and one row. A refused charge is a `200` with `payment.status: "failed"` and the reason in `payment.error`, not an error envelope — it is a state the place moved into, the same way a booking a teacher declines is. The place stays shut, and the next press asks for a _new_ row quoting the same amount: the refusal happened and stays in the ledger.
 
 Three refusals are not states of the place. A place that never owed anything — a free course, or one whose coupon opened it on the arithmetic — answers `400` with `BAD_REQUEST` and "That place never owed anything." Somebody else's place, and a place that was never taken, answer `404` with `NOT_FOUND` and "We cannot find that enrollment.", because which enrollments exist is not a fact about the caller. And a deployment with no payment provider answers `503`, having asked nothing of anybody.
 
@@ -87,6 +87,16 @@ The caller's own open places, newest first, and only in courses that still open 
 The answer is `{ items: [...] }`, where each item has `id`, `course: { id, slug, title }`, `isActive`, `enrolledAt`, and `updatedAt`. An archived course is not on the list, because the teacher withdrew the teaching and every page in it is closed; a paused one is, because a list that hid a course the student can still open would be a list with a hole in it. A student who left a course and came back sees one row, not two — the place was reopened, not replaced.
 
 There is no pagination: a student's list is read on a screen, not exported, so a page is what fits on one. If the list grows beyond that, the design decision is to show the most recent and let the student search, not to add pages nobody asked for.
+
+## GET /api/v1/enrollments/held
+
+The caller's places that are shut behind money, newest first. `student` role required, and the session is the whole filter — there is no parameter that widens this list to somebody else's holds.
+
+This is the other half of `GET /enrollments`, and it exists because the first half cannot carry it. That list is a list of links, and a place waiting on money opens nothing, so a student who asked for a place and then reloaded the page would find their own hold missing: the button said "Enroll", and pressing it twice was the only way back to the amount they had been quoted. This read is what stops the kicking. It is also the read a portal makes on a course page, where the answer names the amount, the currency and what happened the last time the money was asked for.
+
+The answer is `{ items: [...] }`, and each item is the same pair the two writes above answer with: `{ enrollment, payment }` — the place as it stands (`isActive` is `false` on every row here) beside the newest attempt against it, which is `pending` or `failed`. A place whose newest row is `completed` is not on this list even when it is closed, because that is a student who paid and then left and owes nothing a second time; a closed place with no ledger row at all is not on it either, because it was never a money question.
+
+The course gate is the one the student's own list uses: a `published` course still counts, a `draft` the teacher paused still counts, and an archived one does not — there is no door there for money to open. The row of an archived course is left exactly as it was written; this read leaves it off a list, which is not the same act as removing it.
 
 ## POST /api/v1/enrollments/:id/cancel
 

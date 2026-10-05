@@ -461,3 +461,124 @@ describe('a coupon against a priced course', () => {
     expect(rows).toHaveLength(0);
   });
 });
+
+/**
+ * The read behind a reload.
+ *
+ * A held place is the one state on this portal that a second visit used to lose. `GET /enrollments`
+ * answers with places the student is *inside of* — the list is a list of links, and a place waiting
+ * on money opens nothing — so a student who pressed Enroll, then reloaded, found the shelf's own
+ * answer instead of their hold: the button said "Enroll", and pressing it again was the only way back
+ * to "Pay ₹50.00". That is not a wrong amount or a double charge (the standing attempt answers a
+ * replay with itself), it is a door the student has to kick twice. These tests are the read that
+ * stops the kicking: the places that are not open and still owe money, with the attempt that says how
+ * much and what happened last time it was asked.
+ */
+async function held(token = student) {
+  const res = await request(app.getHttpServer())
+    .get('/api/v1/enrollments/held')
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+  return res.body.items as Array<{
+    enrollment: Record<string, any>;
+    payment: Record<string, any> | null;
+  }>;
+}
+
+/** Every test in this block enrolls into its own course, so a search by course is the only count
+ * that survives the holds the rest of the file left standing against the same student. */
+async function heldFor(courseId: string, token = student) {
+  return (await held(token)).find((item) => item.enrollment.course.id === courseId);
+}
+
+async function cancelPlace(enrollmentId: string, token = student) {
+  return request(app.getHttpServer())
+    .post(`/api/v1/enrollments/${enrollmentId}/cancel`)
+    .set('Authorization', `Bearer ${token}`)
+    .expect(200);
+}
+
+describe('the places that still owe money', () => {
+  it('lists a held place with the attempt standing against it', async () => {
+    const { id, title } = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    const { body } = await enroll(id);
+
+    const item = await heldFor(id);
+
+    expect(item).toMatchObject({
+      enrollment: {
+        id: body.enrollment.id,
+        isActive: false,
+        course: { id, title, slug: expect.any(String) },
+      },
+      payment: { amountMinorUnits: 5000, currency: 'INR', status: 'pending' },
+    });
+  });
+
+  it('lists a place whose charge was refused, so the press can be offered again', async () => {
+    const { id } = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    const { body } = await enroll(id);
+    gateway.answer = { status: 'failed', error: 'The card was declined.' };
+    await pay(body.enrollment.id);
+
+    const item = await heldFor(id);
+
+    expect(item?.payment).toMatchObject({ status: 'failed', error: 'The card was declined.' });
+  });
+
+  it('leaves out a place the student is inside of', async () => {
+    const { id } = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    const { body } = await enroll(id);
+
+    await pay(body.enrollment.id);
+
+    expect(await heldFor(id)).toBeUndefined();
+  });
+
+  it('leaves out a place that was paid for and then left', async () => {
+    const { id } = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    const { body } = await enroll(id);
+    await pay(body.enrollment.id);
+
+    await cancelPlace(body.enrollment.id);
+
+    // Nothing is owed twice, so this is not a waiting place — the press that reopens it is free.
+    expect(await heldFor(id)).toBeUndefined();
+  });
+
+  it('keeps a place in a course the teacher paused, and drops one in a course they archived', async () => {
+    const paused = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    const archived = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    await enroll(paused.id);
+    const { body } = await enroll(archived.id);
+
+    await request(app.getHttpServer())
+      .post(`/api/v1/courses/${paused.id}/unpublish`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/api/v1/courses/${archived.id}/archive`)
+      .set('Authorization', `Bearer ${teacher}`)
+      .expect(200);
+
+    expect(await heldFor(paused.id)).toBeDefined();
+    expect(await heldFor(archived.id)).toBeUndefined();
+    await expect(place(body.enrollment.id)).resolves.toMatchObject({ isActive: false });
+  });
+
+  it('answers a second student with their own waiting places, not this one’s', async () => {
+    const { id } = await course({ price: { minorUnits: 5000, currency: 'INR' } });
+    await enroll(id);
+
+    expect(await heldFor(id, stranger)).toBeUndefined();
+  });
+
+  it('refuses the list to a session that cannot hold a place', async () => {
+    const res = await request(app.getHttpServer())
+      .get('/api/v1/enrollments/held')
+      .set('Authorization', `Bearer ${teacher}`)
+      .expect(403);
+
+    expect(res.body.code).toBe('FORBIDDEN');
+  });
+});

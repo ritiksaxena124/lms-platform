@@ -3,6 +3,7 @@ import {
   PERMISSION_CODES,
   type EnrollmentListResponse,
   type EnrollmentResponse,
+  type HeldPlaceListResponse,
   type PlaceResponse,
 } from '@lms/shared';
 
@@ -34,6 +35,20 @@ export class EnrollmentsController {
   @Get()
   async list(@CurrentUser() user: AuthenticatedUser): Promise<EnrollmentListResponse> {
     return { items: await this.enrollments.list(user.id) };
+  }
+
+  /**
+   * The caller's places that are shut behind money.
+   *
+   * Read beside `GET /enrollments` rather than folded into it, because the two answer different
+   * questions and one screen needs both answers: the open list is a list of links, and a place
+   * waiting on money is not a link — it is the amount the student was quoted and the press that has
+   * not become a place yet. Nothing here widens with a parameter; the session is the whole filter, so
+   * a held place in somebody else's name is not on this list to be found.
+   */
+  @Get('held')
+  async held(@CurrentUser() user: AuthenticatedUser): Promise<HeldPlaceListResponse> {
+    return { items: await this.enrollments.held(user.id) };
   }
 
   /** `200` even the first time: taking a place twice is one place, and a client that had to

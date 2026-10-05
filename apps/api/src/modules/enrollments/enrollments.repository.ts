@@ -524,6 +524,52 @@ export class EnrollmentsRepository {
     });
   }
 
+  /**
+   * The places that are shut behind money, newest first.
+   *
+   * The mirror of `listOpen`, and the reason it exists is a reload: a held place is not a place the
+   * student is inside of, so the list of links cannot carry it, and a portal that reads only that
+   * list loses the hold its own button just created.
+   *
+   * "Still owes money" is the pair of filters below rather than one of them, and `none` is the half
+   * that does the real work. A place with a `completed` row is not waiting on anything even when it
+   * is closed — that is a student who paid and then left, and a list that showed them a pay button
+   * would be asking the same money twice. A closed place with no ledger row at all is a place that
+   * was never a money question, so `some` keeps it out as firmly as `none` keeps the paid one out.
+   *
+   * The course gate is `listOpen`'s, copied on purpose rather than shared by a helper: a paused term
+   * still holds places that were asked for, and an archived one has no door for anybody's money to
+   * open. The row of the archived course stays exactly as it was written — this read leaves it off a
+   * list, which is not the same act as deleting it.
+   */
+  async listHeld(
+    studentUserId: string,
+    publishedCourseStatusValueId: string,
+    draftCourseStatusValueId: string,
+    statuses: PaymentStatuses,
+  ): Promise<PlaceWithAttempt[]> {
+    const rows = await this.prisma.enrollment.findMany({
+      where: {
+        studentUserId,
+        isActive: false,
+        course: {
+          isActive: true,
+          OR: [
+            { statusValueId: publishedCourseStatusValueId },
+            { statusValueId: draftCourseStatusValueId },
+          ],
+        },
+        payments: {
+          some: { statusValueId: { in: [statuses.pending, statuses.failed] } },
+          none: { statusValueId: statuses.completed },
+        },
+      },
+      select: PLACE_WITH_ATTEMPT,
+      orderBy: { createdAt: 'desc' },
+    });
+    return rows.map(toPlaceWithAttempt);
+  }
+
   /** The course whose roster is being read, and only if the caller wrote it. `isActive` is the
    * whole of the filter, not its status: a teacher who archived a course still owns the class
    * that sat in it, and §2 keeps the rows that say so. */

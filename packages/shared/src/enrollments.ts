@@ -74,6 +74,23 @@ export interface EnrollmentListResponse {
   items: Enrollment[];
 }
 
+/**
+ * The places that are not open yet and still owe money, newest first.
+ *
+ * `GET /enrollments` cannot answer this, and it is not a flaw in it: that list is a list of links,
+ * and a place waiting on money opens nothing. This is the other half of the student's record — the
+ * press that has not become a place — and it exists because a page has to survive a reload. Without
+ * it a student who asked for a place and refreshed finds the shelf's own answer, and their only way
+ * back to the amount they were quoted is to press again and hope the quote repeats.
+ *
+ * Each item carries both halves for the reason `PlaceResponse` does: `isActive: false` is a student
+ * who left just as much as it is a place nobody has paid for, and only the attempt beside it says
+ * which. A place that was paid for and then left appears here nowhere, because nothing is owed twice.
+ */
+export interface HeldPlaceListResponse {
+  items: PlaceResponse[];
+}
+
 /** The whole of what it takes to enroll: which course, and optionally a discount code. There is no
  * "as which student" — the session answers that, and a body that could name somebody else would be a
  * way to take a place in a stranger's name. */

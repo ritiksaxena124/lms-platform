@@ -426,6 +426,23 @@ export class EnrollmentsService {
     return rows.map(toEnrollment);
   }
 
+  /** The caller's own places that are shut behind money, newest first — the read a reload makes when
+   * the student is not in a course yet but has already asked to be.
+   *
+   * This is the same two questions `list` answers, asked of the other half of the table: which courses
+   * still open, and which of the caller's rows are standing shut with an attempt against them. The
+   * statuses are resolved here rather than in the repository because "owed, and not yet paid" is
+   * vocabulary, and the row only stores ids. */
+  async held(studentUserId: string): Promise<PlaceResponse[]> {
+    const [published, draft, statuses] = await Promise.all([
+      this.reference.valueId(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.PUBLISHED),
+      this.reference.valueId(LKP_TYPE_CODES.COURSE_STATUS, COURSE_STATUS_CODES.DRAFT),
+      this.paymentStatuses(),
+    ]);
+    const rows = await this.enrollments.listHeld(studentUserId, published, draft, statuses);
+    return rows.map(toPlace);
+  }
+
   /**
    * Who holds a place in one of the caller's own courses.
    *
