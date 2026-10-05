@@ -32,7 +32,7 @@ import { createTestApp } from './utils/create-test-app';
  * was in before anybody answered, and a student who has left the course simply stops being on the
  * sheet while their row and its answer stay where the history reads them.
  */
-const RUN = randomUUID().slice(0, 8);
+const RUN = `${randomUUID().slice(0, 8)}-${process.pid}-${Date.now()}`;
 const DOMAIN = `${RUN}.localtest.me`;
 const emailFor = (name: string) => `${name}@${DOMAIN}`;
 const PASSWORD = 'correct horse battery staple';

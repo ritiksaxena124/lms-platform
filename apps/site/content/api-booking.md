@@ -66,6 +66,12 @@ Moves a booking from `requested` to `confirmed`. Only the teacher who owns the s
 
 Moves a booking from `requested` to `refused`. The teacher provides an optional reason; the student is notified through the outbox system. Rejected bookings free the slot immediately.
 
+## POST /api/v1/bookings/:id/attendance
+
+Marks attendance for a confirmed one-to-one booking. Only the teacher who owns the booking may mark attendance, and only after the class's first minute has passed. The body carries `status`, which must be either `completed` or `no_show` — the two endings a 1:1 class can have, since there is no register beside it.
+
+The write is idempotent: pressing the same status again answers `200` without writing, while pressing the other status on an already-marked class answers `409`. A cancelled, expired or still-unanswered booking also answers `409`, because nothing was taught.
+
 ## POST /api/v1/bookings/:id/room
 
 Assigns a physical or virtual room to a confirmed booking. The request body supplies the room identifier and optional connection details (URL, dial-in number). Only ops staff may assign rooms.
