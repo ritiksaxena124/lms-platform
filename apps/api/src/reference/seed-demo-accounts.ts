@@ -14,6 +14,7 @@ export interface DemoAccount {
   email: string;
   fullName: string;
   role: RoleCode;
+  timezone?: string;
 }
 
 /**
@@ -26,9 +27,9 @@ export interface DemoAccount {
  * eyes that approve teachers and retire a listing.
  */
 export const DEMO_ACCOUNTS: readonly DemoAccount[] = [
-  { email: 'teacher@example.test', fullName: 'Aditi Sharma', role: ROLE_CODES.TEACHER },
-  { email: 'student@example.test', fullName: 'Rohan Mehta', role: ROLE_CODES.STUDENT },
-  { email: 'ops@example.test', fullName: 'Ops Desk', role: ROLE_CODES.OPS },
+  { email: 'teacher@example.test', fullName: 'Aditi Sharma', role: ROLE_CODES.TEACHER, timezone: 'Asia/Kolkata' },
+  { email: 'student@example.test', fullName: 'Rohan Mehta', role: ROLE_CODES.STUDENT, timezone: 'Asia/Kolkata' },
+  { email: 'ops@example.test', fullName: 'Ops Desk', role: ROLE_CODES.OPS, timezone: 'Asia/Kolkata' },
 ];
 
 /** Fails rather than warns: a documented password must never be minted on a live server. */
@@ -73,6 +74,7 @@ export async function seedDemoAccounts(
         email: account.email,
         fullName: account.fullName,
         passwordHash: await hasher.hash(DEMO_PASSWORD),
+        timezone: account.timezone ?? 'UTC',
         roleValueId: role.id,
         statusValueId: active.id,
       },
