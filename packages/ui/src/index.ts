@@ -76,3 +76,6 @@ export {
 } from './toast/notify';
 export { Toaster, type ToasterProps } from './toast/Toaster';
 export { ToastCard, type ToastCardProps, type ToastTone } from './toast/ToastCard';
+
+export { ThemeSwitcher } from './components/ThemeSwitcher';
+export { useTheme } from './hooks/use-theme';

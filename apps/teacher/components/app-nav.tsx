@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { buttonClass, cn, notify, Skeleton } from '@lms/ui';
+import { buttonClass, cn, notify, Skeleton, ThemeSwitcher } from '@lms/ui';
 
 import { useSession } from './session-provider';
 
@@ -73,6 +73,10 @@ export function AppNav() {
           })}
         </ul>
       </nav>
+
+      <div className="mt-4 lg:mt-6">
+        <ThemeSwitcher />
+      </div>
 
       <AccountSlot />
     </aside>

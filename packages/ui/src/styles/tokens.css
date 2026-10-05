@@ -157,3 +157,58 @@
   --container-page: 80rem;
   --container-reading: 46rem;
 }
+
+/* ---------------------------------------------------------------------------
+ * Dark mode overrides
+ *
+ * Applied via [data-theme="dark"] on <html>. System preference is resolved by
+ * the shared theme module and written to this attribute by the provider hook.
+ * Every token here maintains the same contrast ratios and semantic meaning as
+ * its light counterpart — only the luminance shifts.
+ * ------------------------------------------------------------------------- */
+
+[data-theme='dark'] {
+  /* Surfaces: deep charcoal, not pure black — reduces eye strain while keeping
+   * the flat, border-separated aesthetic intact. */
+  --color-paper: #1a1d21;
+  --color-paper-sunk: #23272c;
+  --color-surface: #2a2e33;
+  --color-surface-raised: #2f343a;
+
+  /* Ink: reversed hierarchy — white for body, softer grays for metadata. All
+   * maintain AA against their respective surfaces. */
+  --color-ink: #e5e8eb;
+  --color-ink-strong: #f7f8f9;
+  --color-ink-muted: #9ca3af;
+  --color-ink-faint: #8b929d;
+  --color-ink-inverse: #1a1d21;
+
+  /* Lines: subtle but visible against dark surfaces. */
+  --color-line: #3a3f45;
+  --color-line-strong: #4a5058;
+
+  /* Brand: slightly brighter emerald for dark backgrounds, maintaining the
+   * same visual weight and readability. */
+  --color-brand: #10a37f;
+  --color-brand-deep: #0d8a6b;
+  --color-brand-soft: rgba(16, 163, 127, 0.15);
+  --color-brand-line: rgba(16, 163, 127, 0.3);
+  --color-ember: #10a37f;
+  --color-ember-deep: #0d8a6b;
+  --color-ember-soft: rgba(16, 163, 127, 0.15);
+  --color-ember-line: rgba(16, 163, 127, 0.3);
+
+  /* Semantic status: adjusted saturation for dark legibility. */
+  --color-success: #10a37f;
+  --color-success-soft: rgba(16, 163, 127, 0.15);
+  --color-warning: #fbbf24;
+  --color-warning-soft: rgba(251, 191, 36, 0.15);
+  --color-danger: #f87171;
+  --color-danger-soft: rgba(248, 113, 113, 0.15);
+  --color-info: #60a5fa;
+  --color-info-soft: rgba(96, 165, 250, 0.15);
+
+  /* Shadows: darker drop shadows work better on dark surfaces. */
+  --shadow-overlay: 0 4px 12px -2px rgb(0 0 0 / 0.4), 0 12px 32px -8px rgb(0 0 0 / 0.5);
+  --shadow-focus: 0 0 0 3px var(--color-brand-soft);
+}

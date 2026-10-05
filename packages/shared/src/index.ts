@@ -18,4 +18,5 @@ export * from './mail-outbox';
 export * from './money';
 export * from './permissions';
 export * from './schedule';
+export * from './theme';
 export * from './timezone';
