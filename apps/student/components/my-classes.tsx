@@ -18,10 +18,13 @@ import {
 } from '@lms/ui';
 import {
   API_ERROR_CODES,
+  ATTENDANCE_STATUS_CODES,
+  ATTENDANCE_STATUS_LABELS,
   BOOKING_STATUS_CODES,
   BOOKING_STATUS_LABELS,
   CANCELLABLE_BOOKING_STATUSES,
   type AssignedClass,
+  type AttendanceStatusCode,
   type Booking,
   type BookingStatusCode,
   type LiveClassDoor,
@@ -50,6 +53,16 @@ const TONES: Record<BookingStatusCode, StatusTone> = {
 };
 
 /**
+ * Which colour the teacher's word about this name wears. Green for the roll saying the class was
+ * stood for, amber for the one saying it was not — and neither is a judgement this screen adds,
+ * since the mark is the teacher's and the colour only keeps the two words apart at a glance.
+ */
+const MARK_TONES: Record<AttendanceStatusCode, StatusTone> = {
+  [ATTENDANCE_STATUS_CODES.PRESENT]: 'success',
+  [ATTENDANCE_STATUS_CODES.ABSENT]: 'warning',
+};
+
+/**
  * One line on this calendar, from either of the two lists that build it.
  *
  * To a reader a class they booked and a class the course scheduled are the same thing: a minute
@@ -67,6 +80,10 @@ interface CalendarRow {
   startsAt: string;
   endsAt: string;
   booking: Booking | null;
+  /** What the teacher said about this name on a scheduled class, or null while nobody has. Only the
+   * second kind of row can carry one: a booked class is a different arrangement, and its own status
+   * pill already tells that story. */
+  mark: AttendanceStatusCode | null;
 }
 
 /** One calendar, in the order the classes happen. */
@@ -78,6 +95,7 @@ function mergeRows(booked: Booking[], scheduled: AssignedClass[]): CalendarRow[]
       startsAt: booking.startsAt,
       endsAt: booking.endsAt,
       booking,
+      mark: null,
     })),
     ...scheduled.map((row): CalendarRow => ({
       key: `scheduled-${row.id}`,
@@ -85,6 +103,7 @@ function mergeRows(booked: Booking[], scheduled: AssignedClass[]): CalendarRow[]
       startsAt: row.startsAt,
       endsAt: row.endsAt,
       booking: null,
+      mark: row.status,
     })),
   ].sort((left, right) => Date.parse(left.startsAt) - Date.parse(right.startsAt));
 }
@@ -127,10 +146,11 @@ interface Failure {
  * something this person has to be awake for, and the same instant on two walls is the one place a
  * mistake costs an hour.
  *
- * The split is on the date and nothing else. On the status alone a confirmed class would go on
- * being "coming up" after its hour passed, because Phase 4 has nothing that marks a class taught;
- * on whether the minute is still held, a class this student called off would vanish from the week
- * it happened in. The date is the only fact on a row that never changes.
+ * The split is on the date and nothing else. On the status alone a confirmed class would stay
+ * "coming up" until somebody marked it off, and a class its teacher never got round to marking
+ * would sit in next week forever; on whether the minute is still held, a class this student called
+ * off would vanish from the week it happened in. The date is the only fact on a row that never
+ * changes.
  *
  * Leaving is one press, and both lists are read again after it rather than edited in place: whether
  * the class stood down or the teacher answered it a second earlier, the honest answer is the one
@@ -323,10 +343,11 @@ export function MyClasses() {
  * One half of the calendar. "Coming up: nothing" is drawn rather than hidden, because it is the
  * answer to the question the page was opened to ask.
  *
- * A row that came from a series carries the fact that it came from a series, and nothing else: no
- * status word, no way out, no door. Each of those three is a booking's story, and the platform has
- * no route behind any of them for a class this student never asked for — a pill that said
- * "confirmed" here would be reporting a teacher's silence as an answer.
+ * A row that came from a series carries the fact that it came from a series, and the one thing the
+ * teacher wrote about this name: no way out and no door. Those two are a booking's story, and the
+ * platform has no route behind either of them for a class this student never asked for — a pill that
+ * said "confirmed" here would be reporting a teacher's silence as an answer. An unmarked line shows
+ * no word at all, because nobody has said one.
  */
 function Section({
   heading,
@@ -385,7 +406,14 @@ function Section({
                         ) : null}
                       </>
                     ) : (
-                      <StatusPill tone="neutral">Cohort class</StatusPill>
+                      <>
+                        <StatusPill tone="neutral">Cohort class</StatusPill>
+                        {row.mark ? (
+                          <StatusPill tone={MARK_TONES[row.mark]}>
+                            {ATTENDANCE_STATUS_LABELS[row.mark]}
+                          </StatusPill>
+                        ) : null}
+                      </>
                     )}
                   </div>
                 </div>
@@ -437,6 +465,10 @@ function Section({
  * entry, a hover status line and a prefetch, three copies of an address meant to be used once
  * (ARCHITECTURE §6, §14). "Leave the room" takes it back off the page, and is worded apart from
  * "Leave this class" above it because the two do very different things.
+ *
+ * The line under the frame is the honest half: the room lives on somebody else's bridge, which has
+ * no way to tell this page who is inside it. So the page says what an empty room means rather than
+ * letting a student sit in another service's hold screen and read it as a class that never happened.
  */
 function ClassDoor({
   booking,
@@ -500,15 +532,22 @@ function ClassDoor({
       </div>
 
       {room ? (
-        <iframe
-          src={room}
-          // No referrer: the address should not reach the video host's logs as a page URL either.
-          referrerPolicy="no-referrer"
-          allow="camera; microphone; fullscreen; display-capture; autoplay"
-          allowFullScreen
-          title={`Live class: ${booking.course.title}`}
-          className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
-        />
+        <>
+          <p className="text-[0.8125rem] text-ink-muted">
+            {`This is the room ${booking.course.title} opened. `}
+            An empty one means the teacher has not arrived yet — the class has not failed, and this
+            page cannot see inside the room, so wait a few minutes before you call it missed.
+          </p>
+          <iframe
+            src={room}
+            // No referrer: the address should not reach the video host's logs as a page URL either.
+            referrerPolicy="no-referrer"
+            allow="camera; microphone; fullscreen; display-capture; autoplay"
+            allowFullScreen
+            title={`Live class: ${booking.course.title}`}
+            className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
+          />
+        </>
       ) : null}
     </>
   );

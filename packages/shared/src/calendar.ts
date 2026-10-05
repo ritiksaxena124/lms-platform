@@ -10,7 +10,8 @@
  */
 
 import { expandWindows, type SlotHorizon, type SlotInstant, type WeeklyWindow } from './schedule';
-import type { AttendanceStatusCode } from './lookup-codes';
+import { ATTENDANCE_STATUS_CODES, type AttendanceStatusCode } from './lookup-codes';
+import type { RosterStudent } from './enrollments';
 import { zoneDateKey } from './timezone';
 
 /** The seven days, numbered the way the table stores them: Monday is 1. Re-exported here so
@@ -151,6 +152,27 @@ export function holidayOn(holidays: HolidayPattern[], localDate: string): Holida
 }
 
 /**
+ * The holiday that closes the day a class instant falls on, or nothing.
+ *
+ * The instant is converted to a date on the teacher's own clock rather than read as a UTC day,
+ * which is the same fact for most of the year and a different one at midnight: a 00:30 class in
+ * Kolkata is a 19:00 instant on the day before, and a teacher who marks off Monday has closed that
+ * class whether or not the database filed it on Sunday.
+ *
+ * This is the only place the conversion happens. The cohort calendar asks it in bulk while a sweep
+ * fills a month, and the 1:1 calendar asks it about the grid it shows and again about the minute a
+ * student pressed; a second copy of the rule is how those three would drift into offering a square
+ * one of them then refuses.
+ */
+export function holidayForInstant(
+  holidays: HolidayPattern[],
+  instant: Date,
+  timeZone: string,
+): HolidayPattern | null {
+  return holidayOn(holidays, zoneDateKey(instant, timeZone));
+}
+
+/**
  * Every class one series opens inside `horizon`, oldest first, with the marked-off days gone.
  *
  * Deliberately a single series rather than a list: the sweep that fills a calendar has to know
@@ -158,10 +180,8 @@ export function holidayOn(holidays: HolidayPattern[], localDate: string): Holida
  * would throw the answer away. `holidays` is the teacher's own list — a blocker belongs to the
  * person who does not teach, not to the course.
  *
- * The holiday test runs on each class's *own* local date rather than the date of the tile it came
- * from, which is the same fact for most of the year and a different one at midnight: a 00:30 class
- * in Kolkata is a 19:00 instant on the day before, and a teacher who marks off Monday has closed
- * that class whether or not the database filed it on Sunday.
+ * Each class is tested against its own local date, which is `holidayForInstant`'s rule rather than
+ * one this function re-decides.
  */
 export function expandSeries(
   series: SeriesPattern,
@@ -171,7 +191,7 @@ export function expandSeries(
 ): SlotInstant[] {
   if (!series.isActive) return [];
   return expandWindows([seriesWindow(series)], timeZone, horizon).filter(
-    (slot) => holidayOn(holidays, zoneDateKey(slot.startsAt, timeZone)) === null,
+    (slot) => holidayForInstant(holidays, slot.startsAt, timeZone) === null,
   );
 }
 
@@ -185,6 +205,18 @@ export function expandSeries(
  * would show a calendar with a hole in the middle of it.
  */
 export const OCCURRENCE_HORIZON_DAYS = 30;
+
+/**
+ * How far back a dated-class read reaches when the caller asks for no window.
+ *
+ * The horizon is forward because rows have to be written before a class happens; this is the other
+ * half of the same stretch, because a class does not stop being somebody's appointment at its start
+ * minute. A teacher marks a roll *after* the hour it was due, and the word they write is read by a
+ * student on the very same list — so a calendar that begins at `now` loses a class at exactly the
+ * moment it becomes the interesting one. Seven days, because a teacher who lost a week still has a
+ * week to answer for, and no further back a portal has to draw.
+ */
+export const OCCURRENCE_LOOKBACK_DAYS = 7;
 
 /**
  * One dated class, as the teacher who teaches it reads it.
@@ -247,4 +279,67 @@ export interface LearningClassesResponse {
   from: string;
   to: string;
   items: AssignedClass[];
+}
+
+/**
+ * What a teacher said about one name on one class's register.
+ *
+ * Two words, because two answers exist. The third state a line can be in — nobody has marked it —
+ * is carried by `null` on the line rather than by a code, and a label for it would put a word on
+ * the absence of one.
+ */
+export const ATTENDANCE_STATUS_LABELS: Record<AttendanceStatusCode, string> = {
+  [ATTENDANCE_STATUS_CODES.PRESENT]: 'Present',
+  [ATTENDANCE_STATUS_CODES.ABSENT]: 'Absent',
+};
+
+/**
+ * One name a dated class is standing for, and the mark on it.
+ *
+ * The student is a `RosterStudent` — an id and a name, no address — for the same reason the course
+ * roster withholds one: this screen answers who was expected, and an email is the field a list
+ * like this picks up by convenience and never puts down.
+ *
+ * `id` is the register line's own key, which a screen never sends back. A teacher marks a *person*,
+ * so the save names students; the row is found from the pair (this class, that person) once the
+ * route has established that the class is the caller's to mark.
+ */
+export interface RollLine {
+  id: string;
+  student: RosterStudent;
+  status: AttendanceStatusCode | null;
+}
+
+/**
+ * One class's register: the names it stands for, and whether a mark may be written right now.
+ *
+ * `canMark` is the server's fact rather than a client comparing `startsAt` against its own clock,
+ * because the two would disagree by whatever the visitor's device is off, and the disagreement
+ * would be a save button on a class that has not happened yet. It stays true forever after the
+ * class starts: a register the teacher forgot to fill in on Monday is a register they can still
+ * fill in on Thursday, and nothing in the platform should get harder to do with age.
+ *
+ * The lines are the names on the sheet — the ones the sweep keeps in step with the course's open
+ * places. A student who has left is not on it: the row stays in the table with its mark, because
+ * "who was meant to be there" is a fact about that day, but a screen that offered a mark for a
+ * person who no longer holds a place would be asking a question the class no longer has.
+ */
+export interface ClassRoll {
+  classId: string;
+  course: { id: string; slug: string; title: string };
+  startsAt: string;
+  endsAt: string;
+  canMark: boolean;
+  lines: RollLine[];
+}
+
+/**
+ * The marks a teacher is making on one class — a whole roll, saved at once.
+ *
+ * A list rather than a single line because that is the act: somebody goes down the names after the
+ * lesson and puts the answer in. `null` on a line clears the mark, which is a correction and not a
+ * non-answer — a line marked absent by mistake goes back to unmarked, not to a word nobody gave.
+ */
+export interface SaveRollInput {
+  lines: Array<{ studentId: string; status: AttendanceStatusCode | null }>;
 }

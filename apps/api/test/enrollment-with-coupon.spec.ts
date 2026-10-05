@@ -5,17 +5,20 @@ import request from 'supertest';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 import { AppModule } from '../src/app.module';
+import { MockPayment } from '../src/providers/payment/mock-payment.adapter';
+import { PAYMENT } from '../src/providers/payment/payment.port';
 import { seedLookups } from '../src/reference/seed-lookups';
 import { createTestApp } from './utils/create-test-app';
 
 /**
- * Integration test: enrolling with a coupon code end-to-end.
+ * A coupon from the teacher's own side of the counter.
  *
- * This verifies the complete flow:
- * 1. Teacher creates a coupon
- * 2. Student enrolls with the coupon code
- * 3. Payment is created with discounted amount
- * 4. Coupon redemption count is incremented
+ * The code here is created through `POST /courses/:id/coupons` rather than written onto the table,
+ * which is what makes this file the place the teacher's numbers are proved: a percentage, a
+ * redemption limit, and a validity window that closed yesterday. What the enrollment does with a
+ * coupon that passes those checks — and what the pay button then does with the place it holds — is
+ * `enrollment-payment.spec.ts`; the port is overridden with the gateway that always says yes so that
+ * only the coupon's own arithmetic is in question.
  */
 const RUN = randomUUID().slice(0, 8);
 const emailFor = (name: string) => `${name}.${RUN}@localtest.me`;
@@ -33,7 +36,7 @@ async function tokenFor(name: string): Promise<string> {
 }
 
 beforeAll(async () => {
-  app = await createTestApp({ imports: [AppModule] });
+  app = await createTestApp({ imports: [AppModule] }, [[PAYMENT, new MockPayment()]]);
   await app.listen(0);
   await seedLookups(prisma);
 });
@@ -70,37 +73,47 @@ afterAll(async () => {
 });
 
 describe('Enrollment with coupon - E2E', () => {
-  it('creates coupon, enrolls with it, and verifies payment record', async () => {
+  it('creates a coupon, quotes its discount against the place, and settles it on the pay press', async () => {
     // Create teacher and student
-    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
-      fullName: 'E2E Teacher',
-      email: emailFor('e2e-teacher'),
-      password: PASSWORD,
-      role: 'teacher',
-    });
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        fullName: 'E2E Teacher',
+        email: emailFor('e2e-teacher'),
+        password: PASSWORD,
+        role: 'teacher',
+      });
 
-    await request(app.getHttpServer()).post('/api/v1/auth/register').send({
-      fullName: 'E2E Student',
-      email: emailFor('e2e-student'),
-      password: PASSWORD,
-      role: 'student',
-    });
+    await request(app.getHttpServer())
+      .post('/api/v1/auth/register')
+      .send({
+        fullName: 'E2E Student',
+        email: emailFor('e2e-student'),
+        password: PASSWORD,
+        role: 'student',
+      });
 
     const teacherToken = await tokenFor('e2e-teacher');
     const studentToken = await tokenFor('e2e-student');
 
     // Get lookup IDs
-    const levelValueId = await prisma.lkpValue.findFirstOrThrow({
-      where: { type: { code: 'CourseLevel' }, code: 'beginner' },
-    }).then((v) => v.id);
+    const levelValueId = await prisma.lkpValue
+      .findFirstOrThrow({
+        where: { type: { code: 'CourseLevel' }, code: 'beginner' },
+      })
+      .then((v) => v.id);
 
-    const statusValueId = await prisma.lkpValue.findFirstOrThrow({
-      where: { type: { code: 'CourseStatus' }, code: 'published' },
-    }).then((v) => v.id);
+    const statusValueId = await prisma.lkpValue
+      .findFirstOrThrow({
+        where: { type: { code: 'CourseStatus' }, code: 'published' },
+      })
+      .then((v) => v.id);
 
-    const currencyValueId = await prisma.lkpValue.findFirstOrThrow({
-      where: { type: { code: 'Currency' } },
-    }).then((v) => v.id);
+    const currencyValueId = await prisma.lkpValue
+      .findFirstOrThrow({
+        where: { type: { code: 'Currency' } },
+      })
+      .then((v) => v.id);
 
     const teacher = await prisma.user.findFirstOrThrow({
       where: { email: emailFor('e2e-teacher') },
@@ -122,9 +135,11 @@ describe('Enrollment with coupon - E2E', () => {
     });
 
     // Teacher creates a 25% discount coupon
-    const discountTypeValueId = await prisma.lkpValue.findFirstOrThrow({
-      where: { type: { code: 'DiscountType' }, code: 'percentage' },
-    }).then((v) => v.id);
+    const discountTypeValueId = await prisma.lkpValue
+      .findFirstOrThrow({
+        where: { type: { code: 'DiscountType' }, code: 'percentage' },
+      })
+      .then((v) => v.id);
 
     const createCouponResponse = await request(app.getHttpServer())
       .post(`/api/v1/courses/${course.id}/coupons`)
@@ -153,7 +168,14 @@ describe('Enrollment with coupon - E2E', () => {
     expect(enrollResponse.body.enrollment).toBeDefined();
     expect(enrollResponse.body.enrollment.course.id).toBe(course.id);
 
-    // Verify payment was created with correct discounted amount (25% off $100 = $75)
+    // The discount is the quote the place is held behind: 25% off $100 is $75, and the money has
+    // not arrived, so the student is not in the course yet.
+    expect(enrollResponse.body.enrollment.isActive).toBe(false);
+    expect(enrollResponse.body.payment).toMatchObject({
+      amountMinorUnits: 7500,
+      status: 'pending',
+    });
+
     const student = await prisma.user.findFirstOrThrow({
       where: { email: emailFor('e2e-student') },
     });
@@ -165,13 +187,12 @@ describe('Enrollment with coupon - E2E', () => {
           studentUserId: student.id,
         },
       },
-      include: { coupon: true },
+      include: { coupon: true, status: true },
     });
 
-    expect(payment).toBeDefined();
     expect(payment?.amountMinorUnits).toBe(7500); // 25% off $100 = $75
     expect(payment?.coupon?.id).toBe(couponId);
-    expect(payment?.statusValueId).toBeDefined();
+    expect(payment?.status.code).toBe('pending');
 
     // Verify coupon redemption count was incremented
     const updatedCoupon = await prisma.coupon.findUnique({
@@ -179,6 +200,24 @@ describe('Enrollment with coupon - E2E', () => {
     });
 
     expect(updatedCoupon?.redemptionCount).toBe(1);
+
+    // The pay press asks the gateway for the quoted amount and opens the place on the answer, on
+    // the row the quote wrote rather than a second one.
+    const paid = await request(app.getHttpServer())
+      .post(`/api/v1/enrollments/${enrollResponse.body.enrollment.id}/pay`)
+      .set('Authorization', `Bearer ${studentToken}`)
+      .expect(200);
+
+    expect(paid.body.enrollment.isActive).toBe(true);
+    expect(paid.body.payment).toMatchObject({ status: 'completed', amountMinorUnits: 7500 });
+
+    const rows = await prisma.payment.findMany({
+      where: { enrollmentId: enrollResponse.body.enrollment.id },
+    });
+    expect(rows).toHaveLength(1);
+
+    const afterPaying = await prisma.coupon.findUniqueOrThrow({ where: { id: couponId } });
+    expect(afterPaying.redemptionCount).toBe(1);
   });
 
   it('rejects enrollment with expired coupon', async () => {
@@ -199,9 +238,11 @@ describe('Enrollment with coupon - E2E', () => {
     });
 
     // Create an expired coupon
-    const discountTypeValueId = await prisma.lkpValue.findFirstOrThrow({
-      where: { type: { code: 'DiscountType' }, code: 'percentage' },
-    }).then((v) => v.id);
+    const discountTypeValueId = await prisma.lkpValue
+      .findFirstOrThrow({
+        where: { type: { code: 'DiscountType' }, code: 'percentage' },
+      })
+      .then((v) => v.id);
 
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
@@ -229,7 +270,7 @@ describe('Enrollment with coupon - E2E', () => {
     expect(response.body.message).toContain('expired');
   });
 
-  it('allows enrollment without coupon code', async () => {
+  it('holds the full price on a place taken without a coupon', async () => {
     const studentEmail = emailFor('no-coupon-student');
 
     await request(app.getHttpServer()).post('/api/v1/auth/register').send({
@@ -254,7 +295,9 @@ describe('Enrollment with coupon - E2E', () => {
 
     expect(response.body.enrollment).toBeDefined();
 
-    // Verify no payment was created (since no coupon was used)
+    // A place with no code on it still has a price, and the price is what the ledger is asked for:
+    // one pending row for the full amount, with no coupon behind it. Before the gate existed this
+    // press wrote no row at all, which left a priced course opening for nothing.
     const student = await prisma.user.findFirstOrThrow({
       where: { email: studentEmail },
     });
@@ -266,8 +309,12 @@ describe('Enrollment with coupon - E2E', () => {
           studentUserId: student.id,
         },
       },
+      include: { status: true },
     });
 
-    expect(payments.length).toBe(0);
+    expect(payments).toHaveLength(1);
+    expect(payments[0]?.amountMinorUnits).toBe(10000);
+    expect(payments[0]?.couponId).toBeNull();
+    expect(payments[0]?.status.code).toBe('pending');
   });
 });

@@ -229,9 +229,8 @@ A full API suite can exhaust Postgres's 100 connections. Each spec file boots it
 
 ```typescript
 // vitest.config.ts
-poolOptions: {
-  forks: { maxForks: 4 }
-}
+pool: 'forks',
+maxWorkers: 4,
 ```
 
 ### Sweep Assertions Scope to Created Rows

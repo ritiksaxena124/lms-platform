@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
 
 const roster = vi.hoisted(() => ({
   myPlaces: vi.fn(),
+  heldPlaces: vi.fn(),
   takePlace: vi.fn(),
 }));
 
@@ -139,6 +140,7 @@ beforeEach(() => {
   session.value = { status: 'signed-out', user: null };
   // Reset rather than only re-stubbing: the call counts are what some of these tests read.
   roster.myPlaces.mockReset().mockResolvedValue([]);
+  roster.heldPlaces.mockReset().mockResolvedValue([]);
   api.readCatalogCourse.mockReset().mockResolvedValue(detail());
 });
 

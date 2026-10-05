@@ -21,6 +21,10 @@ import { ClassOccurrenceService } from './class-occurrence.service';
  * row it asks about is not ours to read directly. The sweep writes a register of names beside every
  * class it opens, and who is on that sheet is exactly who holds a place, which makes the answer
  * somebody else's table and this module a caller.
+ *
+ * The holidays leave this module as a read for the same reason the availability rows leave theirs:
+ * a day a teacher marked off is a fact about that person, owned here, and the 1:1 grid has to ask
+ * about it rather than keep its own copy of what a marked day means.
  */
 @Module({
   imports: [PrismaModule, EnrollmentsModule],
@@ -31,5 +35,6 @@ import { ClassOccurrenceService } from './class-occurrence.service';
     ClassOccurrenceService,
     ClassOccurrenceRepository,
   ],
+  exports: [CalendarRepository],
 })
 export class CalendarModule {}

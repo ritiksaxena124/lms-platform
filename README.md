@@ -5,7 +5,7 @@ teacher writes the course, opens the week they teach and keeps the record; three
 student, ops), one public site and one docs site share one API, one database and one component
 library.
 
-**Status: thirteen phases, two of them half-done** — a teacher writes a course and opens a week in it,
+**Status: thirteen phases, one of them half-done** — a teacher writes a course and opens a week in it,
 a learner reads enough of that course to want a place, asks for a minute of the teacher's time, is let
 into a room for it when the teacher says yes, is told about all of it by email, and every one of those
 decisions leaves a record the platform can be asked about. An operator signs in on a third port and
@@ -19,13 +19,19 @@ Two phases are delivered only halfway, and the honest version of that belongs he
 commit message:
 
 - **Phase 10 — the calendar.** A weekly series now writes dated classes and a marked-off day takes them
-  out again; the teacher reads those rows on `/calendar`, and a student meets them on their own list
-  beside the classes they booked. Two things are missing. Every dated class carries a register of the
-  names holding a place and nothing answers it, so `completed` and `no_show` stay unreachable until a
-  teacher can mark a class that has happened. And the booking grid still expands the availability
-  windows alone, so a day off stops a cohort class rather than a minute a student asks for.
-- **Phase 9 — money.** A teacher issues discount codes, a learner redeems one while enrolling, and the
-  discounted amount is filed as a `payment` row. No provider is connected and no money moves.
+  out again; the teacher reads those rows on `/calendar`, marks the register beside one of them at
+  `/calendar/class/{id}`, and a student meets the class — and the teacher's word about their own name —
+  on their list beside the classes they booked. A day off now closes a one-to-one square exactly as it
+  closes a cohort class: the grid at `/courses/{id}/book` hides that day, and the write refuses the
+  minute a student presses there rather than confirming a class the teacher is away for. One thing is
+  still missing — the same answer for a class a *student* booked rather than one a course scheduled:
+  `completed` and `no_show` stay seeded booking statuses no code writes, so a one-to-one class ends
+  with nobody having said it happened.
+- **Phase 9 — money.** A teacher issues discount codes, a learner redeems one while enrolling, and a
+  priced course writes the place it opens as *held* until the payment port reports the charge came back.
+  The port's only gateway is `mock`: **no vendor SDK is wired in and no money leaves the machine**, which
+  is a decision about this POC rather than a gap in it. A real gateway would arrive as a third adapter
+  behind the same port.
 
 See [Phases](#phases) for what each phase promised and what it delivered.
 
@@ -67,14 +73,19 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   (`/api/v1/modules/:moduleId/lessons`) for the lessons inside one: the page of body text, its rough
   length, its slot in that block's order, its own draft/published flag, and whether one of them is
   free to read before enrolling.
-- **A price, as a quote** — set in the editor, printed on the shelf, stored as minor units plus a
-  `Currency` lookup value: `null` when nobody has quoted it, `0` when the teacher says free.
-  `PAYMENT_PROVIDER` is still `none`, so enrollment grants a place for nothing.
+- **A price, as a quote that is also a gate** — set in the editor, printed on the shelf, stored as
+  minor units plus a `Currency` lookup value: `null` when nobody has quoted it, `0` when the teacher
+  says free. A priced course no longer opens on the press that asks for a place: the enrollment is
+  written held beside a `pending` `payment` row, and it opens when the payment port reports the charge
+  came back. `PAYMENT_PROVIDER` picks that port and has two legal values — `mock`, the gateway this box
+  runs on, and `none`, which answers a priced enrollment with `503` before anything is written rather
+  than leaving a learner holding a place no code can settle.
 - **Discount codes** — `/courses/[id]/coupons` (`/api/v1/courses/:courseId/coupons`) for the codes a
   teacher runs on one course: a percentage or a fixed amount off the quoted price, a validity window,
   an optional redemption cap, and a counter of how often it has been used. A learner who redeems one
-  while enrolling leaves a `payment` row at the discounted amount — a record of what the class cost,
-  not a charge that was made.
+  while enrolling has the discount written on the attempt the gateway is asked about — the ledger row
+  carries the coupon, the amount after it, and what came back. A code that brings the price to nothing
+  opens the place on the arithmetic and never dials a provider: there is no charge inside a zero.
 - **A roster** — `/courses/[id]/roster` (`/api/v1/courses/:courseId/roster`) names who holds a place
   in a course they own and the day they took it: a headcount, a name and a day per row, and no
   button that removes somebody.
@@ -87,17 +98,25 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   and the calendar in front of the teacher do not get to spend an hour disagreeing.
 - **Holidays** — `/holidays` for days the teacher doesn't teach. Festivals, personal days off, or
   recurring annual observances. A marked-off day takes that date's classes out of the calendar and
-  puts them back when the day is lifted. It does not touch the booking grid, which still expands the
-  availability windows alone.
+  the same day out of the one-to-one grid, so a student is never offered a minute the teacher is away
+  for.
 - **The dated calendar** — `/calendar` (`/api/v1/classes/teaching`) shows the classes the series wrote,
   the next thirty days in whole weeks. The rows rather than the patterns, because only the table holds
   the days that were marked off. A day with more classes than a column shows folds the rest behind a
-  press that names the day, and the list under the grid holds all of them either way. No class on it
-  is clickable: no route accepts an edit to a dated class, and a chip that invited one would be a
-  feature the API refuses to back.
+  press that names the day, and the list under the grid holds all of them either way. Nothing on a row
+  edits the class — no route accepts a dated class from a caller, and a chip that invited one would be
+  a feature the API refuses to back — but each row links to the roll beside it.
+- **The roll beside a class** — `/calendar/class/[classId]` (`GET`/`PUT /api/v1/classes/:id/roll`) lists
+  every student holding a place in that course and lets the teacher say _present_ or _absent_ beside a
+  name, or nothing at all. The sheet opens when the class's minute arrives — the server decides that, so
+  the buttons are not drawn on a class that has not started — and the whole sheet is sent as one save,
+  because calling the roll is one act rather than one per name.
 - **The queue, and the classes** — an ask lands in `/requests` as `pending` and holds the minute;
   nothing is a class until the teacher confirms or refuses it. `/classes` holds the answer either
-  way, soonest first.
+  way, soonest first, and once a confirmed class's own minute has passed it grows the last two buttons:
+  _Mark taught_ and _Mark missed_, which write that word onto the booking rather than onto a sheet
+  beside it. A marked class keeps its row and loses its door and its held minute; the student reads the
+  same word on their own list.
 - **A room, while the class is live** — a confirm gives the class its own Jitsi address, minted from
   a uuid, stored and never sent. A class row grows a Join button inside the window that door opens
   in, and opens it in a frame rather than a link.
@@ -122,19 +141,26 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   only to a reader the catalog admits, piece by piece so the player can seek.
 - **A session of its own** — `/login` and `/register` on :3001, sent on the reads whose answer
   depends on who is asking.
-- **Places** — an enroll button on a course outline, the locked rows that become links once it is
-  pressed, and `/my-courses`, the list of courses the student is inside, where a place can be left.
+- **Places** — an enroll button on a course outline, the locked rows that become links once the place
+  opens, and `/my-courses`, the list of courses the student is inside, where a place can be left.
   A course its teacher has paused for editing stays on that list and stays open: a place is bought
   against the reading, not against the shelf.
-  The button takes an optional coupon code: a valid one prices the place at the discount and files the
-  `payment` row beside the enrollment, an expired, exhausted or unknown one is refused before the place
-  opens. All of it is one table on the API's side: `/api/v1/enrollments`.
+  The button takes an optional coupon code: a valid one prices the place at the discount, an expired,
+  exhausted or unknown one is refused before anything is written. On a priced course the press is an
+  _ask_ rather than a door: the outline then reads "Your place is held until the money arrives" beside a
+  Pay button, and the locked rows unlock when the charge comes back. A reload finds the same hold
+  waiting, because `GET /api/v1/enrollments/held` is the mirror of `/my-courses` for exactly the places
+  that still owe one. All of it is one table on the API's side: `/api/v1/enrollments`.
 - **Classes** — `/courses/[id]/book` shows the teacher's next thirty days as minutes to ask for
   (`/api/v1/bookings/slots`), under the caption "Times are the teacher's clock"; `/my-classes`
   shows the same class in the student's own timezone, _Leave this class_ gives the minute back
-  while it still stands, and Join opens the room for the class happening now. The classes a course's
+  while it still stands, and Join opens the room for the class happening now. A booked class the
+  teacher has since marked wears that word as its own pill — `Completed` or `No show` — and has no door
+  and nothing to give back, because the class is over. The classes a course's
   series scheduled (`/api/v1/classes/learning`) arrive on that same list in the order they happen,
-  wearing one pill and no door — nobody booked them, so there is no minute to give back.
+  wearing no door — nobody booked them, so there is no minute to give back — and beside the pill that
+  says so, the one word the teacher wrote about their own name, or nothing at all while the roll is
+  still unmarked.
 
 ### The operator's desk
 
@@ -171,7 +197,8 @@ two things it may change.
   against what the code says now; the phase table is read out of this README at build time. Three
   ways of saying the same thing: a page cannot report a fact the source has stopped holding.
 
-Money and attendance are still ahead — [Phases](#phases) says in which order they arrive.
+A cohort class now gets its roll marked, and a student reads the teacher's word about their own
+name; money is still ahead — [Phases](#phases) says in which order.
 
 ---
 
@@ -288,6 +315,12 @@ same time.
 2. _Sign in_ (`student@example.test`) and the same outline changes character: an _Enroll in this
    course_ button appears, and taking a place unlocks the locked rows. A page flips from a free
    preview to a member's page the moment you are inside.
+   On a course the teacher has priced, that press is only the ask: the control reads "Your place is
+   held until the money arrives" beside a **Pay** button, and the rows unlock when the charge comes
+   back. `PAYMENT_PROVIDER=mock` — what `.env.example` ships — settles every charge on this box, so the
+   loop runs end to end with nobody's card in it; on `none`, which is what the schema defaults to when
+   the key is absent, the same press answers `503` before a row is written, and that refusal is the
+   other half of this screen.
 3. `/my-courses` lists the courses you hold a place in, and lets you leave one. Back in the
    teacher's profile, `/courses/[id]/roster` now names you.
 
@@ -313,6 +346,11 @@ Phase 4's loop, still in the teacher's course page and the student's:
    `/classes` holds the answer either way, soonest first.
 5. As the student, `/my-classes` shows the same class in your own timezone — and _Leave this
    class_ gives the minute back while it still stands.
+6. Once that class's own minute has passed, `/classes` grows **Mark taught** and **Mark missed** beside
+   it. Press one and the word becomes the booking's status: the minute goes back to the grid, the room
+   shuts, and the student reads the same word on their row in `/my-classes`. A dated cohort class
+   answers the same question one level up at `/calendar/class/[classId]`, where there is a register
+   rather than one name to mark.
 
 #### Then the class itself, and the recording on a page
 
@@ -448,14 +486,20 @@ A release is a phase boundary, not a deploy. `main` carries work in flight; a ta
 at. Versions track the phase table below — Phase 6 closed at `v0.6.0`, Phase 7 at `v0.7.0` and
 Phase 8 at `v0.8.0`. Phases 9 and 10 came after that run, so the number stopped being the phase
 number: `v0.9.0` closes Phases 11 and 12, the two apps outside the product, `v0.13.0` closes Phase 13,
-and `v0.14.0` / `v0.14.1` close Phase 9 — the coupon and payment API, then its screens on both portals
+and `v0.14.0` / `v0.14.1` open Phase 9 — the coupon and payment API, then its screens on both portals
 with the tests around them. `v0.14.0` also carries Phase 10's tables, endpoints and teacher screens,
-which is why that row reads Partial inside a published tag: a tag marks the gate, and the table says
+and Phase 10 stayed open inside those tags: a tag marks the gate, and the table says
 what is behind it. After that the numbers stopped tracking phases altogether, because not everything
 worth shipping is a roadmap row: `v0.15.2` carried the container stack, `v0.16.0` carried Phase 10's
 second stage — a series that generates its cohort classes — and `v0.17.0` carries the capability layer
-under the three roles. A release closes a phase or makes something a person can finally do; both are
-boundaries.
+under the three roles. `v0.18.0` is the third: the roll beside a dated class, the teacher's one word per
+name, and that word reading back to the student whose name it is. `v0.18.1` is the repair pair that followed
+it: a date a teacher marked off no longer opens as a one-to-one slot, and the two dependency advisories the
+security scan was still carrying are closed. `v0.19.0` finishes the money — the payment port Phase 9 left
+unbuilt, the place that is held until a charge answers, and the pay step on the student's outline — running
+against `mock` and against no vendor SDK, which is the ceiling the POC chose. `v0.20.0` is the last row:
+the same answer for a class a *student* booked, written onto the booking itself. A release closes a phase
+or makes something a person can finally do; both are boundaries.
 
 ```
 bun run release v0.8.0 --title="Phase 8: the ops portal"
@@ -559,29 +603,33 @@ decision was made, and what was deliberately left out.
 | 7     | Action log — who did what, to what, in which part of the app              | **Done**    |
 | 8     | Ops portal — the desk that reads the log, the accounts and the queue      | **Done**    |
 | 9     | Coupons and payments — teacher-issued codes, redeemed on enrollment       | **Done**    |
-| 10    | The teacher's calendar — a course's class series, holidays, no-class days | **Partial** |
+| 10    | The teacher's calendar — a course's class series, holidays, no-class days | **Done**    |
 | 11    | Product website — the public face of the marketplace                      | **Done**    |
 | 12    | Docs site — guide, data model, API reference and the phase record         | **Done**    |
 | 13    | The API explained endpoint by endpoint — purpose, fields, failures        | **Done**    |
 
-Two of those rows need their notes read with them. **9** shipped the codes, the redemption and the
-`payment` row, and no provider behind any of it. **10** shipped its tables, endpoints and screens and
-now the sweep that turns a series into dated classes and takes a marked-off day's classes out from
-under it — but nothing answers the register beside a class, so no class is yet taught or missed, and the
-booking grid is still expanded from the availability windows alone, so a day off stops a cohort class
-rather than a minute a student asks for. The rest of the table means what it says.
+Two of those rows carry a note that has to be read with them. **9** shipped the codes, the redemption
+and the `payment` row first, and for four tags there was no provider behind any of it; `v0.19.0` built
+the port Phase 9 left unbuilt, and the only gateway on it is `mock` — the money is real to the ledger,
+the place really does wait on it, and nothing leaves the machine, which is the ceiling this POC chose
+rather than a gap in it. **10** shipped its tables, endpoints and screens, then the sweep that turns a
+series into dated classes and takes a marked-off day's classes out from under it — the same day taken
+out of the one-to-one grid — then the register beside one of them, where a teacher marks a class's roll
+and the student sees their own word, and at `v0.20.0` the same answer for a class a student booked:
+`POST /bookings/:id/attendance` writes `completed` or `no_show` onto the booking itself, so no seeded
+booking status is left unwritten. The rest of the table means what it says.
 
 ### All thirteen, in order
 
 The table is the index; this is what each one is for. Phases 0–8 are the product, the last of them
 putting a door in front of what the two before it had only recorded, and 11–12 are the two apps that
 sit outside it — the face and the manual. 9 and 10 sit where they do because of what has to exist
-before their shape stops moving, and both are now half-built rather than unbuilt: each wrote its
-tables, its endpoints and its screens, and each left out the part that would have changed what the
-older phases do — Phase 9 a charge behind the price, Phase 10 the mark on a class and any effect on
-the minutes the booking grid offers. That is recorded on the rows above rather than smoothed over. 13
-was added on
-2026-09-30, after 12 closed, because a route table is a catalogue and not a manual.
+before their shape stops moving: each needed the older phases to have settled, Phase 9 because a
+discount only means something beside a price that is charged and a place that can be withheld, Phase 10
+because a series and a holiday are edits to what §13's windows mean. Both were built in two halves, and
+both halves are now in: the charge behind the price landed at `v0.19.0`, and the mark on a class a
+student booked at `v0.20.0`. 13 was added on 2026-09-30, after 12 closed,
+because a route table is a catalogue and not a manual.
 
 - **Phase 0 — the plan.** The decisions every later phase inherits, and the reason for each:
   one API, three portals, nothing ever destroyed, UTC in storage and the reader's zone on screen,
@@ -615,23 +663,32 @@ was added on
   Phase 6 fills. It is read-mostly with exactly two bites — disable an account, issue or revoke the
   `ops` role — because an operator who can unpublish a course or move a price is undoing a decision
   that was somebody else's to make.
-- **Phase 9 — money.** Coupons a teacher generates per course, each with its own discount and its
-  own run-time, redeemed on enrollment, and `PAYMENT_PROVIDER` ceasing to be `none`. Last among the
-  surfaces a student touches, because a discount only means something beside a price that is
-  charged. **The coupons arrived; the ceasing did not.** Codes, redemptions and the `payment` row are
-  real, on both portals' screens; there is still no payment port in `apps/api/src/providers`, so the
-  amount recorded is an arithmetic result, not a charge, and `PAYMENT_PROVIDER` is an env key no code
-  reads.
+- **Phase 9 — money.** Coupons a teacher generates per course, each with its own discount and its own
+  validity window, redeemed on enrollment, and `PAYMENT_PROVIDER` ceasing to be a key no code reads. Last
+  among the surfaces a student touches, because a discount only means something beside a price that is
+  charged. **Both halves are in.** Codes, redemptions and the `payment` row were; `v0.19.0` added the port
+  in `apps/api/src/providers/payment`, so a priced place is now written *held* with a pending attempt and
+  opens when `collect` answers `completed`, and the student's outline carries the Pay step between asking
+  and getting in. The only adapter besides `none` is `mock`: what is charged is a reference this box
+  derives from the ledger row's own id, and no card number, vendor SDK or webhook is anywhere in the
+  repository — a deliberate ceiling, documented as one (§6).
 - **Phase 10 — the teacher's calendar.** A course's classes repeating weekly, and the holidays and
   no-class days that stop a date being taught at all. Both are edits to what §13's windows mean, so they
-  come after booking, video and both portals have settled. **Delivered except the mark:** the
+  come after booking, video and both portals have settled. **Delivered, mark and all:** the
   `class_series` and `holiday` tables, their endpoints and their screens were already in, and an hourly
   sweep now reconciles them into `class_occurrence` — a dated class with its `class_attendance` register
   beside it — so a series stands for real classes and a holiday takes that date's away. The teacher reads
-  the rows at `/calendar`, a student meets them on `/my-classes`, and the booking grid is untouched: it
-  still expands the availability windows alone, because a cohort class is a timetable rather than minutes
-  to claim. What is missing is the answer on the register — nothing marks a class taught or missed, so
-  `completed` and `no_show` stay unreachable for a cohort class.
+  the rows at `/calendar`, a student meets them on `/my-classes`, and the same day off now empties the
+  booking grid for that date too: a weekly window names a weekday and a holiday names one date, so the
+  grid asks the teacher's own calendar beside the windows. It still does not read `class_series`, because
+  a cohort class is a timetable rather than minutes to claim. The answer on the register arrived last: `GET` and `PUT /classes/:id/roll` read and write one
+  class's sheet — a name, and `present` or `absent` beside it, nothing said about a name nobody has
+  marked — with the teacher marking at `/calendar/class/{id}` and the student seeing their own word on
+  the row in their list. The last gap in the phase closed at `v0.20.0`, and it closed by not inventing a
+  second sheet: a _booked_ class ends in its own status, so the teacher presses _Mark taught_ or _Mark
+  missed_ on `/classes` and `completed` or `no_show` lands on the booking — the minute it held goes back
+  to the grid, its room shuts, and the student reads the word as the pill on their own row. No seeded
+  booking status is left unwritten now, and nothing about a class is decided by a room emptying.
 - **Phase 11 — the product's face.** A public website a school or a teacher reads before anybody
   signs up: an `apps/*` workspace member on `@lms/ui` and `@lms/shared`, and not a second backend.
 - **Phase 12 — the docs.** The guide, the data model, the API reference and this phase record,
@@ -842,9 +899,9 @@ nothing else; an unpublish would undo a teacher's decision about their own mater
 and the two writes that remain are the two only the platform can make for itself. **And every screen
 reads an endpoint rather than a table**: Phase 7's `GET /actions`, which had no door since it shipped,
 an accounts surface built for this phase, and an outbox reader that Phase 6 left unwritten. What is
-still deliberately not in the phase: attendance (`completed` and `no_show` are seeded statuses no code
-can write, and marking a class taught is a teacher's act, not an admin's), any edit of a teacher's
-content, and deployment.
+still deliberately not in the phase: attendance (how a class ended is a teacher's act about a class they
+taught, so it belongs beside the calendar rather than on a desk that reads a ledger), any edit of a
+teacher's content, and deployment.
 
 **Step 8a, the accounts, is in** (`/api/v1/users`). A list with a name search, a role filter and a status
 filter over three pages, a single read, and the two patches. Both patches refuse to be asked twice — a
@@ -951,11 +1008,14 @@ reason — a website advertises a thing that has to exist, and a guide written w
 moving is a guide that gets rewritten. Neither became a backend: the API is still the only writer to
 the database, and every generated table on the site is a reading of what the code already says rather
 than a second copy of it that can drift. The table above is what the docs site publishes, and what the
-public page points at. Nothing is left unstarted in the table, but two rows are not the whole thing
-they were scoped as: Phase 9 wrote its coupons and its `payment` rows without a payment provider behind
-them, and Phase 10 now reconciles its series and holidays into a dated calendar without the booking
-grid ever reading either, or anybody marking a class taught. Those are the two
-places where a phase is closed on paper and open in the product.
+public page points at. Nothing is left unstarted in the table, and after `v0.19.0` and `v0.20.0` nothing
+in it is half-built either. Phase 9's `payment` rows now sit behind the port that asks for the money —
+against `mock`, since no vendor is wired in by decision — and a priced place waits on that answer instead
+of opening on the arithmetic. Phase 10 reconciles its series and holidays into a dated calendar, marks the
+roll beside one of its classes, takes a marked-off day out of the one-to-one grid, and ends a class a
+student booked in that class's own status. The grid still derives from a teacher's windows rather than
+from `class_series`, which is deliberate: a cohort class is a timetable, not minutes to claim. Those were
+the two places where a phase was closed on paper and open in the product; both are now closed in both.
 
 ## Environment variables
 
@@ -976,11 +1036,15 @@ places where a phase is closed on paper and open in the product.
   `smtp://` or `smtps://` endpoint, the boot stops rather than finding out at the first confirmation.
   A sandbox endpoint is the honest way to watch a letter arrive on a laptop — Phase 6's step 6f read
   its own mail back over IMAP for exactly that reason.
-- `PAYMENT_PROVIDER` defaults to `none`, and `none` is the only value any code acts on: it is read at
-  the door and nowhere else, because there is no payment port in `apps/api/src/providers` to select.
-  Phase 9's coupons discount the quoted price and write a `payment` row beside the enrollment, and that
-  row's `providerReference` is a literal string, not a receipt. Wiring a provider means building the
-  port the way `mail`, `storage` and `video` were built, not flipping this key.
+- `PAYMENT_PROVIDER` picks the payment port, and it has two legal values: `mock`, the gateway this POC
+  charges against, and `none`, a deployment that does not collect. Anything else stops the boot with
+  `UnknownPaymentProviderError` rather than letting the platform choose for its operator. On `mock` a
+  priced enrollment writes a *held* place with a pending attempt, and `POST /api/v1/enrollments/:id/pay`
+  settles it against a reference derived from that row's own id — no card data, no vendor SDK, no
+  webhook, and nothing that leaves the machine. On `none` the same ask answers `503` before a row is
+  written, and a place the coupon brought to nothing opens on either value, because a zero is never sent
+  to a gateway. `.env.example` ships `mock`; the schema's default is `none`, so a `.env` written before
+  this key existed is a box that takes no money until the operator flips it.
   `VIDEO_PROVIDER` defaults to `none` too, and is a real configuration rather than a
   placeholder: with `jitsi` and a `JITSI_DOMAIN` (a bare host, `meet.jit.si` unless you name
   another) a class gets a room address; on `none` the same screens say there is no room. A Jitsi

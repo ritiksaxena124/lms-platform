@@ -244,8 +244,9 @@ model Course {
   /// the currency row it is quoted against. Both halves are absent together, because "not
   /// priced yet" and "priced at nothing" are two different things a student is told.
   ///
-  /// This is a quote on a shelf, not a charge: nothing collects a payment in this phase, and
-  /// an enrollment stays a place rather than a purchase.
+  /// A quote rather than a receipt: a priced course writes this number into a `payment` row as a
+  /// pending attempt, and the place that row hangs on stays closed until the payment port (ARCHI-
+  /// TECTURE §6) reports the money arrived.
   priceMinorUnits      Int?    @map("price_minor_units")
   priceCurrencyValueId String? @map("price_currency_value_id") @db.Uuid
 
