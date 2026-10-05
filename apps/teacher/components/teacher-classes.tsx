@@ -266,6 +266,7 @@ function Section({
             <li
               key={booking.id}
               data-icon-zone
+              data-tour="class-card"
               className="flex flex-col gap-3 rounded-card border border-line bg-surface p-4 sm:p-5"
             >
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
@@ -391,6 +392,7 @@ function ClassDoor({
             variant="secondary"
             loading={asking}
             onClick={() => void join()}
+            data-tour="join-button"
             className="w-full justify-center"
           >
             Join video call
@@ -399,7 +401,7 @@ function ClassDoor({
       ) : (
         <>
           <div className="flex items-center gap-1.5">
-            <Button type="button" size="sm" variant="ghost" onClick={() => setRoom(null)}>
+            <Button type="button" size="sm" variant="ghost" onClick={() => setRoom(null)} data-tour="leave-room">
               Leave the room
             </Button>
           </div>
@@ -410,6 +412,7 @@ function ClassDoor({
             allow="camera; microphone; fullscreen; display-capture; autoplay"
             allowFullScreen
             title={`Live class with ${booking.student.displayName}`}
+            data-tour="video-frame"
             className="aspect-video w-full rounded-card border border-line bg-paper-sunk"
           />
         </>
