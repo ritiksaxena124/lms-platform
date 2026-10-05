@@ -30,16 +30,19 @@ export function formatDay(instant: string | Date, timeZone?: string | null): str
 }
 
 /**
- * The zone the reader is actually in, when the account cannot name one it trusts.
+ * The zone the reader is actually in right now.
  *
- * A dated calendar has to group its columns in some zone, and the account's own is the only one
- * worth asking the browser about — the platform's is not the teacher's, and a screen that grouped
- * a week by UTC would teach a Kolkata Monday on a London Sunday.
+ * A dated calendar has to group its columns in some zone, and the browser's current zone is the
+ * only one that stays true when someone travels — an account saved in Kolkata but opened from New
+ * York must read "09:30 EST", not "09:30 IST", or the student turns up ten and a half hours late.
+ *
+ * We keep the account's timezone as a preference for defaults (new bookings, availability windows),
+ * but the clock on screen is always where the person reading it stands.
  */
-export function readerZone(timeZone?: string | null): string {
-  return timeZone && isValidIanaTimeZone(timeZone)
-    ? timeZone
-    : Intl.DateTimeFormat().resolvedOptions().timeZone;
+export function readerZone(_timeZone?: string | null): string {
+  // Always use the browser's current timezone, not the account's saved preference.
+  // This ensures travelers see times in their actual location.
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /** `Thu 1 Oct`, named by the same locale that writes `formatDay`. */

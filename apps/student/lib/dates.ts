@@ -28,11 +28,11 @@ export function formatDay(instant: string | Date, timeZone?: string | null): str
   return formatter.format(new Date(instant));
 }
 
-/** The zone the reader is actually in, when the account cannot name one it trusts. */
-function zoneFor(timeZone?: string | null): string {
-  return timeZone && isValidIanaTimeZone(timeZone)
-    ? timeZone
-    : Intl.DateTimeFormat().resolvedOptions().timeZone;
+/** The zone the reader is actually in right now, wherever they are. */
+function zoneFor(_timeZone?: string | null): string {
+  // Always use the browser's current timezone, not the account's saved preference.
+  // This ensures travelers see times in their actual location.
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
 }
 
 /** `Thu 1 Oct`, named by the same locale that writes `formatDay`. */
