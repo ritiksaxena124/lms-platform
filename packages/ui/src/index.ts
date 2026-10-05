@@ -79,3 +79,6 @@ export { ToastCard, type ToastCardProps, type ToastTone } from './toast/ToastCar
 
 export { ThemeSwitcher } from './components/ThemeSwitcher';
 export { useTheme } from './hooks/use-theme';
+
+export { TourOverlay, type TourOverlayProps } from './components/TourOverlay';
+export { useTour, useHasCompletedTours } from './hooks/use-tour';
