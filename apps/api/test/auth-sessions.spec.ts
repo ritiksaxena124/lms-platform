@@ -54,9 +54,14 @@ function post(path: string, cookie?: string): Promise<request.Response> {
 
 /** The cookie and its attributes, because supertest runs no cookie jar for us. */
 function rawCookie(res: request.Response, withAttributes = false): string | undefined {
-  const entries = (res.headers['set-cookie'] ?? []) as string[];
+  const entries = cookieEntries(res);
   const entry = entries.find((cookie) => cookie.startsWith(`${REFRESH_COOKIE}=`));
   return withAttributes ? entry : entry?.split(';')[0];
+}
+
+/** Every `Set-Cookie` the response wrote, because a login is now more than one line. */
+function cookieEntries(res: request.Response): string[] {
+  return (res.headers['set-cookie'] ?? []) as string[];
 }
 
 async function sessionId(name: string): Promise<string> {
@@ -118,6 +123,19 @@ describe('auth sessions', () => {
       expect(cookie).toMatch(/SameSite=Lax/i);
       // Only the endpoints that consume it should receive it on every request.
       expect(cookie).toMatch(/Path=\/api\/v1\/auth/i);
+    });
+
+    it('expires the host-only twin beside the session it just wrote', async () => {
+      const res = await login(emailFor('alice'));
+
+      // A jar that once held a host-only `lms_refresh` sends it beside the shared-domain one, and
+      // only the first is read — so a login that does not clear the twin can be answered by an
+      // account nobody just signed in to.
+      const twin = cookieEntries(res).find((entry) => !/Domain=/i.test(entry));
+      expect(twin).toBeDefined();
+      expect(twin).toMatch(/^lms_refresh=;/);
+      expect(twin).toMatch(/Max-Age=0/i);
+      expect(twin).toMatch(/Path=\/api\/v1\/auth/i);
     });
 
     it('puts the account id and role in the token, and no personal data', async () => {
@@ -212,6 +230,19 @@ describe('auth sessions', () => {
       expect(await liveSessions(dave)).toBe(0);
 
       expect((await post('refresh', cookie)).status).toBe(401);
+    });
+
+    it('expires both halves, because signing out of one twin leaves the other signed in', async () => {
+      const cookie = rawCookie(await login(emailFor('alice')));
+
+      const res = await post('logout', cookie);
+      const entries = cookieEntries(res);
+
+      // One line for the shared-domain session and one for the host-only twin: expiring either
+      // alone leaves a cookie in the jar that still answers for a live account.
+      expect(entries).toHaveLength(2);
+      expect(entries.every((entry) => entry.startsWith(`${REFRESH_COOKIE}=;`))).toBe(true);
+      expect(entries.filter((entry) => /Domain=/i.test(entry))).toHaveLength(1);
     });
   });
 });

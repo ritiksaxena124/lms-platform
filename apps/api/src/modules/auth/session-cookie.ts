@@ -10,7 +10,9 @@ export const REFRESH_COOKIE = 'lms_refresh';
 const PATH = `${API_PREFIX}/auth`;
 
 export function setRefreshCookie(res: Response, token: string, env: AppEnv): void {
-  res.cookie(REFRESH_COOKIE, token, cookieOptions(env, refreshTokenMaxAge(env)));
+  const ttl = refreshTokenMaxAge(env);
+  res.cookie(REFRESH_COOKIE, token, cookieOptions(env, ttl, env.COOKIE_DOMAIN));
+  dropHostOnlyTwin(res, env);
 }
 
 /**
@@ -18,6 +20,20 @@ export function setRefreshCookie(res: Response, token: string, env: AppEnv): voi
  * every one of them drops a `Max-Age=0` cookie immediately.
  */
 export function clearRefreshCookie(res: Response, env: AppEnv): void {
+  res.cookie(REFRESH_COOKIE, '', cookieOptions(env, 0, env.COOKIE_DOMAIN));
+  dropHostOnlyTwin(res, env);
+}
+
+/**
+ * A cookie is keyed on name *and* `Domain` *and* `Path`, so a jar that once held a host-only
+ * `lms_refresh` — written before `COOKIE_DOMAIN` existed, or by a run that left it unset — keeps
+ * it beside the shared-domain one. Both travel on every request and only the first is read, which
+ * means a login can be answered by an account nobody just signed in to and a logout can leave the
+ * other half signed in. Expiring it takes the same `Path` with no `Domain` at all; anything else
+ * addresses a different cookie and leaves this one standing.
+ */
+function dropHostOnlyTwin(res: Response, env: AppEnv): void {
+  if (!env.COOKIE_DOMAIN) return;
   res.cookie(REFRESH_COOKIE, '', cookieOptions(env, 0));
 }
 
@@ -34,7 +50,7 @@ export function readRefreshCookie(header: string | undefined): string | undefine
   return undefined;
 }
 
-function cookieOptions(env: AppEnv, maxAge: number) {
+function cookieOptions(env: AppEnv, maxAge: number, domain?: string) {
   return {
     httpOnly: true,
     sameSite: 'lax' as const,
@@ -43,7 +59,7 @@ function cookieOptions(env: AppEnv, maxAge: number) {
     maxAge,
     // Unset keeps the cookie to this host. Portals on *.localtest.me set it so one login
     // covers every portal; a host-only cookie would be invisible to the others.
-    ...(env.COOKIE_DOMAIN ? { domain: env.COOKIE_DOMAIN } : {}),
+    ...(domain ? { domain } : {}),
   };
 }
 
