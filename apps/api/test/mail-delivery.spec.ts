@@ -1,5 +1,5 @@
 import type { INestApplication } from '@nestjs/common';
-import { SchedulerRegistry } from '@nestjs/schedule';
+import { CronExpression, SchedulerRegistry } from '@nestjs/schedule';
 import { PrismaClient, type MailOutbox } from '@prisma/client';
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
@@ -9,7 +9,6 @@ import {
   MAIL_OUTBOX_STATUS_CODES,
   MAIL_RETRY_DELAYS_MINUTES,
   MAIL_SENDING_RECLAIM_MINUTES,
-  MAIL_SWEEP_INTERVAL_MINUTES,
 } from '@lms/shared';
 import { AppModule } from '../src/app.module';
 import { MailOutboxRepository } from '../src/modules/notifications/mail-outbox.repository';
@@ -70,6 +69,16 @@ import { createTestApp } from './utils/create-test-app';
  * The exception is `reclaimAbandoned`, which has no page. It is safe for the reason the booking
  * sweep is: its `where` is a fifteen-minute window on `updatedAt`, and no other suite ages a row that
  * far.
+ *
+ * ## Why nothing sweeps this file from the outside
+ *
+ * Both rules above are about a *test* asking for too much, and neither is worth much while another
+ * process can take the rows without being asked. Two things keep that from happening, and neither
+ * lives in this file. The delivery cron is stopped in every spec process by the shared app factory,
+ * because it fires on the wall clock rather than on a test boundary, so all four forks reach for the
+ * whole queue at the same five-minute instant. And the queue is emptied before a run starts, because
+ * a claim an interrupted run left behind ages past this file's six hours eventually and then it is
+ * the oldest news in the database whatever a fixture does.
  *
  * ## Why one fixture writes raw SQL, and why the clock is a parameter
  *
@@ -620,16 +629,19 @@ describe('the sweep that sends what the queue was told', () => {
     expect((await rowOf(row.id)).status).toBe(STATUS.QUEUED);
   });
 
-  it('is on a clock as well as in this file', () => {
-    // Nothing calls the sweep over HTTP, so a cron that stopped being registered would leave every
-    // test above green while the queue filled and nobody was told. The name is spelled out rather
-    // than read from the service because a renamed job is a job ops cannot find.
+  it('is on a clock in production and off it in this process', () => {
+    // Two halves, because the job has two audiences. Registered and on the sweep interval is what
+    // ops asks when the queue fills and nobody is told — a cron that stopped being registered would
+    // leave every test above green. Not running is what this file asks: the sweep is a whole-table
+    // claim, four spec processes share one database, and the cron fires on the wall clock every five
+    // minutes, so a suite that outlives a boundary would have its own fixtures mailed, dropped and
+    // reclaimed under it. The name is spelled out rather than read from the service because a
+    // renamed job is a job ops cannot find.
     const scheduler = app.get(SchedulerRegistry);
     const job = scheduler.getCronJob('mail-outbox-delivery');
-    expect(job.isActive).toBe(true);
-    expect(job.nextDate().toMillis() - Date.now()).toBeLessThanOrEqual(
-      MAIL_SWEEP_INTERVAL_MINUTES * MS_PER_MINUTE,
-    );
+
+    expect(job.cronTime.source).toBe(CronExpression.EVERY_5_MINUTES);
+    expect(job.isActive).toBe(false);
   });
 
   it('is wired to the transport the deployment configured, not one it invented', () => {
