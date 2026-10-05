@@ -35,6 +35,24 @@ export const SLOT_DENIAL_CODES = {
 export type SlotDenialCode = (typeof SLOT_DENIAL_CODES)[keyof typeof SLOT_DENIAL_CODES];
 
 /**
+ * The two words a teacher may put on a class that has happened.
+ *
+ * A mark is a booking status, not a second register — which is why these are two members of
+ * `BOOKING_STATUS_CODES` rather than a list of their own, and why the student's list needs no new
+ * word to print the ending of a class. What this file adds is the boundary: a mark endpoint that took
+ * any status would let one person write another person's ending onto a row, and the four it leaves
+ * out each belong to somebody else. `cancelled` is a student standing down, `confirmed` and `rejected`
+ * are the teacher's answer to an ask rather than to a class, and `expired` is the sweep's verdict on a
+ * silence.
+ */
+export const BOOKING_MARK_CODES = {
+  COMPLETED: BOOKING_STATUS_CODES.COMPLETED,
+  NO_SHOW: BOOKING_STATUS_CODES.NO_SHOW,
+} as const;
+
+export type BookingMarkCode = (typeof BOOKING_MARK_CODES)[keyof typeof BOOKING_MARK_CODES];
+
+/**
  * What each booking status reads as to a person.
  *
  * A booking arrives with bare codes — `status` is a string, where a course carries its lookup

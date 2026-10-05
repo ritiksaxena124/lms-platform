@@ -146,10 +146,11 @@ interface Failure {
  * something this person has to be awake for, and the same instant on two walls is the one place a
  * mistake costs an hour.
  *
- * The split is on the date and nothing else. On the status alone a confirmed class would go on
- * being "coming up" after its hour passed, because Phase 4 has nothing that marks a class taught;
- * on whether the minute is still held, a class this student called off would vanish from the week
- * it happened in. The date is the only fact on a row that never changes.
+ * The split is on the date and nothing else. On the status alone a confirmed class would stay
+ * "coming up" until somebody marked it off, and a class its teacher never got round to marking
+ * would sit in next week forever; on whether the minute is still held, a class this student called
+ * off would vanish from the week it happened in. The date is the only fact on a row that never
+ * changes.
  *
  * Leaving is one press, and both lists are read again after it rather than edited in place: whether
  * the class stood down or the teacher answered it a second earlier, the honest answer is the one

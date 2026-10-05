@@ -459,9 +459,11 @@ describe('the guide', () => {
   });
 
   it('names every port the API stands behind', () => {
-    // The three folders in `apps/api/src/providers` are the whole surface the platform offers to
+    // The four folders in `apps/api/src/providers` are the whole surface the platform offers to
     // hand to somebody else's system, and a guide that leaves one out teaches the design wrongly.
-    expect(providerPorts()).toHaveLength(3);
+    // The count is pinned so that a fifth port has to be explained before these pages are allowed
+    // to go on not mentioning it.
+    expect(providerPorts()).toHaveLength(4);
 
     for (const port of providerPorts()) {
       expect(page.html, `the ${port} port is not on the guide`).toContain(`<code>${port}</code>`);

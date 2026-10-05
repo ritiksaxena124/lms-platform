@@ -22,6 +22,7 @@ import { CurrentUser } from '../auth/current-user.decorator';
 import { Permissions } from '../auth/permissions.decorator';
 import { BookingsService } from './bookings.service';
 import { CreateBookingDto } from './dto/create-booking.dto';
+import { MarkAttendanceDto } from './dto/mark-attendance.dto';
 import { OpenSlotsQueryDto } from './dto/open-slots-query.dto';
 
 /**
@@ -96,7 +97,7 @@ export class BookingsController {
   /**
    * The teacher's door: what is waiting for them, what they are teaching, and what they say to it.
    *
-   * Four routes on one table read from the other side, all under `@Permissions(BOOKING_ANSWER)` —
+   * Five routes on one table read from the other side, all under `@Permissions(BOOKING_ANSWER)` —
    * which is why the student routes above carry their own `@Permissions` rather than a
    * controller-wide one. The requests are pending only, because the answered ones are not a queue;
    * the class list keeps them all, because an answered Tuesday is still a Tuesday.
@@ -139,6 +140,23 @@ export class BookingsController {
     @Param('id') id: string,
   ): Promise<{ booking: Booking }> {
     return { booking: await this.bookings.answer(user.id, id, 'reject') };
+  }
+
+  /**
+   * Say what became of a class that has gone by — it happened, or the student never came.
+   *
+   * The teacher's door, beside the confirm and the refuse, because they are the one who was in the
+   * room. A student marking their own class taught would be a roll the absent people fill in.
+   */
+  @Post(':id/attendance')
+  @HttpCode(HttpStatus.OK)
+  @Permissions(PERMISSION_CODES.BOOKING_ANSWER)
+  async attendance(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: MarkAttendanceDto,
+  ): Promise<{ booking: Booking }> {
+    return { booking: await this.bookings.markAttendance(user.id, id, dto.status) };
   }
 
   /**

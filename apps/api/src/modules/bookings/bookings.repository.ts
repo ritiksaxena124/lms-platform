@@ -113,6 +113,26 @@ const BOOKING_ROOM_SELECT = {
 
 export type BookingRoomRow = Prisma.BookingGetPayload<{ select: typeof BOOKING_ROOM_SELECT }>;
 
+/** The three facts the mark door reads before it writes anything, and the shape it reads them in.
+ *
+ * A mark is refused three different ways and the refusals say different things, so the route has to
+ * know which one it is answering: a class that has not begun yet, a class that is not a standing
+ * confirmed one, and a class that was marked the other word already. `swapOwnedStatus` cannot tell
+ * them apart — it comes back `not-standing` for all three, because all three are the same thing to
+ * an `update` that matched nothing. So the state is read once, cheaply, to choose the sentence.
+ *
+ * The start travels because the mark is judged against it. Nothing else about the class is read: a
+ * refusal about a state needs no title, no name and no room. */
+const BOOKING_MARK_TARGET_SELECT = {
+  id: true,
+  startsAt: true,
+  status: { select: { code: true } },
+} as const satisfies Prisma.BookingSelect;
+
+export type BookingMarkTargetRow = Prisma.BookingGetPayload<{
+  select: typeof BOOKING_MARK_TARGET_SELECT;
+}>;
+
 /**
  * What the write decided, in the two ways a request can end without a new row.
  *
@@ -161,10 +181,12 @@ export type AnswerOutcome =
  * Ownership is in every `where` clause rather than checked afterwards, the rule every repository
  * here runs on.
  *
- * The three writes that change a class — the insert, the status swap, the expiry sweep — each take a
- * `notify` and call it inside their own transaction. That is the outbox rule (ARCHITECTURE §6) in
- * one sentence: the news is filed by the write that made it, so a class that rolled back cannot have
- * a letter about it waiting to send.
+ * The writes that change a class — the insert, the status swap, the expiry sweep — take a `notify`
+ * and call it inside their own transaction. That is the outbox rule (ARCHITECTURE §6) in one
+ * sentence: the news is filed by the write that made it, so a class that rolled back cannot have a
+ * letter about it waiting to send. One caller passes no `notify` at all — the mark files a record and
+ * mails nobody — which is why the callback is a parameter on the write rather than a mail service
+ * wired into this class.
  *
  * Each takes a `record` too, called on the same road a line later for the reason Phase 7 gives for
  * the same choice everywhere: the log is the account of what the platform did, and an account of a
@@ -556,6 +578,54 @@ export class BookingsRepository {
       releaseHold: args.releaseHold,
       mintRoomName: args.mintRoomName,
       notify: args.notify,
+      record: args.record,
+    });
+  }
+
+  /**
+   * The row a mark is being asked about, for the one thing the swap cannot answer: which refusal to
+   * say.
+   *
+   * Ownership is in the `where` rather than checked afterwards, like every other write here, so
+   * another teacher's class answers with the same silence as a class that never existed.
+   */
+  async markTarget(bookingId: string, teacherUserId: string): Promise<BookingMarkTargetRow | null> {
+    return this.prisma.booking.findFirst({
+      where: { id: bookingId, teacherUserId, isActive: true },
+      select: BOOKING_MARK_TARGET_SELECT,
+    });
+  }
+
+  /**
+   * Mark off one of this teacher's classes: it happened, or the student never came.
+   *
+   * The row must still be `confirmed` for either word to land, which is the rule that keeps a mark
+   * from being written over a request nobody answered, a refusal, an expiry or a cancellation — each
+   * of those already says what became of the class, and reporting a class that never stood as one
+   * that was missed would be a record, not a correction.
+   *
+   * The minute goes back either way. Both words end the class, and a class that is over has no claim
+   * on a calendar minute — which is what `BLOCKING_BOOKING_STATUSES` has said all along. The row
+   * itself survives, because a class that was held and then taught or missed is a fact the teacher's
+   * history and the student's list both still read.
+   *
+   * No `notify`: the four booking letters each ask something of the person who reads them, and a mark
+   * reports a class that is already over. The record is the whole report, and the student sees the
+   * ending on their own list.
+   */
+  async markOwned(args: {
+    bookingId: string;
+    teacherUserId: string;
+    confirmedStatusValueId: string;
+    markStatusValueId: string;
+    record?: WriteRecorder<BookingTransition>;
+  }): Promise<AnswerOutcome> {
+    return this.swapOwnedStatus({
+      bookingId: args.bookingId,
+      owner: { teacherUserId: args.teacherUserId },
+      fromStatusValueIds: [args.confirmedStatusValueId],
+      toStatusValueId: args.markStatusValueId,
+      releaseHold: true,
       record: args.record,
     });
   }

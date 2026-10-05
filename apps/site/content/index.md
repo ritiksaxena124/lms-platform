@@ -24,23 +24,23 @@ the interesting decisions here are about a teacher's minutes, not about distribu
 | `packages/ui`     | One component library shared by all four front ends.                         |
 | `packages/shared` | The vocabulary both sides of the wire agree on: codes, money, time zones.    |
 
-Postgres holds the data and Prisma speaks to it. Third-party systems — mail, video, object storage —
-sit behind ports the application defines, so the platform has an opinion about what sending an email
-means and can change who actually does it without re-deciding that.
+Postgres holds the data and Prisma speaks to it. Third-party systems — mail, video, object storage,
+money — sit behind ports the application defines, so the platform has an opinion about what sending an
+email or collecting a payment means and can change who actually does it without re-deciding that.
 
 ## What is real today
 
-Courses with modules, lessons and an attached recording. A free page of a paid course. Enrollment, with a discount code a teacher issued and a `payment` row recording
-what the place was priced at. A
-teacher's availability drawn on a calendar in their own time zone, and the requests that come out of
-it. A room for the class that opens in its window and not a minute before. Email at each turn of that
-loop. A log of who changed what, and a screen that reads it back.
+Courses with modules, lessons and an attached recording. A free page of a paid course. Enrollment, with
+a discount code a teacher issued; where the course carries a price, the place is written closed beside a
+`payment` row that starts as a pending attempt, and it opens when that attempt is reported collected. A
+teacher's availability drawn on a calendar in their own time zone, and the requests that come out of it.
+A room for the class that opens in its window and not a minute before. A class a student booked, ended as
+taught or missed by the teacher who kept it. Email at each turn of that loop. A log of who changed what,
+and a screen that reads it back.
 
-What is not: a charge. A course carries a price, a coupon lowers it, and nothing is billed — no payment
-provider is connected, so a `payment` row is a record rather than a receipt. An attendance sheet. A
-weekly series now writes real dated classes and a holiday takes that date's away, and every one of those
-classes carries a register of the names holding a place — but nothing answers it, so a class that happened
-is not yet marked taught or missed. And discovery: a teacher is
+What is not: money that moves. The price is real, the gate is real, and the port behind it answers
+`mock` — no payment provider is wired in and none is planned, so a `payment` row is a record rather than
+a receipt. And discovery: a teacher is
 found by a link someone sent you, not by a search that ranks them.
 
 ## Where to go next

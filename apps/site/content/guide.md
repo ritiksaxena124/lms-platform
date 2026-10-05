@@ -41,32 +41,40 @@ cron with its own connection — which is what makes a rule stated in a service 
 
 ## Ports, not vendors
 
-Three folders in `apps/api/src/providers` are the entire surface this platform offers to hand to
-somebody else's system: `mail`, `storage` and `video`. Each defines the operations the domain needs
-in its own words, and an adapter implements them. Which adapter runs is chosen by the environment,
-so picking a different vendor later is an adapter plus an env change rather than a refactor.
+Four folders in `apps/api/src/providers` are the entire surface this platform offers to hand to
+somebody else's system: `mail`, `storage`, `video` and `payment`. Each defines the operations the
+domain needs in its own words, and an adapter implements them. Which adapter runs is chosen by the
+environment, so picking a different vendor later is an adapter plus an env change rather than a
+refactor.
 
 Two details make the pattern worth having. A `none` adapter is a real implementation, not an `if` in
 every route: with video set to `none` the platform answers that it does not run live classes, and no
 caller has to guess. And the caller mints the storage key — an endpoint asks for a uuid rather than
 trusting a filename, because a filename is not unique across teachers and a lesson id is guessable.
 
-Payment is the [[port]] that was never written. `PAYMENT_PROVIDER` exists in the environment and is read at
-the door by nothing else — there is no `providers/payment` beside `mail`, `storage` and `video`, because
-no route has needed to ask a vendor anything.
+The payment [[port]] asks two questions, and they arrive in different shapes on purpose. `takesMoney`
+is answered before anything is written, because a deployment that collects elsewhere must not leave a
+learner holding a place that waits on a payment nobody can take. `collect` is asked about a ledger row
+that already exists, so the amount and the currency a learner was quoted are the ones the gateway
+sees — not whatever the course happens to say now. This POC runs `mock`, which reports the money
+arrived and mints its own reference from the attempt's id, and `none`, which refuses both times.
+There is no vendor SDK in the tree and none is planned; a real gateway would be a third adapter
+behind the same two questions.
 
-What Phase 9 built sits in front of that gap rather than across it. A teacher issues discount codes per
-course, each carrying a percentage or fixed-amount discount, a validity window and an optional cap on
-redemptions. When a learner enrolls with a code, the enrollment endpoint checks it against the course,
-works out the discounted price, writes a `payment` row linking the enrollment to the coupon, and
-increments the redemption count — all inside the transaction that opens the place. An expired,
-exhausted or unknown code is refused before the place opens, so a bad code never costs a learner their
-seat.
+The gate those answers open is the enrollment one. A free course opens its place on the press. A
+priced course writes the place shut with a `pending` attempt beside it, and the learner's pay press is
+what asks the port; the place opens, the letter is queued and the decision is logged on the answer —
+never ahead of it. A refused charge leaves the place shut and the refusal in the ledger, and asking
+again is a second row quoting the same amount rather than a rewrite of the row that failed.
 
-None of that is a charge. The `payment` row records what the class was priced at; its
-`providerReference` is a literal string, not a receipt, and no money moved anywhere. Wiring a provider
-means building the port the other three were built as — an interface, a `none` adapter that means it
-honestly, and an env switch — and the `payment` table is where that port will hang.
+Phase 9's discount codes hang off that same transaction. A teacher issues codes per course, each
+carrying a percentage or fixed-amount discount, a validity window and an optional cap on
+redemptions. When a learner enrolls with a code, the endpoint checks it against the course's own
+price — a body that could name an amount would be a learner discounting themselves — works out the
+discounted figure, files it as the attempt, and counts the redemption in the same statement. A code
+that brings the price to zero opens the place on the arithmetic and never asks a gateway, because
+there is no charge in a zero. An expired, exhausted or unknown code is refused before anything is
+written, so a bad code never costs a learner their seat.
 
 ## One session, four doors
 

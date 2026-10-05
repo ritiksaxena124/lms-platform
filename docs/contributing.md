@@ -18,7 +18,7 @@ description a stranger could act on, a merge, and a tag only when the gate is gr
 branch off `main` silently excludes whatever has already been integrated.
 
 ```
-main ──────●───────────────────●  (latest tag: v0.18.1)
+main ──────●───────────────────●  (latest tag: v0.20.0)
             ╲                 ╱
 release ─────╲───●───●────────   fixes only, nothing new
               ╲       ╱
@@ -220,16 +220,16 @@ Patches **accumulate and go out together**. Six fixes are one tag, not six. With
 number stops carrying information and the repository ends up with a hundred releases that all mean
 "something small changed".
 
-The version line today: the newest tag is **`v0.18.1`**, and `release` and `develop` are the history that
-led into it. So the next repair on that line is **`v0.18.2`**, and the next thing a user could not do
-before is **`v0.19.0`**. Read `git log --oneline <newest tag>..develop` before choosing a number — the
+The version line today: the newest tag is **`v0.20.0`**, and `release` and `develop` are the history that
+led into it. So the next repair on that line is **`v0.20.1`**, and the next thing a user could not do
+before is **`v0.21.0`**. Read `git log --oneline <newest tag>..develop` before choosing a number — the
 answer is in what has landed since the last tag, not in what this file last said.
 
 Cutting a release:
 
 ```
-bun run release v0.18.1 --title="Patch: a day off is not offered as a class"
-bun run release v0.18.1 --dry-run          # look first
+bun run release v0.20.0 --title="Phase 10: the class a student booked, ended"
+bun run release v0.20.0 --dry-run          # look first
 ```
 
 `scripts/release.mjs` refuses a dirty tree, a branch that is not `main`, and a tag that already exists on
@@ -284,8 +284,9 @@ to it in full.
 4. `develop` → `release` → `main`, then `bun run release v0.15.1 --title="Patch: the student reading path"`.
 5. The container stack came next as **`v0.15.2`** — a patch, because it is not a roadmap row and nobody
    could not reach a page without it. **`v0.16.0`** then carried Phase 10's second stage, a series that
-   generates its cohort classes, and that row still reads `Partial`: a tag marks the gate, the table says
-   what is behind it.
+   generates its cohort classes. That row read `Partial` at the time and still did when this section was
+   written: a tag marks the gate, the table says what is behind it. `v0.20.0` is the row's last stage, and
+   the table now reads `Done`.
 
 ## Worked example — the chain that landed `v0.17.0`
 

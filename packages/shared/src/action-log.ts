@@ -134,6 +134,12 @@ export const ACTION_CODES = {
   BOOKING_REFUSED: 'booking_refused',
   BOOKING_CANCELLED: 'booking_cancelled',
   BOOKING_EXPIRED: 'booking_expired',
+  /** The two endings a class reaches by being lived through rather than decided. Both are the
+   * teacher's, because the teacher is the one who was in the room, and neither is mailed: a mark
+   * reports a class that is already over, so unlike the five above it asks nothing of its reader.
+   * `detail` carries the pair, the way every other status move here does. */
+  BOOKING_COMPLETED: 'booking_completed',
+  BOOKING_NO_SHOW: 'booking_no_show',
 } as const;
 
 export type ActionCode = (typeof ACTION_CODES)[keyof typeof ACTION_CODES];
@@ -350,6 +356,19 @@ export const ACTION_SHAPES = {
     targetTable: ACTION_TARGET_TABLE_CODES.BOOKING,
     actorKind: ACTION_ACTOR_KIND_CODES.SYSTEM,
   },
+  /** Both marks are a person pressing a button on a class list, so neither joins the system rows the
+   * expiry sits beside — and both are about the booking itself, not about a register line under it,
+   * because a one-to-one has no line: the student on the row is the whole roll. */
+  booking_completed: {
+    section: ACTION_SECTION_CODES.BOOKING,
+    targetTable: ACTION_TARGET_TABLE_CODES.BOOKING,
+    actorKind: ACTION_ACTOR_KIND_CODES.USER,
+  },
+  booking_no_show: {
+    section: ACTION_SECTION_CODES.BOOKING,
+    targetTable: ACTION_TARGET_TABLE_CODES.BOOKING,
+    actorKind: ACTION_ACTOR_KIND_CODES.USER,
+  },
 } as const satisfies Record<ActionCode, ActionShape>;
 
 /**
@@ -496,6 +515,11 @@ export const ACTION_LABELS: Record<ActionCode, string> = {
   [ACTION_CODES.BOOKING_REFUSED]: 'Class refused',
   [ACTION_CODES.BOOKING_CANCELLED]: 'Class cancelled',
   [ACTION_CODES.BOOKING_EXPIRED]: 'Request expired',
+  // Said as what the teacher saw rather than what the column holds: an operator scanning the ledger
+  // is asking whether a class happened, and `no_show` reads as a form field in a sentence about a
+  // person. The status label beside it stays "No show", because that one is read off a row.
+  [ACTION_CODES.BOOKING_COMPLETED]: 'Class taught',
+  [ACTION_CODES.BOOKING_NO_SHOW]: 'Class missed',
 };
 
 /** What the sections are called to a person who has never read a column name.

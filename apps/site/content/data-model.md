@@ -71,8 +71,10 @@ Nothing on this page enforces a business rule, and that is deliberate.
   that writes it.
 - Whether a student may take a place — course published, student not the owner — is decided by the
   endpoint that writes the enrollment, not by a constraint.
-- A price is a quote on a shelf. Nothing collects money in this build, and no column pretends
-  otherwise.
+- A price is a number on a row, not a receipt. Nothing in the schema moves money, and no column
+  pretends otherwise: the enrollment endpoint files the amount as a `payment` row whose status says
+  whether the money has arrived, and a real gateway would be an adapter behind the `payment` port
+  rather than a column here.
 - How many times a notification retries is a number in the shared package, compared against
   `attempts` by the sweep that owns it.
 - One demo call per student per course is a count over the rows that survived. A unique key would

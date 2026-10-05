@@ -15,7 +15,8 @@ the row changes here because it changed there — including when it closes only 
 tests pass, the behaviour was checked in a browser by hand, and the next phase was approved — a phase
 is not finished when it compiles. **Partial** means the records and the screens are there but the part
 that changes what an older feature does is not: read the note beside the row before trusting it.
-**Not started** is a promise still in the plan.
+**Not started** is a promise still in the plan. No row above reads `Partial` or `Not started` today, and
+the words stay because a row can earn them again — the two notes below are what each `Done` stops at.
 
 ## What the record says
 
@@ -29,18 +30,29 @@ teacher's repeating calendar, the public face of the marketplace, and these docs
 turns what `ARCHITECTURE.md` already argues into pages somebody outside the repository can read, plus
 one phase after it that explains every endpoint rather than only listing it. The face and the manual
 are standing, and this page is one of them: the row above it is read from the repository's own record,
-so it says Done for the same reason the record does. Money and the calendar are the two that stopped
-halfway, and what "halfway" means for each is below.
+so it says Done for the same reason the record does. Money and the calendar are the two rows whose notes
+have to be read along with them, and what each of those means is below.
 
 **Money, as far as it goes (Phase 9).** A teacher issues discount codes on a course — a percentage or a
 fixed amount off the quoted price, a validity window, an optional cap on redemptions, and a counter of
 uses — at `/courses/:courseId/coupons`, managed from the course's own screen. A learner types a code
-where the enroll button is. A valid one prices the place at the discount and writes a `payment` row in
-the same transaction that opens the place; an expired, exhausted or unknown code is refused before the
-place opens. That is the whole of it: **nothing is charged.** There is no payment port behind
-`PAYMENT_PROVIDER`, so the amount on a `payment` row is what the class costs, not money that moved.
+where the enroll button is. A valid one prices the place at the discount; an expired, exhausted or
+unknown code is refused before anything is written. A free course opens the place on that press and
+files no payment row at all. A priced one does not: the place is written closed with a `pending` attempt
+quoting the amount beside it, `POST /enrollments/:id/pay` asks the provider for that money, and the place
+opens exactly when the attempt comes back `completed`. `GET /enrollments/held` lists the attempts waiting
+on the learner, so a reload finds the same hold rather than a second quote, and a place whose newest row
+is `completed` is never on that list. A refused charge leaves the place shut and the refusal in the
+ledger, and the next press quotes the same number the learner already saw.
 
-**The calendar, executed but unanswered (Phase 10).** A course keeps a weekly series — Monday, 09:00 to
+The money itself does not leave the machine. There is a payment port behind `PAYMENT_PROVIDER` — that
+was the phase's missing half — but the only adapters shipped are `mock`, which answers `completed` and
+derives a reference from the attempt's own id, and `none`, which says plainly that this build takes no
+money. **No card is charged and no vendor SDK is wired in**, by decision: a gateway replaces one adapter
+and nothing else, and the failure path is real because tests hand the service a provider that answers
+`failed`.
+
+**The calendar, now answered at both ends (Phase 10).** A course keeps a weekly series — Monday, 09:00 to
 10:00, a 45-minute class, repeating until retired — and a teacher keeps holidays, single dates or ones
 that return each year. Both now have consequences. A sweep reconciles them into dated classes over the
 next thirty days, so a series stands for real classes on the teacher's `/calendar`, a marked-off day
@@ -49,9 +61,11 @@ their own list beside the classes they booked. A dated class carries the registe
 name holding a place, with `present` or `absent` beside it once the teacher says so at
 `/calendar/class/{id}`, and nothing at all about a name nobody has marked. The day off now reaches past
 the sweep as well — a marked date leaves the booking grid too, so a student is never offered a minute
-their teacher is away for. What the phase still does not answer is the one-to-one class at its end:
-`completed` and `no_show` stay seeded booking statuses that nothing writes, so a class a student booked
-finishes with nobody having said it happened.
+their teacher is away for. The one-to-one class at the end of the phase is answered too:
+`POST /bookings/:id/attendance` writes `completed` or `no_show` onto the booking itself, since a 1:1 has
+one name on the sheet and it is the person who asked, so there is no register to mark beside it. The
+word is refused before the class's first minute has passed and accepted any time after it, which is how
+a class forgotten on Thursday is still markable on Monday.
 
 ## Where the reasoning lives
 
