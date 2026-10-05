@@ -20,3 +20,4 @@ export * from './permissions';
 export * from './schedule';
 export * from './theme';
 export * from './timezone';
+export * from './tour';
