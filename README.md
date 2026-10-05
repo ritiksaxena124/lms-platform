@@ -120,6 +120,14 @@ See [Phases](#phases) for what each phase promised and what it delivered.
 - **A room, while the class is live** — a confirm gives the class its own Jitsi address, minted from
   a uuid, stored and never sent. A class row grows a Join button inside the window that door opens
   in, and opens it in a frame rather than a link.
+
+  **How joining works:** Five minutes before the class starts, the door opens and a prominent
+  highlighted card appears on the class row with a video camera icon and a full-width "Join video
+  call" button. Clicking it loads the Jitsi room directly in an iframe on the same page — no new tab,
+  no external link. The door stays open for 15 minutes after the class ends. If the teacher hasn't
+  arrived yet, the room will be empty; wait a few minutes before marking the class missed. After the
+  door closes, the row shows "Door closed" and the join button disappears.
+
 - **A recording on a lesson** — attached, named, replaced and played from the same panel that edits
   the page it belongs to.
 - **Trial calls** — `/api/v1/courses/:id/demo-bookings` grants a course the switch that lets a
@@ -161,6 +169,12 @@ See [Phases](#phases) for what each phase promised and what it delivered.
   wearing no door — nobody booked them, so there is no minute to give back — and beside the pill that
   says so, the one word the teacher wrote about their own name, or nothing at all while the roll is
   still unmarked.
+
+  **Joining a live class:** When the class time arrives (5 minutes before start), a highlighted card
+  with a video camera icon and "Live class is open" appears on the class row. Click the full-width
+  "Join video call" button to load the Jitsi room in an iframe on the page. If the teacher hasn't
+  arrived yet, the room will be empty — wait a few minutes before calling it missed. The door closes
+  15 minutes after the class ends.
 
 ### The operator's desk
 
