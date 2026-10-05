@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { BookingRequest } from '@lms/shared';
+import type { BookingRequest, BookingStatusCode } from '@lms/shared';
 import { BOOKING_STATUS_CODES } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
@@ -16,6 +16,7 @@ vi.mock('./session-provider', () => ({
 vi.mock('@/lib/bookings', () => ({
   listClasses: vi.fn(),
   joinRoom: vi.fn(),
+  markClass: vi.fn(),
 }));
 
 const { notify } = vi.hoisted(() => ({ notify: { success: vi.fn(), error: vi.fn() } }));
@@ -24,7 +25,7 @@ vi.mock('@lms/ui', async (importOriginal) => {
   return { ...actual, notify };
 });
 
-import { joinRoom, listClasses } from '@/lib/bookings';
+import { joinRoom, listClasses, markClass } from '@/lib/bookings';
 
 /** The teacher's own schedule, read at a moment when nothing booked below has gone by yet. */
 const NOW = new Date('2026-10-03T06:00:00.000Z');
@@ -63,6 +64,15 @@ const WAS = {
   endsAt: '2026-10-01T10:15:00.000Z',
 };
 
+/** A confirmed class two days gone, door window and all. The window travels with the status rather
+ * than with the clock, so the row still carries it and the screen still says the door is shut. This
+ * is the shape that used to sit on the schedule forever, reading `Confirmed` long after the hour it
+ * names had gone by — the mark door is what finishes the sentence. */
+const AND_GONE = {
+  ...WAS,
+  live: { opensAt: '2026-10-01T09:25:00.000Z', closesAt: '2026-10-01T10:30:00.000Z' },
+};
+
 const queue = () => vi.mocked(listClasses);
 
 /** The address the join endpoint hands out for `CLASS_ONE`. It exists only in the answer. */
@@ -76,6 +86,11 @@ beforeEach(() => {
   vi.setSystemTime(NOW);
   queue().mockReset().mockResolvedValue([]);
   vi.mocked(joinRoom).mockReset().mockResolvedValue(ROOM_URL);
+  vi.mocked(markClass)
+    .mockReset()
+    .mockImplementation(async (id, status) =>
+      booked({ ...AND_GONE, id, status: status as BookingStatusCode }),
+    );
 });
 
 afterEach(() => {
@@ -296,5 +311,125 @@ describe('TeacherClasses', () => {
       ),
     );
     expect(document.querySelector('iframe')).toBeNull();
+  });
+
+  /**
+   * The two words that end a class.
+   *
+   * The screen offers them on one shape and one shape only: a confirmed class whose first minute
+   * has arrived. Every other row already says how it ended — a request has not been answered, a
+   * refusal and an expiry and a cancellation each name themselves — and a class that carries a mark
+   * has been said. The gate here is courtesy, not the rule: the route refuses the same presses
+   * again, and a row that went stale while the page stood open is corrected by the re-read.
+   */
+  it('offers the two words on a class whose hour has gone by', async () => {
+    queue().mockResolvedValue([booked(AND_GONE)]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    const row = rowOf('Aria Kapoor');
+    expect(within(row).getByRole('button', { name: 'Mark taught' })).toBeInTheDocument();
+    expect(within(row).getByRole('button', { name: 'Mark missed' })).toBeInTheDocument();
+  });
+
+  it('offers neither word on a class that has not happened yet', async () => {
+    // A mark is a report about an event. Filed before the event it is a prediction, and the API has
+    // no door for one either.
+    queue().mockResolvedValue([booked()]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    expect(within(rowOf('Aria Kapoor')).queryByRole('button', { name: /mark/i })).toBeNull();
+  });
+
+  it('offers neither word on a class that never stood', async () => {
+    // Two days gone, and each of these already says what became of it. `no_show` over a request the
+    // teacher never answered would report a class that never happened as one a student missed.
+    for (const status of [
+      BOOKING_STATUS_CODES.PENDING,
+      BOOKING_STATUS_CODES.EXPIRED,
+      BOOKING_STATUS_CODES.CANCELLED,
+    ]) {
+      queue().mockResolvedValue([booked({ ...AND_GONE, status })]);
+      const { unmount } = render(<TeacherClasses />);
+      await screen.findByText('Aria Kapoor');
+
+      expect(within(rowOf('Aria Kapoor')).queryByRole('button', { name: /mark/i })).toBeNull();
+      unmount();
+    }
+  });
+
+  it('offers neither word twice, on a class that has one', async () => {
+    queue().mockResolvedValue([
+      booked({ ...AND_GONE, status: BOOKING_STATUS_CODES.COMPLETED }),
+      booked({
+        ...AND_GONE,
+        id: 'class-old-2',
+        status: BOOKING_STATUS_CODES.NO_SHOW,
+        student: { id: 'student-2', displayName: 'Chen Yu' },
+      }),
+    ]);
+    render(<TeacherClasses />);
+    await screen.findByText('Chen Yu');
+
+    expect(within(rowOf('Aria Kapoor')).queryByRole('button', { name: /mark/i })).toBeNull();
+    expect(within(rowOf('Chen Yu')).queryByRole('button', { name: /mark/i })).toBeNull();
+    // The word the API gave is the word the row wears, in the shared vocabulary the student's list
+    // reads from as well.
+    expect(within(rowOf('Aria Kapoor')).getByText('Completed')).toBeInTheDocument();
+    expect(within(rowOf('Chen Yu')).getByText('No show')).toBeInTheDocument();
+  });
+
+  it('marks a class taught, and re-reads so the word on the row is the API’s', async () => {
+    // The list is fetched again rather than the pressed word spliced into it: what the row says
+    // after the press is what the table answered, not what the button was labelled.
+    queue().mockResolvedValueOnce([booked(AND_GONE)]).mockResolvedValueOnce([
+      booked({ ...AND_GONE, status: BOOKING_STATUS_CODES.COMPLETED }),
+    ]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mark taught' }));
+
+    await waitFor(() => expect(markClass).toHaveBeenCalledWith('class-old', 'completed'));
+    await waitFor(() => expect(queue()).toHaveBeenCalledTimes(2));
+    expect(within(section('Earlier')).getByText('Completed')).toBeInTheDocument();
+    expect(within(rowOf('Aria Kapoor')).queryByRole('button', { name: /mark/i })).toBeNull();
+  });
+
+  it('marks a class the student never came to as missed', async () => {
+    queue().mockResolvedValue([booked(AND_GONE)]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mark missed' }));
+
+    await waitFor(() => expect(markClass).toHaveBeenCalledWith('class-old', 'no_show'));
+  });
+
+  it('says the reason a mark was refused, and re-reads the schedule rather than the word', async () => {
+    // A 409 here means the class was not what the row on screen said it was — cancelled, or marked
+    // from another tab. The API's sentence is the one worth reading, and the re-read is what makes
+    // the row tell the truth afterwards.
+    vi.mocked(markClass).mockRejectedValue(
+      new ApiError({
+        statusCode: 409,
+        code: 'CONFLICT',
+        message: 'This class has already been marked off, so it cannot be marked a second way.',
+      }),
+    );
+    queue().mockResolvedValue([booked(AND_GONE)]);
+    render(<TeacherClasses />);
+    await screen.findByText('Aria Kapoor');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Mark taught' }));
+
+    await waitFor(() =>
+      expect(notify.error).toHaveBeenCalledWith(
+        'This class has already been marked off, so it cannot be marked a second way.',
+      ),
+    );
+    await waitFor(() => expect(queue()).toHaveBeenCalledTimes(2));
+    expect(within(rowOf('Aria Kapoor')).getByText('Confirmed')).toBeInTheDocument();
   });
 });

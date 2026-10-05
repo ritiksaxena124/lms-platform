@@ -95,3 +95,9 @@ lesson free, open an evening on the availability calendar, then sign in as the l
 profile, read the free page, take a place and ask for that minute. The teacher answers yes, which
 gives the class a room and tells both of them by email. Then sign in as the operator and find the
 same decisions in the activity log.
+
+Two turns of that walk depend on a setting. Take a place on a course that carries a price and it comes
+back held rather than open; it opens when the learner pays, which needs `PAYMENT_PROVIDER=mock` — with
+the default `none` the API says up front that this box takes no money and writes nothing. And once the
+booked minute has passed, the teacher's class list offers a mark for it, taught or missed, which is how
+a 1:1 ends.

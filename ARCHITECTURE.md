@@ -141,17 +141,40 @@ errors, which is why both sides import the type from one place.
 
 ## 6. Third-party providers
 
-Video, storage and email sit behind ports in `apps/api/src/providers`, selected by environment
-(`STORAGE_PROVIDER`, `VIDEO_PROVIDER`, `SMTP_URL`). Domain code depends on the port, never on a vendor
-SDK.
+Video, storage, email and money sit behind ports in `apps/api/src/providers`, selected by environment
+(`STORAGE_PROVIDER`, `VIDEO_PROVIDER`, `SMTP_URL`, `PAYMENT_PROVIDER`). Domain code depends on the port,
+never on a vendor SDK.
 
-Payment is the exception, and the honest way to say it is that **there is no payment port**. A
-`PAYMENT_PROVIDER` key exists in the schema and defaults to `none`; nothing outside the env parser reads
-it, because there is no `providers/payment` directory to hand a message to. Phase 9 built the money half
-of the product — coupon codes, redemption, a `payment` row priced at the discount — without building it,
-so the platform records what a class costs and asks nobody for anything. That is a real gap rather than a
-config flag: when a vendor arrives, the work is the port the other three were built as, not a value in
-an env file. `STORAGE_PROVIDER=s3` throws at boot rather than silently doing nothing.
+Payment is the last of the four to be built, and it arrived as a port rather than as a value in an env
+file (Phase 9's gap, closed for `v0.19.0`). `apps/api/src/providers/payment` asks two questions:
+`takesMoney`, a synchronous "can this box ask anybody for money at all", and `collect`, an asynchronous
+"did the money for this ledger row arrive". The env enum has two legal values and defaults to `none`;
+`mock` answers `completed` against a reference derived from the attempt's own id, and `none` says it
+takes nothing. **No vendor SDK is wired in and none is planned** — that is a decision, not a TODO. A
+real gateway would arrive as a third adapter in this directory plus one value in that enum; the
+enrollment gate, the ledger and both portals' screens are already written against the port, so nothing
+above it changes. Three rules the shape carries, which are the parts a caller cannot see from the
+signature:
+
+- **The caller mints the attempt id.** A `payment` row exists before anyone asks a provider about it,
+  so the ledger's own primary key is the thing a charge is made against — the same division storage
+  uses for its key and the video port uses for a room name. Nothing here builds an identifier out of a
+  course id, an amount or a timestamp.
+- **An outcome is not a permission.** `collect` answers whether money arrived for one attempt; the
+  enrollment service decides whether a place opens, and it asks `takesMoney` *before* writing a row
+  that could wait forever. A deployment on `none` therefore answers a priced enrollment with `503`
+  rather than leaving a learner holding a place no code can settle.
+- **A quote is what the student was shown, and it is never recomputed here.** The service writes the
+  quoted amount and currency into the ledger row and hands that row's own numbers to the provider, so
+  a retry after a teacher re-prices the course collects what the first attempt asked for. A refused
+  charge is a returned `failed` rather than a throw — a declined card is an answer, and the caller's
+  job is to record it and leave the place closed — while an attempt that is not money at all (no
+  amount, a negative one, a fraction of a minor unit, a blank currency, or a provider that has already
+  said it takes nothing) throws `UnchargeableAttemptError`.
+
+`PAYMENT_PROVIDER` names a gateway nothing implements, or `STORAGE_PROVIDER=s3`, throws at boot rather
+than silently choosing for the operator: a school whose config claims a payment provider has to find out
+on the deploy, not from a student standing on a pay button.
 
 Storage is the first of these to be real (Phase 5, step 5a). `apps/api/src/providers/storage`
 defines two operations — write a stream under a key, read a stream back for a key — and the
@@ -359,6 +382,12 @@ or left. Each files exactly one `mail_outbox` row, and it files it _inside the t
 moved the row_ — the outbox rule, which is worth more than the pattern's usual justification. A
 letter queued after a commit is a letter about a class that a rollback may never have allowed.
 
+Two of the platform's writes deliberately are not on that list. The enrollment that is only _held_
+behind money files no letter (§12) — a place nobody can yet walk into is not news a student was
+told about — and marking a booked class taught or missed files none either (§14), because a mark
+reports a class already over and asks nothing of its reader. Both still go down the action log,
+which is the record of what the platform did rather than a message to anybody.
+
 - **The repository calls the queue; the service names the event.** Each write takes a `notify`
   callback that receives the caller's `Prisma.TransactionClient` and the row as its own statement
   just read it. `when` the news is filed is a fact about the transaction, and only the transaction
@@ -497,19 +526,19 @@ The choice has now been made, which is why these are phases rather than open que
   `STORAGE_PROVIDER`, which is the second reason storage gets built before either is demoed —
   a recorded lesson and a live room are one field apart on a page, and two completely
   different promises about where the bytes live.
-- **Money was to arrive with coupons, and only half of it did.** The argument held — a discount code
-  is meaningless on a course nothing charges for, so it came after every portal existed and after the
+- **Money arrived in two halves, and both are now built.** The argument held — a discount code is
+  meaningless on a course nothing charges for, so it came after every portal existed and after the
   price did. Phase 9 shipped the code: a teacher issues many per course from the course itself, each
   with its own discount and its own lifetime, a student redeems one on the way to a place, and a
   redemption writes a `payment` row inside the transaction that opens the place. The lifetime was
   planned as an `LkpCouponValidityUnit` interval so "48 hours" and "end of the month" would both be
   data; what shipped is a `validFrom` / `validUntil` pair, which states the same window once and needs
   no lookup type, and a run-time measured from the redemption date is the half that was not built.
-  What it did not ship
-  is the charging: no `PAYMENT_PROVIDER` adapter is selected because no port exists (§6), so the row's
-  `providerReference` is a literal, and the ledger is arithmetic rather than money. The reason to say
-  so here is that the shape of the row was decided as if a provider existed — which is the useful part
-  of the work, and the part a later vendor fits into.
+  The other half — the charging — shipped beside the port (§6): the row a redemption writes is now
+  written as a *pending* attempt, `POST /enrollments/:id/pay` asks the provider about it, and the
+  place opens on the answer rather than on the arithmetic. What did not change is that the provider is
+  `mock` and the money does not leave the machine, which is the deliberate ceiling of this POC rather
+  than a gap in it.
 - **Every entity's write is recorded** (§18): an append-only `action_log` of who did what, to
   which row, and in which part of the app. It was a phase rather than a column added earlier
   because a record's shape is only worth fixing once every kind of write exists — and
@@ -625,16 +654,18 @@ A portal is a client of that design, and inherits its rules:
   carries `teacherUserId` in its `where` clause rather than checking ownership afterwards, so
   ownership is not a step a later endpoint can forget. `403` would tell a colleague the id
   exists and is a course.
-- **A course can carry a price, and the price is a quote, not a checkout.** `priceMinorUnits`
-  and `priceCurrencyValueId` are two nullable columns that move as one decision (§5), the
-  currency a `LkpValue` under the `Currency` type rather than an enum so a new one is a seed
-  row, not a deploy. `null` in both means nobody has quoted it — which a shelf renders as
-  silence, distinct from a `0` that means free. Nothing charges it: there is no payment port (§6), a
-  place in a course is still taken without a payment being taken (§12), and a coupon lowers the figure
-  that is written down rather than moving any money. The price is the teacher's stated intent, and the
-  `payment` row a redemption writes is a record of that intent at a discount. It is writable while
-  a course is a draft and locked once published, exactly like every other field the student
-  reads.
+- **A course can carry a price, and the price is a quote the student is shown rather than a checkout
+  the student is run through.** `priceMinorUnits` and `priceCurrencyValueId` are two nullable columns
+  that move as one decision (§5), the currency a `LkpValue` under the `Currency` type rather than an
+  enum so a new one is a seed row, not a deploy. `null` in both means nobody has quoted it — which a
+  shelf renders as silence, distinct from a `0` that means free. A quote is now also what a charge is
+  made against: a priced course does not open on the press that asks for a place, it writes the place
+  closed beside a `pending` ledger row and waits for `POST /api/v1/enrollments/:id/pay` (§12). A coupon
+  lowers the figure quoted, and a coupon that lowers it to nothing opens the place on the arithmetic
+  without asking a gateway for a zero. The price is the teacher's stated intent and the ledger row is
+  that intent at a discount; the money itself does not move, because the port behind it is `mock` (§6).
+  It is writable while a course is a draft and locked once published, exactly like every other field
+  the student reads.
 - **`DELETE` is still not a thing.** Retiring is archiving; the row is what an enrollment points
   at (§12), and an archived course keeps a roster of the people who were inside it.
 - **The teacher writes courses at `/courses`, `/courses/new` and `/courses/[id]/edit`.** One
@@ -897,16 +928,40 @@ what an invitation is for.
 - **Two indexes, one per question.** `ix_enrollment_student_list` answers "my courses", newest
   first, and `ix_enrollment_course_roster` answers a teacher's headcount and the gate's own
   lookup — "is this student inside this course" has to be an index probe, not a scan.
-- **Three routes, a student's and nobody else's.** `GET /api/v1/enrollments` is "my courses",
-  `POST /api/v1/enrollments` takes a place by `courseId`, and `POST
-/api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
+- **Five routes, a student's and nobody else's.** `GET /api/v1/enrollments` is "my courses", `GET
+  /api/v1/enrollments/held` is the places written but not yet paid for, `POST /api/v1/enrollments` asks
+  for a place by `courseId`, `POST /api/v1/enrollments/:id/pay` answers for the money that place owes,
+  and `POST /api/v1/enrollments/:id/cancel` closes one. They live in `modules/enrollments`, and what a
   place is _worth_ stays the catalog's decision — this module writes the row §11 reads.
+- **Asking is not having, when the course has a price.** A place in a free or unpriced course opens on
+  the press, as it always did. A place in a priced one is written `isActive: false` with a `pending`
+  `payment` row beside it, and it opens only when the port reports the charge came back `completed`;
+  a refusal leaves the place closed and the refusal in the ledger. The two writes are separate because
+  the two lifetimes are separate — a place is kept, a charge is attempted — and folding them together
+  is how a platform ends up reporting money it never asked anybody for.
+- **A held place is a list of its own, because a reload cannot find it otherwise.** `GET /enrollments`
+  answers the question "what am I inside", so a place waiting on payment is not on it, and a student who
+  pressed enroll and refreshed would appear to have taken nothing. `/enrollments/held` is the mirror:
+  the same shape, only the attempts that still owe an answer, which is what the student portal's pay
+  step reads on load. A place that has already been paid for is never on it, and neither is one that was
+  never owed anything.
+- **The number charged is the number quoted.** `pay` reads the amount and currency back off the ledger
+  row rather than recomputing them from the course, so a teacher who re-prices while a place is held
+  cannot move what the student was shown — and a retry collects what the first attempt asked for (§6).
+  A settled attempt is reported, not re-asked: the second press of a pay button returns the same place
+  and files neither a second charge nor a second letter. A press after a refusal mints a *new* attempt
+  row, because the refusal happened and rewriting it would erase the fact that the money did not come.
+- **A deployment that takes no money says so before a row exists.** `PAYMENT_PROVIDER=none` answers a
+  priced enrollment with `503` and one sentence, on both the ask and the pay, having asked nothing of
+  any gateway: a place waiting on a payment nobody can take is not a state this platform leaves a learner
+  in. `none` is a configuration a school runs on purpose (§6), not a fault, so the answer is a status
+  the portal can show rather than a stack trace.
 - **The capability is the whole of "a teacher cannot enroll in their own course."** The enrollments
   controller asks for `enrollment.hold`, which §7's matrix hands to students alone, so that request
   never reaches a query to be checked. When a later phase wants teachers to take places too, the one
   line that changes is the matrix — and the ownership question it would raise is a decision somebody
   makes on purpose rather than a hole a service forgot to plug.
-- **A fourth route reads the same table for the teacher who owns the course.** `GET
+- **A sixth route reads the same table for the teacher who owns the course.** `GET
 /api/v1/courses/:courseId/roster` answers the question `ix_enrollment_course_roster` was built
   for, and it is addressed through the course rather than through a student, so ownership is the
   whole permission: another teacher's roster and a uuid nobody wrote are one `404`, exactly as on
@@ -925,10 +980,12 @@ what an invitation is for.
   of the count, and one who came back is a single entry on the day they first arrived; a draft
   course reads empty for its own teacher rather than refusing, and an archived one still names
   who was inside it, since archiving closes pages rather than rewriting who turned up (§2).
-- **Both writes are idempotent and both answer `200`.** Enrolling twice returns the row that
-  already exists, with its original `enrolledAt`; cancelling a closed place returns it closed. A
-  button on a slow connection gets pressed twice, and a `201` with a second row — or a `409` the
-  portal has to interpret — is the API handing that problem to the client.
+- **Every write here is idempotent and every one answers `200`.** Enrolling twice returns the row that
+  already exists, with its original `enrolledAt`, and a second press on a priced course returns the
+  attempt already waiting on it rather than minting another; paying twice returns the settled place;
+  cancelling a closed place returns it closed. A button on a slow connection gets pressed twice, and a
+  `201` with a second row — or a `409` the portal has to interpret — is the API handing that problem to
+  the client.
 - **A student's place is worth pages through the catalog's own routes.** §11 folds it into the
   page query's `where` as the alternative to `isFreePreview`, and answers it as a probe beside the
   outline read to set each row's `isReadable`, which buys the things the suite checks directly:
@@ -944,10 +1001,14 @@ what an invitation is for.
   reason this table keeps one row per pair.
 - **What holds it:** `apps/api/test/enrollment-schema.spec.ts` for the table's promises,
   `apps/api/test/enrollments.spec.ts` for the routes, the gate they open, the outline rows they
-  light up and the silence they keep, and `apps/api/test/course-roster.spec.ts` for the teacher's
-  read of the same table — who is in the class, who is not, and what a roster is not allowed to
+  light up and the silence they keep, `apps/api/test/enrollment-payment.spec.ts` for the half where a
+  price stands between the press and the place — the hold, the pay, the retry that mints a second row,
+  the double press that does not, and the `503` a deployment on `none` gives before anything is written
+  — and `apps/api/test/course-roster.spec.ts` for the teacher's
+  read of the same table: who is in the class, who is not, and what a roster is not allowed to
   say. The student portal reads the first set now — `lib/enrollments.ts`
-  for the transport, `EnrollControl` for taking a place, `my-courses` for the roster and leaving
+  for the transport, `EnrollControl` for taking a place and for the pay step a held one opens into,
+  `my-courses` for the roster and leaving
   one — the teacher portal reads the roster at `/courses/[id]/roster`, and the rules those screens
   keep are §15's.
 
@@ -1110,6 +1171,34 @@ offered at, and everything else about the hour happens somewhere else.
   confirms gets one of the two, and the loser is told to look again rather than being shown a row
   whose status says one thing and whose hold says another. Releasing the hold and writing the status
   are the same statement, always.
+- **A booked class ends in its own status list.** `POST /api/v1/bookings/:id/attendance` writes
+  `completed` or `no_show` onto the booking, and those are two members of the same `BookingStatus`
+  lookup the confirm and refuse routes already move along rather than a second pair of words with their
+  own table. The split from a dated cohort class is by how many names are on the sheet: a cohort class
+  has a `class_attendance` register under it (§13) because many students hold a place in it, and a 1:1
+  has exactly one name — the person who asked — so its attendance is the row's own ending. The route
+  asks `booking.answer`, the capability the teacher's yes and no already carry, and another teacher's
+  class answers `404`.
+- **The gate is the class's start, never its end.** Only a `confirmed` booking can be marked, and any
+  time after its first minute has passed counts: a class taught on Monday and remembered on Thursday is
+  still markable, and the platform that refuses it would be asking the teacher to be present at the
+  moment the fact became known. Pressing the word a class already wears replays the row with `200` and
+  writes nothing — a second tab is not a second event — while the other word on a marked class answers
+  `409`, and so does a cancelled, expired or still-unanswered one. Two clauses, one read: the cheap
+  pre-read decides _which sentence_ the caller hears, and the compare-and-swap above decides _whether
+  the write lands_, so a class that moved underneath the reader is told to look again rather than being
+  quietly re-ended.
+- **Marking a class gives the minute back and closes the door.** The mark clears `slotHeldAt` with the
+  same statement that writes the status, because the grid asks what is *standing* and a finished class
+  should not keep its square off the shelf forever; `isActive` stays true and nothing is deleted (§2),
+  since the row is the record that this class happened. The room goes dark with it: `live` is set only
+  when a row has a room *and* stands `confirmed`, so a taught class has no door to open and no code had
+  to be written to close one.
+- **The mark is logged and not mailed.** `booking_completed` and `booking_no_show` go down the action
+  log's append-only road (§18) inside the same transaction as the write, which is what the ops desk
+  reads as evidence. No `mail_outbox` row is filed: the four booking letters each ask their reader to do
+  something, and a mark reports a class already over — the student reads that word on their own list,
+  and a letter about it would be the platform announcing a fact it has no way to change.
 - **A confirmed class gets a room, and a list gets only the window it opens in** (step 5d).
   `roomName` is written by the same statement that writes `confirmed` — a uuid through the video
   port, so a `VIDEO_PROVIDER=none` deployment mints nothing and has no branch to forget — and is
@@ -1145,22 +1234,25 @@ offered at, and everything else about the hour happens somewhere else.
   student asking for the same minute of the same course replays their existing row instead of
   adding one; cancelling a cancelled class and confirming a confirmed one both answer `200` with
   the row as it now reads.
-- **Four student routes, four teacher ones and one they share, on one table.** `GET slots`,
+- **Four student routes, five teacher ones and one they share, on one table.** `GET slots`,
   `POST /bookings`, `GET /bookings` and `POST /bookings/:id/cancel` for the student;
-  `GET /bookings/requests`, `GET /bookings/classes`, `POST /bookings/:id/confirm` and
-  `POST /bookings/:id/reject` for the teacher — both teacher lists read from the teacher rather
+  `GET /bookings/requests`, `GET /bookings/classes`, `POST /bookings/:id/confirm`,
+  `POST /bookings/:id/reject` and `POST /bookings/:id/attendance` for the teacher — both teacher lists
+  read from the teacher rather
   than the course, because a teacher with
   four courses keeps one list of people wanting Thursday. Each list returns every active row
   soonest-first and lets the screen decide what "upcoming" means; `requests` is pending-only,
   because answered ones are not a queue, and `classes` keeps them all, because an answered Tuesday
   is still a Tuesday. Both carry the student's name, which the student's own list does not: a
-  teacher's six o'clock is somebody's lesson. The fifth, `POST /bookings/:id/room`, belongs to
+  teacher's six o'clock is somebody's lesson. The shared one, `POST /bookings/:id/room`, belongs to
   neither door and is the reason the roles are asserted per-route in this module instead of on the
   controller.
 - **What holds it:** `apps/api/test/booking-schema.spec.ts` for the table,
   `booking-slots.spec.ts` for the grid and the entitlement that picks it, `booking-create.spec.ts`
   for the hold and the race, `booking-cancel.spec.ts`, `booking-answer.spec.ts` and
-  `booking-expiry.spec.ts` for the three ways a request stops being one, `booking-classes.spec.ts`
+  `booking-expiry.spec.ts` for the three ways a request stops being one, `booking-attendance.spec.ts`
+  for the way a confirmed class ends — the two words, the start that gates them, the replay that writes
+  nothing, the hold the mark gives back and the `404` another teacher gets —, `booking-classes.spec.ts`
   for the teacher's own calendar, `booking-room.spec.ts` for the room a confirmation brings and the
   window that list carries, `booking-join.spec.ts` for the door that turns the window into an
   address, and `packages/shared/src/schedule.test.ts` for the expansion all

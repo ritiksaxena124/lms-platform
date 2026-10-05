@@ -138,6 +138,9 @@ describe('the action vocabulary', () => {
     // job for anybody comparing a letter with the record of the change that caused it — and the
     // sends and the writes are the same seven decisions, which is why this assertion can be exact
     // rather than a subset.
+    //
+    // The two attendance marks below are the one exception the list does not carry: they are
+    // decided, mailed nowhere, and so they join the ledger and not this set.
     const shared = [
       ACTION_CODES.BOOKING_REQUESTED,
       ACTION_CODES.BOOKING_CONFIRMED,
@@ -148,6 +151,31 @@ describe('the action vocabulary', () => {
       ACTION_CODES.ENROLLMENT_LEFT,
     ];
     expect(new Set(shared)).toEqual(new Set(Object.values(MAIL_EVENT_CODES)));
+  });
+
+  it('records a class marked off without promising anybody a letter about it', () => {
+    // A mark reports a class that is already over. The four booking letters each ask something of
+    // their reader — answer me, come to this, it is cancelled — and there is nothing left to do with
+    // a Tuesday that happened, which the student reads on their own list. So the ledger gets the
+    // decision and the queue does not.
+    expect(ACTION_CODES.BOOKING_COMPLETED).toBe('booking_completed');
+    expect(ACTION_CODES.BOOKING_NO_SHOW).toBe('booking_no_show');
+
+    for (const code of [ACTION_CODES.BOOKING_COMPLETED, ACTION_CODES.BOOKING_NO_SHOW]) {
+      expect(actionShapeFor(code)).toEqual({
+        section: ACTION_SECTION_CODES.BOOKING,
+        targetTable: ACTION_TARGET_TABLE_CODES.BOOKING,
+        actorKind: ACTION_ACTOR_KIND_CODES.USER,
+      });
+      expect(Object.values(MAIL_EVENT_CODES)).not.toContain(code);
+    }
+
+    // The teacher pressed both of these, so neither joins the system list the sweep's expiry sits on.
+    expect(SYSTEM_ACTION_CODES).not.toContain(ACTION_CODES.BOOKING_COMPLETED);
+    expect(SYSTEM_ACTION_CODES).not.toContain(ACTION_CODES.BOOKING_NO_SHOW);
+
+    expect(actionLabel(ACTION_CODES.BOOKING_COMPLETED)).toBe('Class taught');
+    expect(actionLabel(ACTION_CODES.BOOKING_NO_SHOW)).toBe('Class missed');
   });
 
   it('records a course coming back off the shelf as its own decision, not a re-publish', () => {

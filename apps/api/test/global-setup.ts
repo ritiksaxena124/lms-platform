@@ -9,8 +9,9 @@ const ENV_FILES = ['.env', '.env.test'];
 
 /**
  * Loads the test environment and makes sure `lms_test` has every migration applied
- * before any spec runs. Data isolation between specs is per-test (transaction
- * rollback), so the suite can run repeatedly without truncating anything.
+ * before any spec runs. Data isolation between specs is per-file (each one cleans up what it
+ * filed), so the suite can run repeatedly without truncating anything — with one exception,
+ * `clearMailQueue` below, which is about a table no file owns on its own.
  *
  * The migration CLI is only spawned when a migration is genuinely missing — starting it
  * costs several seconds and would otherwise dominate every test run.
@@ -33,6 +34,33 @@ export async function setup(): Promise<void> {
 
   if (await hasUnappliedMigrations()) {
     execSync('bunx prisma migrate deploy', { stdio: 'inherit', env: process.env });
+  }
+
+  await clearMailQueue();
+}
+
+/**
+ * The run starts from an empty queue.
+ *
+ * Every other table in `lms_test` is left alone, because a spec reads what a previous spec happened
+ * to leave and the suite survives it. The mail queue is the exception, and the reason is a question
+ * a sweep asks of the whole table at once: `claimDue` takes the oldest due rows, and
+ * `reclaimAbandoned` counts every claim older than a run. Rows a killed process left behind are
+ * older than anything a fixture can honestly be dated at — this file's own backdate is six hours, and
+ * a leftover from last week beats it — so the suite's counts become a fact about whenever the box was
+ * last interrupted rather than about the queue. CI never sees this because its database is empty; a
+ * local one is only ever warm.
+ *
+ * Nothing outside the suite writes this table, so emptying it costs no example anybody keeps.
+ */
+async function clearMailQueue(): Promise<void> {
+  const { PrismaClient } = await import('@prisma/client');
+  const prisma = new PrismaClient();
+  try {
+    const { count } = await prisma.mailOutbox.deleteMany();
+    if (count > 0) console.log(`Cleared ${count} leftover row(s) from the mail queue`);
+  } finally {
+    await prisma.$disconnect();
   }
 }
 
