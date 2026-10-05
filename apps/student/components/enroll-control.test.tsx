@@ -2,12 +2,17 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { AuthUser, Enrollment } from '@lms/shared';
+import type { AuthUser, Enrollment, EnrollmentPayment, PlaceResponse } from '@lms/shared';
 
 import { ApiError } from '@/lib/api';
 import { EnrollControl } from './enroll-control';
 
-const enrollments = vi.hoisted(() => ({ myPlaces: vi.fn(), takePlace: vi.fn() }));
+const enrollments = vi.hoisted(() => ({
+  myPlaces: vi.fn(),
+  heldPlaces: vi.fn(),
+  takePlace: vi.fn(),
+  payForPlace: vi.fn(),
+}));
 const session = vi.hoisted(() => ({
   value: { status: 'signed-out' as string, user: null as AuthUser | null },
 }));
@@ -46,6 +51,28 @@ function place(courseId = 'b2a1'): Enrollment {
   };
 }
 
+/** A place whose money has not arrived. The row is closed and an attempt stands beside it —
+ * which is the only thing that tells it apart from a place somebody left. */
+function held(courseId = 'b2a1'): Enrollment {
+  return { ...place(courseId), isActive: false };
+}
+
+const OWED: EnrollmentPayment = {
+  id: 'p1c8',
+  amountMinorUnits: 499900,
+  currency: 'INR',
+  status: 'pending',
+  providerReference: null,
+  error: null,
+};
+
+const PAID: EnrollmentPayment = { ...OWED, status: 'completed', providerReference: 'mock-p1c8' };
+
+/** A course that cost nothing: the place opens and there is no receipt to show. */
+function free(opened = place()): PlaceResponse {
+  return { enrollment: opened, payment: null };
+}
+
 function signedIn() {
   session.value = { status: 'signed-in', user: SAM };
 }
@@ -60,9 +87,14 @@ const refused = (code: string, statusCode: number, message: string) =>
 beforeEach(() => {
   signedOut();
   // Reset, not just a new implementation: the call counts are what several of these tests
-  // assert on, and a mock that carries a previous test's presses answers them wrongly.
+  // assert on, and a mock that carries a previous test's presses answers them wrongly. The
+  // toast spies are reset for the same reason — half of what follows asks that nothing was said.
   enrollments.myPlaces.mockReset().mockResolvedValue([]);
-  enrollments.takePlace.mockReset().mockResolvedValue(place());
+  enrollments.heldPlaces.mockReset().mockResolvedValue([]);
+  enrollments.takePlace.mockReset().mockResolvedValue(free());
+  enrollments.payForPlace.mockReset().mockResolvedValue(free());
+  notify.success.mockReset();
+  notify.error.mockReset();
 });
 
 /**
@@ -152,9 +184,9 @@ describe('EnrollControl', () => {
   it('presses once, however many times the pointer tries', async () => {
     signedIn();
     enrollments.myPlaces.mockResolvedValue([]);
-    let release: (value: Enrollment) => void = () => {};
+    let release: (value: PlaceResponse) => void = () => {};
     enrollments.takePlace.mockReturnValue(
-      new Promise<Enrollment>((resolve) => {
+      new Promise<PlaceResponse>((resolve) => {
         release = resolve;
       }),
     );
@@ -165,7 +197,7 @@ describe('EnrollControl', () => {
     await userEvent.click(button);
 
     expect(enrollments.takePlace).toHaveBeenCalledTimes(1);
-    release(place());
+    release(free());
   });
 
   it('keeps the button where a course that closed refused it', async () => {
@@ -234,5 +266,170 @@ describe('EnrollControl', () => {
       expect(notify.error).toHaveBeenCalledWith(expect.stringMatching(/not a learner account/i)),
     );
     expect(notify.error).not.toHaveBeenCalledWith(expect.stringMatching(/not allowed to do that/i));
+  });
+});
+
+/**
+ * The step between asking for a place and getting one, on a course that costs something: the
+ * press opens a hold rather than a door, and the money is the second press.
+ */
+describe('EnrollControl on a priced course', () => {
+  it('offers the money rather than claiming a place that has not opened', async () => {
+    signedIn();
+    // The press answers a hold: a closed place with an attempt beside it, which is neither "in this
+    // course" nor "not enrolled". The hold read finds nothing here, because this tab is the one that
+    // created it and its own answer is the freshest copy of the row.
+    enrollments.takePlace.mockResolvedValue({ enrollment: held(), payment: OWED });
+    const onPlaceTaken = vi.fn();
+    render(<EnrollControl courseId="b2a1" onPlaceTaken={onPlaceTaken} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /enroll in this course/i }));
+
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(screen.queryByText(/in this course since/i)).not.toBeInTheDocument();
+    // The outline is still locked: `isReadable` is an answer about this reader, and this reader
+    // has not been given the course yet.
+    expect(onPlaceTaken).not.toHaveBeenCalled();
+
+    const pay = await screen.findByRole('button', { name: /pay ₹4,999\.00/i });
+    expect(pay).toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: /enroll in this course/i }),
+    ).not.toBeInTheDocument();
+  });
+
+  it('opens the place the moment the charge comes back', async () => {
+    signedIn();
+    enrollments.takePlace.mockResolvedValue({ enrollment: held(), payment: OWED });
+    enrollments.payForPlace.mockResolvedValue({ enrollment: place(), payment: PAID });
+    const onPlaceTaken = vi.fn();
+    render(<EnrollControl courseId="b2a1" onPlaceTaken={onPlaceTaken} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /enroll in this course/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /pay ₹4,999\.00/i }));
+
+    // The press is against the place, not the attempt: a student acts on the course they asked
+    // for, and the API finds the newest attempt on it.
+    await waitFor(() => expect(enrollments.payForPlace).toHaveBeenCalledWith('e7f2'));
+    expect(onPlaceTaken).toHaveBeenCalled();
+    await screen.findByText(/20 Sept 2026/i);
+    expect(screen.queryByRole('button', { name: /pay /i })).not.toBeInTheDocument();
+  });
+
+  it('says why the charge was refused and asks for the same amount again', async () => {
+    signedIn();
+    enrollments.takePlace.mockResolvedValue({ enrollment: held(), payment: OWED });
+    enrollments.payForPlace.mockResolvedValue({
+      enrollment: held(),
+      payment: { ...OWED, status: 'failed', error: 'The card was declined.' },
+    });
+    const onPlaceTaken = vi.fn();
+    render(<EnrollControl courseId="b2a1" onPlaceTaken={onPlaceTaken} />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /enroll in this course/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /pay ₹4,999\.00/i }));
+
+    // A refusal is `200` with the attempt marked `failed`: the place moved into a state, and the
+    // reason the ledger holds is the only thing the reader can act on. The door did not open, so
+    // nothing above it is re-read and nothing is claimed about it.
+    await screen.findByText(/The card was declined\./i);
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(onPlaceTaken).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /pay ₹4,999\.00/i })).toBeInTheDocument();
+  });
+
+  it('leaves the money standing when the pay press never gets an answer', async () => {
+    signedIn();
+    enrollments.takePlace.mockResolvedValue({ enrollment: held(), payment: OWED });
+    enrollments.payForPlace.mockRejectedValueOnce(
+      refused('SERVICE_UNAVAILABLE', 503, 'This platform is not wired to take a payment.'),
+    );
+    render(<EnrollControl courseId="b2a1" />);
+
+    await userEvent.click(await screen.findByRole('button', { name: /enroll in this course/i }));
+    await userEvent.click(await screen.findByRole('button', { name: /pay ₹4,999\.00/i }));
+
+    // The hold is still there and nothing about it changed, so the button that could settle it
+    // has to stay exactly where it was.
+    await waitFor(() => expect(notify.error).toHaveBeenCalled());
+    expect(screen.getByRole('button', { name: /pay ₹4,999\.00/i })).toBeInTheDocument();
+  });
+});
+
+/**
+ * The hold that outlives the tab that made it.
+ *
+ * A student who pressed Enroll on a priced course and then reloaded came back to a page that did not
+ * know them: `GET /enrollments` lists places that are open, and a place waiting on money is not one,
+ * so the only way to see the amount again was to press Enroll and hope. These tests are the second
+ * read — the one that finds the hold on arrival — and the line the screen draws when it cannot be
+ * heard at all.
+ */
+describe('EnrollControl finds a hold on arrival', () => {
+  it('shows the money for a hold this tab did not press', async () => {
+    signedIn();
+    enrollments.myPlaces.mockResolvedValue([]);
+    enrollments.heldPlaces.mockResolvedValue([{ enrollment: held(), payment: OWED }]);
+    const onPlaceTaken = vi.fn();
+    render(<EnrollControl courseId="b2a1" onPlaceTaken={onPlaceTaken} />);
+
+    const pay = await screen.findByRole('button', { name: /pay ₹4,999\.00/i });
+    expect(pay).toBeInTheDocument();
+    expect(enrollments.heldPlaces).toHaveBeenCalledTimes(1);
+    // Neither of the two lies this screen can tell: that the place is open, or that nothing was
+    // ever asked for.
+    expect(
+      screen.queryByRole('button', { name: /enroll in this course/i }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText(/in this course since/i)).not.toBeInTheDocument();
+    expect(notify.success).not.toHaveBeenCalled();
+    expect(onPlaceTaken).not.toHaveBeenCalled();
+  });
+
+  it('prints the reason a standing attempt was refused, without a press to earn it', async () => {
+    signedIn();
+    enrollments.heldPlaces.mockResolvedValue([
+      {
+        enrollment: held(),
+        payment: { ...OWED, status: 'failed', error: 'The card was declined.' },
+      },
+    ]);
+    render(<EnrollControl courseId="b2a1" />);
+
+    // The ledger already holds the line, so a reload says it rather than showing a bare button and
+    // letting the student find out the same way twice.
+    await screen.findByText(/The card was declined\./i);
+    expect(screen.getByRole('button', { name: /pay ₹4,999\.00/i })).toBeInTheDocument();
+  });
+
+  it('will not offer the money for a hold in another course', async () => {
+    signedIn();
+    enrollments.heldPlaces.mockResolvedValue([{ enrollment: held('c9other'), payment: OWED }]);
+    render(<EnrollControl courseId="b2a1" />);
+
+    // The hold is real and belongs to this student — just not to this page.
+    await screen.findByRole('button', { name: /enroll in this course/i });
+    expect(screen.queryByRole('button', { name: /pay /i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the button when the hold cannot be read', async () => {
+    signedIn();
+    enrollments.heldPlaces.mockRejectedValueOnce(
+      refused('INTERNAL', 500, 'Something went wrong. Please try again.'),
+    );
+    render(<EnrollControl courseId="b2a1" />);
+
+    // Nothing is lost by the failure, only the shortcut: a press answers the standing attempt with
+    // itself, same id and same amount, so the worst this screen can do is make the student ask twice.
+    const button = await screen.findByRole('button', { name: /enroll in this course/i });
+    expect(button).toBeInTheDocument();
+    expect(screen.getByText(/could not check/i)).toBeInTheDocument();
+  });
+
+  it('does not ask for a hold nobody is signed in to read', () => {
+    signedOut();
+    render(<EnrollControl courseId="b2a1" />);
+
+    expect(enrollments.heldPlaces).not.toHaveBeenCalled();
   });
 });

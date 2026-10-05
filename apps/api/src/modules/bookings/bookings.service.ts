@@ -11,6 +11,7 @@ import {
   API_ERROR_CODES,
   BLOCKING_BOOKING_STATUSES,
   BOOKING_HORIZON_DAYS,
+  BOOKING_MARK_CODES,
   BOOKING_STATUS_CODES,
   BOOKING_TYPE_CODES,
   CANCELLABLE_BOOKING_STATUSES,
@@ -25,6 +26,7 @@ import {
   slotAt,
   stretchesOverlap,
   type Booking,
+  type BookingMarkCode,
   type BookingRequest,
   type BookingRoom,
   type BookingStatusCode,
@@ -168,6 +170,37 @@ function changedElsewhere(): ConflictException {
   return new ConflictException({
     code: API_ERROR_CODES.CONFLICT,
     message: 'This class changed while you were deciding. Refresh to see it.',
+  });
+}
+
+/** Pressed a mark on a class that has not begun. Attendance is a report about an event, and a report
+ * filed before the event is a prediction — which is the one thing this platform has no door for.
+ * Judged on the class's own start rather than its end, because a teacher who ran a short lesson, or
+ * sat in an empty room and gave up on it, knows how it finished before the clock does. */
+function notBegun(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'A class that has not started has nothing to mark yet.',
+  });
+}
+
+/** Pressed a mark on a class that is not a standing confirmed one: a request still waiting for its
+ * answer, a refusal, an expiry, a cancellation. Each already says what became of the class, and
+ * putting a mark over any of them would report a class that never stood as one that was missed. */
+function notAClassThatStood(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'Only a confirmed class can be marked off.',
+  });
+}
+
+/** Pressed the *other* word on a class that has one already. A second press of the same word is a
+ * retry and answers with the class as it stands; a different word is a teacher correcting a record,
+ * and a class cannot have both happened and not happened. */
+function alreadyMarked(): ConflictException {
+  return new ConflictException({
+    code: API_ERROR_CODES.CONFLICT,
+    message: 'This class has already been marked off, so it cannot be marked a second way.',
   });
 }
 
@@ -580,6 +613,79 @@ export class BookingsService {
     if (outcome.outcome === 'missing') throw notFoundBooking();
     if (outcome.outcome === 'not-standing') throw alreadyAnswered();
     if (outcome.outcome === 'changed') throw changedElsewhere();
+
+    return toBooking(outcome.booking);
+  }
+
+  /**
+   * Mark off a class that has gone by: it happened, or the student never came.
+   *
+   * A cohort class has a roll because it has a room full of names, and who stood for each of them is
+   * a row under the class. A one-to-one has one name, and that name is the class — so its attendance
+   * is not a sheet beside the booking but the booking's own status, and the two words the teacher
+   * presses are the two states the table has carried since Phase 4 with nothing able to write them.
+   *
+   * The refusals are read before the write, and they are the reason for the read: the swap answers
+   * `not-standing` for a class that has not begun, a class that never stood, and a class marked the
+   * other word already, which are three different things a teacher needs told apart. The read is
+   * authoritative for *which* sentence a refusal gets and never for *whether* the write lands — a
+   * class the student cancelled in the moment between the two is still caught by the swap, and
+   * comes back as the class having changed rather than as a mark that succeeded.
+   *
+   * Same word twice, and the class comes back as it stands with one record behind it. A lost response
+   * is a retry rather than a second decision, and a ledger holding both copies would tell an operator
+   * the teacher marked the class twice.
+   *
+   * No letter is filed. The four booking mails each ask something of the person who reads them; a
+   * mark reports a class that is already over, and the student reads how it ended on their own list.
+   */
+  async markAttendance(
+    teacherUserId: string,
+    bookingId: string,
+    mark: BookingMarkCode,
+  ): Promise<Booking> {
+    const standing = UUID.test(bookingId)
+      ? await this.bookings.markTarget(bookingId, teacherUserId)
+      : null;
+    if (!standing) throw notFoundBooking();
+
+    const state = standing.status.code as BookingStatusCode;
+    if (state === BOOKING_STATUS_CODES.CONFIRMED && standing.startsAt > new Date()) {
+      throw notBegun();
+    }
+    if (state !== BOOKING_STATUS_CODES.CONFIRMED && state !== mark) {
+      const already =
+        state === BOOKING_STATUS_CODES.COMPLETED || state === BOOKING_STATUS_CODES.NO_SHOW;
+      throw already ? alreadyMarked() : notAClassThatStood();
+    }
+
+    const outcome = await this.bookings.markOwned({
+      bookingId,
+      teacherUserId,
+      confirmedStatusValueId: await this.reference.valueId(
+        LKP_TYPE_CODES.BOOKING_STATUS,
+        BOOKING_STATUS_CODES.CONFIRMED,
+      ),
+      markStatusValueId: await this.reference.valueId(LKP_TYPE_CODES.BOOKING_STATUS, mark),
+      // The one action of the two that this press is, chosen by the word that was sent — the same
+      // shape as `answer`, where a confirm recorded as a refusal would be a fault in this line and
+      // not in the log. `from` is read inside the write, because the row stops holding the state it
+      // left the moment the swap lands.
+      record: (tx, change) =>
+        this.actions.record(tx, {
+          action:
+            mark === BOOKING_MARK_CODES.COMPLETED
+              ? ACTION_CODES.BOOKING_COMPLETED
+              : ACTION_CODES.BOOKING_NO_SHOW,
+          targetId: change.booking.id,
+          detail: { from: change.from, to: mark },
+        }),
+    });
+
+    if (outcome.outcome === 'missing') throw notFoundBooking();
+    if (outcome.outcome === 'not-standing' || outcome.outcome === 'changed') {
+      throw changedElsewhere();
+    }
 
     return toBooking(outcome.booking);
   }

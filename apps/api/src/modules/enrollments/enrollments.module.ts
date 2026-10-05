@@ -3,6 +3,7 @@ import { Module } from '@nestjs/common';
 import { ActionLogModule } from '../action-log/action-log.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { CouponModule } from '../coupons/coupon.module';
+import { PaymentModule } from '../../providers/payment/payment.module';
 import { CourseRosterController } from './course-roster.controller';
 import { EnrollmentsController } from './enrollments.controller';
 import { EnrollmentsRepository } from './enrollments.repository';
@@ -32,9 +33,14 @@ import { EnrollmentsService } from './enrollments.service';
  * Those are the reasons this module reaches outside itself — neither table has an opinion about
  * places, and a service that owned its own outbox insert would be a second place where "what just
  * happened" is decided twice, once by the write and once afterwards.
+ *
+ * `PaymentModule` is reached for the same kind of reason and in the opposite direction: the module
+ * decides *when* a place opens — on a price of nothing, or on a charge that came back settled — and
+ * nothing else decides whether this box can ask for money. Reading `PAYMENT_PROVIDER` here would put
+ * the deployment's payment configuration in a second place, one per route that touches money.
  */
 @Module({
-  imports: [ActionLogModule, NotificationsModule, CouponModule],
+  imports: [ActionLogModule, NotificationsModule, CouponModule, PaymentModule],
   controllers: [EnrollmentsController, CourseRosterController],
   providers: [EnrollmentsService, EnrollmentsRepository],
   // "Does this student hold a place" is the first question a booking calendar asks, and the row it

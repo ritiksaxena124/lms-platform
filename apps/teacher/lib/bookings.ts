@@ -1,4 +1,4 @@
-import type { Booking, BookingRequest, BookingRoomResponse } from '@lms/shared';
+import type { Booking, BookingMarkCode, BookingRequest, BookingRoomResponse } from '@lms/shared';
 
 import { apiJson } from './api';
 
@@ -46,6 +46,23 @@ export async function confirmRequest(id: string): Promise<Booking> {
 export async function refuseRequest(id: string): Promise<Booking> {
   const { booking } = await apiJson<{ booking: Booking }>(`${path(id)}/reject`, {
     method: 'POST',
+  });
+  return booking;
+}
+
+/**
+ * Say what became of a class that has gone by: it happened, or the student never came.
+ *
+ * One route carrying the one word, rather than two routes beside the confirm and the refuse. The
+ * answer to an ask is a fork a teacher walks one way or the other, so each half got its own door;
+ * a mark is one act — remembering how a class ended — with two possible reports of it. A body the
+ * client could get wrong is also a body the server refuses, and the row's own state decides which
+ * word is still available.
+ */
+export async function markClass(id: string, mark: BookingMarkCode): Promise<Booking> {
+  const { booking } = await apiJson<{ booking: Booking }>(`${path(id)}/attendance`, {
+    method: 'POST',
+    body: { status: mark },
   });
   return booking;
 }

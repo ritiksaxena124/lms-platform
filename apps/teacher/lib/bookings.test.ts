@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { BookingRequest } from '@lms/shared';
 
-import { confirmRequest, joinRoom, listClasses, listRequests, refuseRequest } from './bookings';
+import { confirmRequest, joinRoom, listClasses, listRequests, markClass, refuseRequest } from './bookings';
 
 const BASE_URL = 'http://api.localtest.me:4000';
 
@@ -178,6 +178,57 @@ describe('joinRoom', () => {
     await expect(joinRoom('b1')).rejects.toMatchObject({
       code: 'CONFLICT',
       message: "This class's room is not open yet.",
+    });
+  });
+});
+
+/**
+ * The word a class ends on.
+ *
+ * One route and one field, because a mark is the smallest decision in this module: the teacher was
+ * in the room and says whether the student came. Unlike the confirm and the refuse it carries a
+ * body rather than naming itself in the path, because the two words are one act on one row — the
+ * same press, and the teacher choosing which way it went — rather than two doors a screen could
+ * walk to by accident.
+ */
+describe('markClass', () => {
+  it('sends the one word it chose to the attendance route', async () => {
+    await expect(markClass('b1', 'completed')).resolves.toMatchObject({ id: 'b1' });
+
+    expect(requestAt(0)).toMatchObject({
+      url: `${BASE_URL}/api/v1/bookings/b1/attendance`,
+      method: 'POST',
+    });
+    expect(JSON.parse(requestAt(0).body ?? '')).toEqual({ status: 'completed' });
+  });
+
+  it('sends the other word the same way', async () => {
+    await markClass('b1', 'no_show');
+
+    expect(JSON.parse(requestAt(0).body ?? '')).toEqual({ status: 'no_show' });
+  });
+
+  it('escapes the class it marks, like every other booking route', async () => {
+    await markClass('b1/attendance', 'completed');
+
+    expect(requestAt(0).url).toBe(`${BASE_URL}/api/v1/bookings/b1%2Fattendance/attendance`);
+  });
+
+  it('hands back the reason a mark was refused, so the row can say it out loud', async () => {
+    fetchMock.mockResolvedValueOnce(
+      jsonResponse(
+        {
+          statusCode: 409,
+          code: 'CONFLICT',
+          message: 'A class that has not started has nothing to mark yet.',
+        },
+        409,
+      ),
+    );
+
+    await expect(markClass('b1', 'completed')).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'A class that has not started has nothing to mark yet.',
     });
   });
 });
