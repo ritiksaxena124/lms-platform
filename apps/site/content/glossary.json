@@ -15,7 +15,7 @@
   "instant-book": "A booking the system confirms the moment it is asked for rather than leaving it for the teacher.",
   "retire": "To take a row out of use by clearing its active flag, leaving the row and everything that points at it.",
   "outbox": "The queue of messages the platform means to send, delivered by a scheduled sweep rather than by the request that wrote it.",
-  "port": "The name for the boundary an outside system sits behind, such as mail, video or storage, and not for a network socket.",
+  "port": "The name for the boundary an outside system sits behind, such as mail, storage, video or payment, and not for a network socket.",
   "redemption": "One use of a coupon, counted against the cap the teacher set on it.",
   "minor units": "An amount stored as a count of the smallest unit of its currency, so 50000 read alongside INR is five hundred rupees."
 }

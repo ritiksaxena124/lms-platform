@@ -16,15 +16,17 @@ import {
   type StatusTone,
 } from '@lms/ui';
 import {
+  BOOKING_MARK_CODES,
   BOOKING_STATUS_CODES,
   BOOKING_STATUS_LABELS,
+  type BookingMarkCode,
   type BookingRequest,
   type BookingStatusCode,
   type LiveClassDoor,
 } from '@lms/shared';
 
 import { describeFailure } from '@/lib/api';
-import { joinRoom, listClasses } from '@/lib/bookings';
+import { joinRoom, listClasses, markClass } from '@/lib/bookings';
 import { formatClassWindow, formatInstant } from '@/lib/dates';
 
 import { useSession } from './session-provider';
@@ -48,6 +50,26 @@ function isComingUp(booking: BookingRequest, now: number): boolean {
   return Date.parse(booking.startsAt) > now;
 }
 
+/** The two words that end a class, in the order a teacher reaches for them.
+ *
+ * Screen-local wording, deliberately: `BOOKING_STATUS_LABELS` says what a row *is* — "Completed",
+ * "No show" — and both portals read that from the API. These are verbs on a button, and "Mark
+ * taught" is the thing a person is doing. */
+const MARKS: { code: BookingMarkCode; word: string; said: string }[] = [
+  { code: BOOKING_MARK_CODES.COMPLETED, word: 'Mark taught', said: 'Marked taught' },
+  { code: BOOKING_MARK_CODES.NO_SHOW, word: 'Mark missed', said: 'Marked missed' },
+];
+
+/** A confirmed class whose first minute has arrived is the only row with a mark left to give.
+ *
+ * Judged on the start and not the end, because a teacher who ran a short lesson, or sat in an empty
+ * room and gave up on it, knows how it finished before the clock does. This is courtesy rather than
+ * the rule — the route refuses the same presses again on the server's clock, and a row that went
+ * stale while the page stood open is corrected by the re-read the press ends with. */
+function isMarkable(booking: BookingRequest, clock: number): boolean {
+  return booking.status === BOOKING_STATUS_CODES.CONFIRMED && Date.parse(booking.startsAt) <= clock;
+}
+
 /**
  * The teacher's classes, in the order they happen.
  *
@@ -58,10 +80,10 @@ function isComingUp(booking: BookingRequest, now: number): boolean {
  * Monday is, next to the word that explains why you are not teaching it.
  *
  * Splitting on anything else breaks in both directions. On the status alone, a confirmed class
- * stays "coming up" after its hour has gone, because Phase 4 has nothing that marks a class
- * taught; on whether the minute is still held, a refused request that was never going to happen
- * moves out of the week it belongs to. The date is the one fact here that does not change when
- * somebody answers.
+ * stays "coming up" until somebody marks it off, and a teacher who meant to press the word after
+ * Thursday and never did would keep seeing a class from last week as one still to prepare for; on
+ * whether the minute is still held, a refused request that was never going to happen moves out of
+ * the week it belongs to. The date is the one fact here that does not change when somebody answers.
  *
  * The instant the split is made against arrives with the read rather than being taken while
  * rendering: a clock in the render body gives the server one schedule and the browser another,
@@ -171,6 +193,7 @@ export function TeacherClasses() {
         bookings={upcoming}
         timezone={user?.timezone}
         clock={doorClock}
+        onMarked={reload}
         empty="Nothing is waiting to happen yet."
       />
       {earlier.length > 0 ? (
@@ -179,6 +202,7 @@ export function TeacherClasses() {
           bookings={earlier}
           timezone={user?.timezone}
           clock={doorClock}
+          onMarked={reload}
           empty="Nothing has been and gone."
         />
       ) : null}
@@ -215,6 +239,7 @@ function Section({
   bookings,
   timezone,
   clock,
+  onMarked,
   empty,
 }: {
   heading: string;
@@ -222,6 +247,9 @@ function Section({
   timezone: string | null | undefined;
   /** The instant the doors are judged against, which moves while the page stands open. */
   clock: number;
+  /** Called after a mark is pressed, whichever way the press went, so the word on the row is read
+   * back from the table rather than left as the one a button was labelled with. */
+  onMarked: () => void;
   empty: string;
 }) {
   return (
@@ -273,6 +301,10 @@ function Section({
                   timezone={timezone}
                   clock={clock}
                 />
+              ) : null}
+
+              {isMarkable(booking, clock) ? (
+                <ClassMark booking={booking} onMarked={onMarked} />
               ) : null}
             </li>
           ))}
@@ -364,5 +396,57 @@ function ClassDoor({
         />
       ) : null}
     </>
+  );
+}
+
+/**
+ * The word a class ends on.
+ *
+ * Two buttons, because there are two things that can be true of a class that has gone by and a
+ * teacher is the only person who knows which. Pressing one is the smallest decision on this screen
+ * — one row, one word, nothing to type — so it goes where the class already is rather than on a
+ * roll page of its own: a one-to-one has one name, and that name is the class.
+ *
+ * The row is re-read whichever way the press went, success or refusal. What a class says afterwards
+ * is what the table answered, and a 409 here means the row this page drew was not the class any
+ * more — somebody cancelled it, or it was marked from another tab — so the same fetch that shows
+ * the new word is what shows the reason the old one was refused.
+ */
+function ClassMark({ booking, onMarked }: { booking: BookingRequest; onMarked: () => void }) {
+  const [pressed, setPressed] = useState<BookingMarkCode | null>(null);
+
+  const busy = pressed !== null;
+
+  async function mark(code: BookingMarkCode, said: string): Promise<void> {
+    setPressed(code);
+    try {
+      await markClass(booking.id, code);
+      notify.success(said);
+    } catch (error) {
+      // The API's sentence is the one worth reading: it says which of the four refusals this class
+      // got, and the difference between them is a fact about the teacher's own week.
+      notify.error(describeFailure(error));
+    } finally {
+      setPressed(null);
+      onMarked();
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-1.5">
+      {MARKS.map((word) => (
+        <Button
+          key={word.code}
+          type="button"
+          size="sm"
+          variant="secondary"
+          disabled={busy}
+          loading={pressed === word.code}
+          onClick={() => void mark(word.code, word.said)}
+        >
+          {word.word}
+        </Button>
+      ))}
+    </div>
   );
 }
